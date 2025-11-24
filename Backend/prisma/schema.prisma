@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  employee
+  admin
+}
+
+enum AppointmentStatus {
+  Завершен
+  Подтвержден
+  Новый
+  Отменен
+}
+
+// done
+model User {
+  id       Int      @id @default(autoincrement())
+  name     String?
+  login    String   @unique
+  password String
+  role     Role?
+  master   Master?  @relation(fields: [masterId], references: [id])
+  masterId Int?     @map("master_id")
+  isActive Boolean? @default(true) @map("is_active")
+
+  @@map("user")
+}
+
+// done
+model Master {
+  id              Int              @id @default(autoincrement())
+  surname         String
+  name            String
+  middlename      String           @map("middle_name")
+  specialization  String
+  phone           String           @unique
+  isActive        Boolean          @default(true) @map("is_active")
+  photo           String?
+  servicePrices   ServicePrice[]
+  appointments    Appointment[]
+  masterSchedules MasterSchedule[]
+  users           User[]
+
+  @@map("master")
+}
+
+//done
+model MasterSchedule {
+  id        Int      @id @default(autoincrement())
+  master    Master   @relation(fields: [masterID], references: [id])
+  masterID  Int      @map("master_id")
+  dayOfWeek Int      @map("day_of_week")
+  startTime DateTime @map("start_time")
+  endTime   DateTime @map("end_time")
+
+  @@map("master_schedule")
+}
+
+// done
+model Category {
+  id       Int       @id @default(autoincrement())
+  title    String    @unique
+  isActive Boolean   @default(true) @map("is_active")
+  services Service[]
+
+  @@map("category")
+}
+
+// done
+model Service {
+  id            Int            @id @default(autoincrement())
+  title         String
+  description   String
+  duration      Int
+  img           String?
+  isActive      Boolean        @default(true) @map("is_active")
+  category      Category       @relation(fields: [categoryId], references: [id])
+  categoryId    Int            @map("category_id")
+  servicePrices ServicePrice[]
+  appointments  Appointment[]
+
+  @@map("service")
+}
+
+//done
+model ServicePrice {
+  id        Int     @id @default(autoincrement())
+  service   Service @relation(fields: [serviceId], references: [id])
+  serviceId Int     @map("service_id")
+  master    Master  @relation(fields: [masterID], references: [id])
+  masterID  Int     @map("master_id")
+  price     Decimal @db.Decimal(10, 2)
+  isActive  Boolean @default(true) @map("is_active")
+
+  @@map("service_price")
+}
+
+model Appointment {
+  id              Int               @id @default(autoincrement())
+  clientSurname   String            @map("client_surname")
+  clientName      String            @map("client_name")
+  clientPhone     String            @map("client_phone")
+  master          Master            @relation(fields: [masterID], references: [id])
+  masterID        Int               @map("master_id")
+  service         Service           @relation(fields: [serviceId], references: [id])
+  serviceId       Int               @map("service_id")
+  appointmentTime DateTime          @map("appointment_time")
+  price           Decimal           @db.Decimal(10, 2)
+  status          AppointmentStatus @default(Новый)
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  @@unique([masterID, appointmentTime])
+  @@map("appointment")
+}
