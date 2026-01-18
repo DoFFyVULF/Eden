@@ -13,7 +13,9 @@ import {
 import { CategoryService } from './category.service';
 import { CategoryDto } from './dto/category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { Auth } from 'src/auth/decorators/auth.decorator';
 
+@Auth()
 @Controller('category')
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}

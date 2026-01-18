@@ -1,17 +1,17 @@
-import { IsInt, IsDateString, Min, Max } from 'class-validator';
+// src/master-schedule/dto/master-schedule.dto.ts
+import { IsNumber, IsString, IsOptional } from 'class-validator';
 
 export class MasterScheduleDto {
-  @IsInt()
+  @IsNumber()
   masterId: number;
 
-  @IsInt()
-  @Min(0)
-  @Max(6)
-  dayOfWeek: number; 
+  @IsNumber()
+  @IsOptional() // ← обязательно!
+  dayOfWeek?: number;
 
-  @IsDateString()
-  startTime: string; 
+  @IsString()
+  startTime: string; // ISO 8601
 
-  @IsDateString()
+  @IsString()
   endTime: string;
 }

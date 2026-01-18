@@ -12,7 +12,9 @@ import {
 import { ServiceService } from './service.service';
 import { ServiceDto } from './dto/service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
+import { Auth } from 'src/auth/decorators/auth.decorator';
 
+@Auth()
 @Controller('service')
 export class ServiceController {
   constructor(private readonly serviceService: ServiceService) {}

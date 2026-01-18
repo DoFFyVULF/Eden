@@ -1,14 +1,14 @@
-import { axiosClassic } from "@/api/interceptors";
+import { axiosWithAuth } from "@/api/interceptors";
 import { IMaster } from "@/types/masters.type";
 
 export const masterService = {
   async getAll(): Promise<IMaster[]> {
-    const { data } = await axiosClassic.get<IMaster[]>("/master");
+    const { data } = await axiosWithAuth.get<IMaster[]>("/master");
     return data;
   },
 
   async getById(id: number): Promise<IMaster> {
-    const { data } = await axiosClassic.get<IMaster>(`/master/${id}`);
+    const { data } = await axiosWithAuth.get<IMaster>(`/master/${id}`);
     return data;
   },
 
@@ -21,7 +21,7 @@ export const masterService = {
     phone?: string;
     isActive?: boolean;
   }): Promise<IMaster> {
-    const { data } = await axiosClassic.post<IMaster>(`/master`, {
+    const { data } = await axiosWithAuth.post<IMaster>(`/master`, {
       name: dto.name,
       surname: dto.surname,
       middlename: dto.middlename,
@@ -46,11 +46,11 @@ export const masterService = {
       isActive?: boolean;
     }
   ): Promise<IMaster> {
-    const { data } = await axiosClassic.patch<IMaster>(`/master/${id}`, dto);
+    const { data } = await axiosWithAuth.patch<IMaster>(`/master/${id}`, dto);
     return data;
   },
 
   async delete(id: number): Promise<void> {
-    await axiosClassic.delete(`/master/${id}`);
+    await axiosWithAuth.delete(`/master/${id}`);
   },
 };

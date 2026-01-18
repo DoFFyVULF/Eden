@@ -1,15 +1,20 @@
-import { axiosClassic } from "@/api/interceptors";
+import { axiosWithAuth } from "@/api/interceptors";
 import { IServicePrice } from "@/types/service-price.types";
 
 export const servicePriceService = {
   async getAll(): Promise<IServicePrice[]> {
-    const { data } = await axiosClassic.get<IServicePrice[]>("/service-price");
+    const { data } = await axiosWithAuth.get<IServicePrice[]>("/service-price");
     return data;
   },
 
   async getById(id: number): Promise<IServicePrice> {
-    const { data } = await axiosClassic.get<IServicePrice>(
-      `/service-price/${id}`
+    const { data } = await axiosWithAuth.get<IServicePrice>(`/service-price/${id}`);
+    return data;
+  },
+
+  async getByMaster(masterId: number): Promise<IServicePrice[]> {
+    const { data } = await axiosWithAuth.get<IServicePrice[]>(
+      `/service-price/master/${masterId}` 
     );
     return data;
   },
@@ -18,38 +23,34 @@ export const servicePriceService = {
     serviceId: number;
     masterId: number;
     price: number;
-    isActive: boolean;
+    isActive?: boolean;
   }): Promise<IServicePrice> {
-    const { data } = await axiosClassic.post<IServicePrice>("/service-price", {
+    const { data } = await axiosWithAuth.post<IServicePrice>("/service-price", {
       serviceId: dto.serviceId,
       masterId: dto.masterId,
       price: dto.price,
-      isActive: dto.isActive ?? true,
+      isActive: dto.isActive ?? true
     });
-
     return data;
   },
 
   async update(
     id: number,
     dto: {
-      serviceId: number;
-      masterId: number;
-      price: number;
-      isActive: boolean;
+      serviceId?: number;
+      masterId?: number;
+      price?: number;
+      isActive?: boolean;
     }
   ): Promise<IServicePrice> {
-    const { data } = await axiosClassic.patch<IServicePrice>(
+    const { data } = await axiosWithAuth.patch<IServicePrice>(
       `/service-price/${id}`,
       dto
     );
     return data;
   },
 
-  async delete(id: number): Promise<{ message: string }> {
-    const { data } = await axiosClassic.delete<{ message: string }>(
-      `/service/${id}`
-    );
-    return data;
-  },
+  async delete(id: number): Promise<void> {
+    await axiosWithAuth.delete(`/service-price/${id}`);
+  }
 };

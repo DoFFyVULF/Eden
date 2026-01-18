@@ -33,22 +33,6 @@ export class AuthService {
     };
   }
 
-  async register(dto: AuthDto) {
-    const olderUser = await this.userService.getByLogin(dto.login);
-
-    if (olderUser) throw new BadRequestException('User already exists');
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...user } = await this.userService.create(dto);
-
-    const tokens = this.issueTokens(user.id);
-
-    return {
-      user,
-      ...tokens
-    };
-  }
-
   private issueTokens(userId: number) {
     const data = { id: userId };
 
@@ -74,46 +58,52 @@ export class AuthService {
   }
 
   async getNewTokens(refreshToken: string) {
-  const result = await this.jwt.verifyAsync(refreshToken);
+    const result = await this.jwt.verifyAsync(refreshToken);
 
-  if (!result) throw new UnauthorizedException('Invalid refresh token');
+    if (!result) throw new UnauthorizedException('Invalid refresh token');
 
-  const user = await this.userService.getById(result.id);
+    const user = await this.userService.getById(result.id);
 
-  if (!user) {
-    throw new UnauthorizedException('User not found');
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const { password, ...userWithoutPassword } = user;
+
+    const tokens = this.issueTokens(user.id);
+
+    return {
+      user: userWithoutPassword,
+      ...tokens
+    };
   }
-
-  const { password, ...userWithoutPassword } = user;
-
-  const tokens = this.issueTokens(user.id);
-
-  return {
-    user: userWithoutPassword,
-    ...tokens
-  };
-}
 
   addRefreshTokenToResponse(res: Response, refreshToken: string) {
     const expiresIn = new Date();
     expiresIn.setDate(expiresIn.getDate() + this.EXPIRE_DAY_REFRESH_TOKEN);
 
+    const isProd = process.env.NODE_ENV === 'production';
+
     res.cookie(this.REFRESH_TOKEN_NAME, refreshToken, {
       httpOnly: true,
-      domain: 'localhost',
       expires: expiresIn,
-      secure: true,
-      sameSite: 'none'
+      secure: isProd, // true ТОЛЬКО в prod
+      sameSite: isProd ? 'none' : 'lax', // none только для HTTPS
+      path: '/' // обязательно
+      // domain НЕ указываем
     });
   }
 
   removeRefreshTokenToResponse(res: Response) {
+    const isProd = process.env.NODE_ENV === 'production';
+
     res.cookie(this.REFRESH_TOKEN_NAME, '', {
       httpOnly: true,
-      domain: 'localhost',
       expires: new Date(0),
-      secure: true,
-      sameSite: 'none'
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      path: '/'
+      // domain НЕ указываем
     });
   }
 }

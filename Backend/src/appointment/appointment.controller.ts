@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import {
   Controller,
   Get,
@@ -7,12 +9,16 @@ import {
   Param,
   Delete,
   ParseIntPipe,
-  HttpCode
+  HttpCode,
+  Query
 } from '@nestjs/common';
 import { AppointmentService } from './appointment.service';
 import { AppointmentDto } from './dto/appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
+import { Auth } from 'src/auth/decorators/auth.decorator';
+import { AppointmentStatus } from 'generated/prisma/enums';
 
+@Auth()
 @Controller('appointment')
 export class AppointmentController {
   constructor(private readonly appointmentService: AppointmentService) {}
@@ -23,9 +29,28 @@ export class AppointmentController {
     return this.appointmentService.create(dto);
   }
 
+  // GET /appointment?date=YYYY-MM-DD&masterId=1&status=Завершен
   @HttpCode(200)
   @Get()
-  findAll() {
+  find(
+    @Query('date') date?: string,
+    @Query('masterId') masterId?: string,
+    @Query('status') status?: AppointmentStatus
+  ) {
+    // Фильтр по статусу
+    if (status) {
+      return this.appointmentService.findByStatus(status);
+    }
+
+    // Фильтр по дате
+    if (date) {
+      return this.appointmentService.findByDate(
+        date,
+        masterId ? Number(masterId) : undefined
+      );
+    }
+
+    // Все записи
     return this.appointmentService.findAll();
   }
 

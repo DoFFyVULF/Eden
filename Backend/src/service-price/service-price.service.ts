@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Injectable, NotFoundException } from '@nestjs/common';
@@ -15,10 +16,18 @@ export class ServicePriceService {
     });
 
     if (!servicePrice) {
-      throw new NotFoundException(`Цена на услугу  с ID ${id} не найдена`);
+      throw new NotFoundException(`Цена на услугу с ID ${id} не найдена`);
     }
 
     return servicePrice;
+  }
+
+  async getByMaster(masterID: number) {
+    return this.prisma.servicePrice.findMany({
+      where: { masterID },
+      include: { service: true, master: true },
+      orderBy: { id: 'asc' }
+    });
   }
 
   async create(dto: ServicePriceDto) {
@@ -42,36 +51,33 @@ export class ServicePriceService {
         service: { connect: { id: dto.serviceId } },
         master: { connect: { id: dto.masterId } },
         price: dto.price,
-        isActive: dto.isActive ?? true
+        isActive: dto.isActive ?? true,
+        durationOverride: dto.durationOverride ?? null
       },
       include: { master: true, service: true }
     });
   }
 
-async update(id: number, dto: UpdateServicePriceDto) {
-  await this.getById(id);
+  async update(id: number, dto: UpdateServicePriceDto) {
+    await this.getById(id);
 
-  const data: any = {
-    price: dto.price,
-    isActive: dto.isActive
-  };
+    const data: any = {};
 
-  if (dto.serviceId) {
-    data.service = { connect: { id: dto.serviceId } };
+    if (dto.price !== undefined) data.price = dto.price;
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    if (dto.serviceId) data.service = { connect: { id: dto.serviceId } };
+    if (dto.masterId) data.master = { connect: { id: dto.masterId } };
+
+    if (dto.durationOverride !== undefined) {
+      data.durationOverride = dto.durationOverride;
+    }
+
+    return this.prisma.servicePrice.update({
+      where: { id },
+      data,
+      include: { master: true, service: true }
+    });
   }
-
-  if (dto.masterId) {
-    data.master = { connect: { id: dto.masterId } };
-  }
-
-  return this.prisma.servicePrice.update({
-    where: { id },
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    data,
-    include: { master: true, service: true }
-  });
-}
-
 
   async getAll() {
     return this.prisma.servicePrice.findMany({
@@ -83,5 +89,9 @@ async update(id: number, dto: UpdateServicePriceDto) {
   async delete(id: number) {
     await this.getById(id);
     return this.prisma.servicePrice.delete({ where: { id } });
+  }
+
+   async count(): Promise<number> {
+    return this.prisma.servicePrice.count();
   }
 }

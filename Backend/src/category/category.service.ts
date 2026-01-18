@@ -12,7 +12,7 @@ export class CategoryService {
       orderBy: { title: 'asc' }
     });
   }
-  
+
   async getById(id: number) {
     return this.prisma.category.findUnique({ where: { id } });
   }
@@ -41,5 +41,9 @@ export class CategoryService {
       }
       throw error;
     }
+  }
+
+  async count(): Promise<number> {
+    return this.prisma.category.count();
   }
 }

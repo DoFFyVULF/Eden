@@ -1,20 +1,22 @@
-import { IsInt, IsPositive, IsBoolean, IsOptional } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsInt, IsPositive, IsBoolean, IsOptional, IsNumber } from 'class-validator';
 
 export class ServicePriceDto {
   @IsInt()
-  @Type(() => Number)
   serviceId: number;
 
   @IsInt()
-  @Type(() => Number)
   masterId: number;
 
+  @IsNumber()
   @IsPositive()
-  @Type(() => Number)
   price: number;
 
-  @IsBoolean()
   @IsOptional()
-  isActive?: boolean = true;
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  durationOverride?: number | null;
 }

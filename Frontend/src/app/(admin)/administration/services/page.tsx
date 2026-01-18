@@ -5,26 +5,28 @@ import { IService } from "@/types/services.types";
 import { ICategory } from "@/types/category.types";
 import { categoryService } from "@/services/category/category.service";
 
-interface UIService extends IService {
-  categoryName?: string;
-}
-
-type SortField = "title" | "duration" | "category" | "status"; 
+type SortField = "title" | "duration" | "category" | "status";
 type SortOrder = "asc" | "desc";
 
+interface UIService extends IService {
+
+}
+
 export default function Services() {
-  const [services, setServices] = useState<UIService[]>([]);
+  const [services, setServices] = useState<IService[]>([]);
   const [categories, setCategories] = useState<ICategory[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingService, setEditingService] = useState<UIService | null>(null);
+  const [editingService, setEditingService] = useState<IService | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
   const [sortField, setSortField] = useState<SortField>("title");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
   const [formData, setFormData] = useState({
-    title: "", 
+    title: "",
     description: "",
     duration: 0,
     categoryId: 0,
@@ -34,71 +36,65 @@ export default function Services() {
   const loadServices = async () => {
     setIsLoading(true);
     try {
-      const servicesData = await serviceService.getAll(); 
-      const enrichedServices: UIService[] = servicesData.map((service) => ({
-        ...service,
-        categoryName:
-          categories.find((cat) => cat.id === service.categoryId)?.title ||
-          "Не указана",
-      }));
-      setServices(enrichedServices);
-    } catch (error) {
-      console.error("Ошибка загрузки услуг:", error);
-      alert("Не удалось загрузить список услуг");
+      const data = await serviceService.getAll();
+      setServices(data);
     } finally {
       setIsLoading(false);
     }
   };
 
   const loadCategories = async () => {
-    try {
-      const activeCategories = await categoryService.getAll();
-      setCategories(activeCategories);
-    } catch (error) {
-      console.error("Ошибка загрузки категорий:", error);
-      alert("Не удалось загрузить категории");
-    }
+    const data = await categoryService.getAll();
+    setCategories(data);
   };
 
+  useEffect(() => {
+    loadCategories();
+    loadServices();
+  }, []);
+
+  const categoryMap = useMemo(() => {
+    return new Map<number, string>(categories.map((c) => [c.id, c.title]));
+  }, [categories]);
+
+  const getCategoryName = (categoryId: number) =>
+    categoryMap.get(categoryId) ?? "Не указана";
+
   // Сортировка
-  const sortServices = (servicesToSort: UIService[]): UIService[] => {
-    const sorted = [...servicesToSort].sort((a, b) => {
-      let aValue: string | number = "";
-      let bValue: string | number = "";
+  const sortServices = (list: IService[]) => {
+    return [...list].sort((a, b) => {
+      let aVal: string | number = "";
+      let bVal: string | number = "";
 
       switch (sortField) {
         case "title":
-          aValue = a.title;
-          bValue = b.title;
+          aVal = a.title;
+          bVal = b.title;
           break;
         case "duration":
-          aValue = a.duration;
-          bValue = b.duration;
+          aVal = a.duration;
+          bVal = b.duration;
           break;
         case "category":
-          aValue = a.categoryName || "";
-          bValue = b.categoryName || "";
+          aVal = getCategoryName(a.categoryId);
+          bVal = getCategoryName(b.categoryId);
           break;
         case "status":
-          aValue = a.isActive ? 1 : 0;
-          bValue = b.isActive ? 1 : 0;
+          aVal = a.isActive ? 1 : 0;
+          bVal = b.isActive ? 1 : 0;
           break;
-        default:
-          return 0;
       }
 
-      if (typeof aValue === "string" && typeof bValue === "string") {
+      if (typeof aVal === "string") {
         return sortOrder === "asc"
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
-      } else {
-        return sortOrder === "asc"
-          ? (aValue as number) - (bValue as number)
-          : (bValue as number) - (aValue as number);
+          ? aVal.localeCompare(bVal as string)
+          : (bVal as string).localeCompare(aVal);
       }
+
+      return sortOrder === "asc"
+        ? (aVal as number) - (bVal as number)
+        : (bVal as number) - (aVal as number);
     });
-
-    return sorted;
   };
 
   // Фильтрация и сортировка
@@ -106,34 +102,37 @@ export default function Services() {
     let filtered = services;
 
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+      const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        (service) =>
-          service.title.toLowerCase().includes(query) ||
-          service.description.toLowerCase().includes(query) ||
-          service.categoryName?.toLowerCase().includes(query)
+        (s) =>
+          s.title.toLowerCase().includes(q) ||
+          s.description.toLowerCase().includes(q) ||
+          getCategoryName(s.categoryId).toLowerCase().includes(q)
       );
     }
 
     if (statusFilter) {
-      filtered = filtered.filter((service) =>
-        statusFilter === "active" ? service.isActive : !service.isActive
+      filtered = filtered.filter((s) =>
+        statusFilter === "active" ? s.isActive : !s.isActive
       );
     }
 
     if (categoryFilter) {
       filtered = filtered.filter(
-        (service) => service.categoryId === parseInt(categoryFilter)
+        (s) => s.categoryId === Number(categoryFilter)
       );
     }
 
     return sortServices(filtered);
-  }, [services, sortField, sortOrder, statusFilter, categoryFilter, searchQuery]);
-
-  // Инициализация
-  useEffect(() => {
-    loadCategories().then(loadServices); 
-  }, []);
+  }, [
+    services,
+    searchQuery,
+    statusFilter,
+    categoryFilter,
+    sortField,
+    sortOrder,
+    categoryMap,
+  ]);
 
   // Модалки
   const openModalForAdd = () => {
@@ -187,7 +186,11 @@ export default function Services() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.title.trim() || formData.duration <= 0 || formData.categoryId === 0) {
+    if (
+      !formData.title.trim() ||
+      formData.duration <= 0 ||
+      formData.categoryId === 0
+    ) {
       alert("Пожалуйста, заполните все обязательные поля");
       return;
     }
@@ -211,8 +214,9 @@ export default function Services() {
               ? {
                   ...updatedService,
                   categoryName:
-                    categories.find((cat) => cat.id === updatedService.categoryId)
-                      ?.title || "Не указана",
+                    categories.find(
+                      (cat) => cat.id === updatedService.categoryId
+                    )?.title || "Не указана",
                 }
               : s
           )
@@ -233,8 +237,8 @@ export default function Services() {
           {
             ...newService,
             categoryName:
-              categories.find((cat) => cat.id === newService.categoryId)?.title ||
-              "Не указана",
+              categories.find((cat) => cat.id === newService.categoryId)
+                ?.title || "Не указана",
           },
         ]);
       }
@@ -427,21 +431,15 @@ export default function Services() {
         </div>
 
         <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white hover:-translate-y-2 transition-all duration-200">
-          <div className="text-3xl font-bold mb-2">
-            {activeServicesCount}
-          </div>
+          <div className="text-3xl font-bold mb-2">{activeServicesCount}</div>
           <div className="text-green-100">Активные</div>
-          <div className="text-sm text-green-200 mt-1">
-            Доступны для записи
-          </div>
+          <div className="text-sm text-green-200 mt-1">Доступны для записи</div>
         </div>
 
         <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-6 text-white hover:-translate-y-2 transition-all duration-200">
           <div className="text-3xl font-bold mb-2">{categories.length}</div>
           <div className="text-purple-100">Категорий</div>
-          <div className="text-sm text-purple-200 mt-1">
-            Активных категорий
-          </div>
+          <div className="text-sm text-purple-200 mt-1">Активных категорий</div>
         </div>
 
         <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 text-white hover:-translate-y-2 transition-all duration-200">
@@ -449,9 +447,7 @@ export default function Services() {
             {filteredAndSortedServices.length}
           </div>
           <div className="text-orange-100">Показано</div>
-          <div className="text-sm text-orange-200 mt-1">
-            После фильтрации
-          </div>
+          <div className="text-sm text-orange-200 mt-1">После фильтрации</div>
         </div>
       </div>
 
@@ -513,7 +509,7 @@ export default function Services() {
                     {service.duration} мин.
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {service.categoryName || "Не указана"}
+                    {getCategoryName(service.categoryId) || "Не указана"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
@@ -585,7 +581,7 @@ export default function Services() {
                     <input
                       type="text"
                       id="serviceTitle"
-                      name="title"  
+                      name="title"
                       value={formData.title}
                       onChange={handleInputChange}
                       placeholder="Например: Стрижка мужская"

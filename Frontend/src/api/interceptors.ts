@@ -1,4 +1,7 @@
-import { getAccessToken, removeFromStorage } from "@/services/auth/auth-token.service";
+import {
+  getAccessToken,
+  removeFromStorage,
+} from "@/services/auth/auth-token.service";
 import axios, { CreateAxiosDefaults } from "axios";
 import { errorCatch } from "./error";
 import { authService } from "@/services/auth/auth.service";
@@ -30,23 +33,22 @@ axiosWithAuth.interceptors.response.use(
     const originalRequest = error.config;
 
     if (
-      error?.response?.status === 401 ||
-      errorCatch(error) === "jwt expired" ||
-      errorCatch(error) === "jwt must be provided" &&
-      error.config && error.config._isRetry
-    ){
-        originalRequest._isRetry = true
-        try {
-            await authService.getNewToken()
-            return axiosWithAuth.request(originalRequest)
-        }
-        catch (error) {
-            if (errorCatch(error) === "jwt expired") removeFromStorage()
-        }
+      error?.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._isRetry
+    ) {
+      originalRequest._isRetry = true;
+
+      try {
+        await authService.getNewToken();
+        return axiosWithAuth.request(originalRequest);
+      } catch (e) {
+        removeFromStorage();
+      }
     }
-      throw error;
+
+    throw error;
   }
 );
 
-
-export {axiosClassic, axiosWithAuth}
+export { axiosClassic, axiosWithAuth };

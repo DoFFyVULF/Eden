@@ -12,7 +12,9 @@ import {
 import { MasterScheduleService } from './master-schedule.service';
 import { MasterScheduleDto } from './dto/master-schedule.dto';
 import { UpdateMasterScheduleDto } from './dto/update-master-schedule.dto';
+import { Auth } from 'src/auth/decorators/auth.decorator';
 
+@Auth()
 @Controller('master-schedule')
 export class MasterScheduleController {
   constructor(private readonly masterScheduleService: MasterScheduleService) {}

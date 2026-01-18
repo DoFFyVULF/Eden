@@ -1,14 +1,11 @@
-export interface IAuthForm {
-    login: string
-    password: string
-}
+import { IUser } from "./user.types";
 
-export interface IUser {
-    id: number
-    name? : string
+export interface IAuthForm {
+  login: string;
+  password: string;
 }
 
 export interface IAuthResponse {
-    accessToken: string
-    user: IUser
+  accessToken: string;
+  user: IUser;
 }

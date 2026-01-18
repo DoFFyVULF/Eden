@@ -8,7 +8,6 @@ import { AppointmentDto } from './dto/appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { AppointmentStatus } from 'generated/prisma/enums';
 
-
 @Injectable()
 export class AppointmentService {
   constructor(private prisma: PrismaService) {}
@@ -57,6 +56,39 @@ export class AppointmentService {
     return appointment;
   }
 
+  async findByDate(date: string, masterId?: number) {
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+
+    return this.prisma.appointment.findMany({
+      where: {
+        appointmentTime: {
+          gte: start,
+          lte: end
+        },
+        ...(masterId !== undefined && { masterID: masterId })
+      },
+      include: {
+        master: true,
+        service: true
+      },
+      orderBy: {
+        appointmentTime: 'asc'
+      }
+    });
+  }
+
+  async findByStatus(status: AppointmentStatus) {
+    return this.prisma.appointment.findMany({
+      where: { status },
+      include: { master: true, service: true },
+      orderBy: { appointmentTime: 'desc' }
+    });
+  }
+
   async update(id: number, dto: UpdateAppointmentDto) {
     const existing = await this.findOne(id);
 
@@ -81,12 +113,8 @@ export class AppointmentService {
         clientSurname: dto.clientSurname,
         clientName: dto.clientName,
         clientPhone: dto.clientPhone,
-        master: dto.masterId
-          ? { connect: { id: dto.masterId } }
-          : undefined,
-        service: dto.serviceId
-          ? { connect: { id: dto.serviceId } }
-          : undefined,
+        master: dto.masterId ? { connect: { id: dto.masterId } } : undefined,
+        service: dto.serviceId ? { connect: { id: dto.serviceId } } : undefined,
         appointmentTime: dto.appointmentTime
           ? new Date(dto.appointmentTime)
           : undefined,
@@ -102,6 +130,9 @@ export class AppointmentService {
     return this.prisma.appointment.delete({ where: { id } });
   }
 
+  async count(): Promise<number> {
+    return this.prisma.appointment.count();
+  }
 
   private async ensureMasterExists(masterId: number) {
     const m = await this.prisma.master.findUnique({ where: { id: masterId } });
@@ -111,7 +142,9 @@ export class AppointmentService {
   }
 
   private async ensureServiceExists(serviceId: number) {
-    const s = await this.prisma.service.findUnique({ where: { id: serviceId } });
+    const s = await this.prisma.service.findUnique({
+      where: { id: serviceId }
+    });
     if (!s) {
       throw new NotFoundException(`Услуга с ID ${serviceId} не найдена`);
     }
@@ -128,9 +161,7 @@ export class AppointmentService {
     });
 
     if (existing) {
-      throw new BadRequestException(
-        `На ${time} мастер уже занят`
-      );
+      throw new BadRequestException(`На ${time} мастер уже занят`);
     }
   }
 }

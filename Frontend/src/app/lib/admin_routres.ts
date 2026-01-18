@@ -4,16 +4,12 @@ export const ADMIN_ROUTES = {
   
   MASTERS: {
     LIST: '/administration/master',
-    CREATE: '/administration/master/create',
-    EDIT: '/administration/master/:id/edit',
-    PROFILE: '/administration/master/:id',
+    SERVICES: '/administration/master-service'
   },
   
   APPOINTMENTS: {
     LIST: '/administration/appointments',
-    CREATE: '/administration/appointments/create',
-    EDIT: '/administration/appointments/:id/edit',
-    CALENDAR: '/administration/appointments/calendar',
+    HISTORY: '/administration/appointments/appointments-history'
   },
   
   SERVICES: {
@@ -24,16 +20,18 @@ export const ADMIN_ROUTES = {
   
   SCHEDULE: {
     OVERVIEW: '/administration/schedule',
-    EMPLOYEE: '/administration/schedule/employee/:id',
     WORKING_HOURS: '/administration/schedule/working-hours',
   },
 
   PRICES: {
-    LIST: '/administration/service-price'
+    LIST: '/administration/service-price',
+    MASTER: '/administration/master-service'
   },
 
   CATEGORY: {
     LIST: '/administration/category'
-  }
+  },
+
+  USERS: '/administration/user',
 
 } as const;

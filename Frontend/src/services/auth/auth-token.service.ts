@@ -1,23 +1,30 @@
 import Cookies from "js-cookie";
 
 export enum EnumTokens {
-  "ACCESS_TOKEN" = "accessToken",
-  "REFRESH_TOKEN" = "refreshToken",
+  ACCESS_TOKEN = "accessToken",
+  REFRESH_TOKEN = "refreshToken",
 }
 
 export const getAccessToken = () => {
-  const accessToken = Cookies.get(EnumTokens.ACCESS_TOKEN);
-  return accessToken || null;
+  return Cookies.get(EnumTokens.ACCESS_TOKEN) || null;
 };
 
 export const saveTokenStorage = (accessToken: string) => {
-    Cookies.set(EnumTokens.ACCESS_TOKEN, accessToken, {
-        domain: 'localhost',
-        sameSite: 'strict',
-        expires: 1
-    })
-}
+  Cookies.set(EnumTokens.ACCESS_TOKEN, accessToken, {
+    sameSite: "strict",
+    expires: 1,
+    path: "/",          // ⬅️ важно
+  });
+
+  // 🔔 уведомляем layout
+  window.dispatchEvent(new Event("auth-changed"));
+};
 
 export const removeFromStorage = () => {
-    Cookies.remove(EnumTokens.REFRESH_TOKEN)
-}
+  Cookies.remove(EnumTokens.ACCESS_TOKEN, {
+    path: "/",          // ⬅️ ОБЯЗАТЕЛЬНО
+  });
+
+  // 🔔 уведомляем layout
+  window.dispatchEvent(new Event("auth-changed"));
+};

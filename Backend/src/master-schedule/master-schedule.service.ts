@@ -11,34 +11,34 @@ export class MasterScheduleService {
     await this.ensureMasterExists(dto.masterId);
     this.validateTime(dto.startTime, dto.endTime);
 
+    // ✅ dayOfWeek может быть undefined — Prisma примет null
     return this.prisma.masterSchedule.create({
       data: {
         master: { connect: { id: dto.masterId } },
-        dayOfWeek: dto.dayOfWeek,
-        startTime: new Date(dto.startTime),
-        endTime: new Date(dto.endTime)
+        dayOfWeek: dto.dayOfWeek ?? null, // явно null, если undefined
+        startTime: new Date(dto.startTime), // ISO string → Date OK
+        endTime: new Date(dto.endTime),
       },
-      include: { master: true }
+      include: { master: true },
     });
   }
 
   async findAll() {
     return this.prisma.masterSchedule.findMany({
       include: { master: true },
-      orderBy: { id: 'asc' }
+      orderBy: { id: 'asc' },
     });
   }
 
   async findOne(id: number) {
     const schedule = await this.prisma.masterSchedule.findUnique({
       where: { id },
-      include: { master: true }
+      include: { master: true },
     });
 
     if (!schedule) {
       throw new NotFoundException(`Расписание с ID ${id} не найдено`);
     }
-
     return schedule;
   }
 
@@ -57,20 +57,22 @@ export class MasterScheduleService {
       where: { id },
       data: {
         master: dto.masterId ? { connect: { id: dto.masterId } } : undefined,
-        dayOfWeek: dto.dayOfWeek,
+        dayOfWeek: dto.dayOfWeek ?? null, // ← важно: undefined → null
         startTime: dto.startTime ? new Date(dto.startTime) : undefined,
-        endTime: dto.endTime ? new Date(dto.endTime) : undefined
+        endTime: dto.endTime ? new Date(dto.endTime) : undefined,
       },
-      include: { master: true }
+      include: { master: true },
     });
   }
-
 
   async remove(id: number) {
     await this.findOne(id);
     return this.prisma.masterSchedule.delete({ where: { id } });
   }
 
+   async count(): Promise<number> {
+    return this.prisma.masterSchedule.count();
+  }
 
   private async ensureMasterExists(masterId: number) {
     const master = await this.prisma.master.findUnique({ where: { id: masterId } });
@@ -82,6 +84,11 @@ export class MasterScheduleService {
   private validateTime(start: string, end: string) {
     const startDate = new Date(start);
     const endDate = new Date(end);
+
+    // ✅ Доп. защита от invalid date
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new BadRequestException('startTime и endTime должны быть валидными ISO 8601 строками');
+    }
 
     if (endDate <= startDate) {
       throw new BadRequestException('Время окончания должно быть позже времени начала');

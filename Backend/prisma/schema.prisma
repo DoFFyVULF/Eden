@@ -9,8 +9,8 @@ datasource db {
 }
 
 enum Role {
-  employee
   admin
+  master
 }
 
 enum AppointmentStatus {
@@ -22,14 +22,15 @@ enum AppointmentStatus {
 
 // done
 model User {
-  id       Int      @id @default(autoincrement())
-  name     String?
-  login    String   @unique
-  password String
-  role     Role?
-  master   Master?  @relation(fields: [masterId], references: [id])
-  masterId Int?     @map("master_id")
-  isActive Boolean? @default(true) @map("is_active")
+  id         Int      @id @default(autoincrement())
+  name       String?
+  login      String   @unique
+  password   String
+  profileImg String?  @map("profile_img")
+  role       Role
+  master     Master?  @relation(fields: [masterId], references: [id])
+  masterId   Int?     @map("master_id")
+  isActive   Boolean? @default(true) @map("is_active")
 
   @@map("user")
 }
@@ -55,12 +56,15 @@ model Master {
 //done
 model MasterSchedule {
   id        Int      @id @default(autoincrement())
-  master    Master   @relation(fields: [masterID], references: [id])
+  master    Master   @relation(fields: [masterID], references: [id], onDelete: Cascade)
   masterID  Int      @map("master_id")
-  dayOfWeek Int      @map("day_of_week")
+  dayOfWeek Int?     @map("day_of_week") // ← изменено: Int → Int?
   startTime DateTime @map("start_time")
   endTime   DateTime @map("end_time")
 
+  @@index([masterID])
+  @@index([masterID, dayOfWeek])
+  @@index([startTime, endTime])
   @@map("master_schedule")
 }
 
@@ -100,9 +104,12 @@ model ServicePrice {
   price     Decimal @db.Decimal(10, 2)
   isActive  Boolean @default(true) @map("is_active")
 
+  durationOverride Int? @map("duration_override")
+
   @@map("service_price")
 }
 
+//done
 model Appointment {
   id              Int               @id @default(autoincrement())
   clientSurname   String            @map("client_surname")
@@ -120,4 +127,20 @@ model Appointment {
 
   @@unique([masterID, appointmentTime])
   @@map("appointment")
+}
+
+//done
+model AppointmentHistory {
+  id              Int      @id @default(autoincrement())
+  appointmentId   Int
+  clientSurname   String
+  clientName      String
+  clientPhone     String
+  masterID        Int
+  serviceId       Int
+  appointmentTime DateTime
+  price           Decimal  @db.Decimal(10, 2)
+  completedAt     DateTime @default(now())
+
+  @@map("appointment_history")
 }

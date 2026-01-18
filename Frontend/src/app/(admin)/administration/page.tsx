@@ -17,9 +17,9 @@ const cards = [
     gradient: "bg-gradient-to-br from-[#a1c4fd] to-[#c2e9fb]"
   },
   {
-    href: ADMIN_ROUTES.PRICES.LIST, 
+    href: ADMIN_ROUTES.SCHEDULE.OVERVIEW, 
     icon: "💰",
-    title: "Цены",
+    title: "Рассписание",
     description: "Управление прайс-листом, установка и изменение стоимости услуг.",
     gradient: "bg-gradient-to-br from-[#ffecd2] to-[#fcb69f]"
   },
@@ -31,7 +31,7 @@ const cards = [
     gradient: "bg-gradient-to-br from-[#84fab0] to-[#8fd3f4]"
   },
   {
-    href: "/admin/master-services", 
+    href: ADMIN_ROUTES.MASTERS.SERVICES,
     icon: "🔧",
     title: "Услуги мастеров",
     description: "Распределение услуг между мастерами, управление их специализациями.",

@@ -13,7 +13,9 @@ import {
 import { MasterService } from './master.service';
 import { MasterDto } from './dto/master.dto';
 import { UpdateMasterDto } from './dto/update-master.dto';
+import { Auth } from 'src/auth/decorators/auth.decorator';
 
+@Auth()
 @Controller('master')
 export class MasterController {
   constructor(private readonly masterService: MasterService) {}

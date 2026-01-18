@@ -1,7 +1,7 @@
 // components/AppointmentConfirmWindow.tsx
 "use client";
 import { useEffect } from "react";
-import AppointmentItem from "../appoinmentItem/AppointmentItem";
+import AppointmentItem from "./AppointmentItem";
 
 interface Appointment {
   id: string;
@@ -66,9 +66,7 @@ export default function AppointmentConfirmWindow({
         {/* Заголовок */}
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-800">
-              {title}
-            </h2>
+            <h2 className="text-xl font-semibold text-gray-800">{title}</h2>
             <span className="text-sm text-gray-500">
               {pendingAppointments.length} записей
             </span>

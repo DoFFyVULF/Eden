@@ -1,8 +1,13 @@
-import { Injectable } from '@nestjs/common';
-import { hash } from 'argon2';
-import { AuthDto } from 'src/auth/dto/auth.dto';
+// src/user/user.service.ts
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
+import { hash } from 'argon2';
 import { UserDto } from './dto/user.dto';
+import { Role } from 'generated/prisma/enums';
 
 @Injectable()
 export class UserService {
@@ -12,27 +17,64 @@ export class UserService {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
-  getByLogin(login: string) {
+  async getByLogin(login: string) {
     return this.prisma.user.findUnique({ where: { login } });
   }
 
-  async create(dto: AuthDto) {
-    const user = {
-      login: dto.login,
-      password: await hash(dto.password),
-      isActive: true
-    };
+  /**
+   * 🔐 Создание пользователя администратором
+   */
+  async createByAdmin(dto: UserDto) {
+    const exists = await this.getByLogin(dto.login);
+    if (exists) {
+      throw new BadRequestException('Пользователь уже существует');
+    }
 
-    return this.prisma.user.create({ data: user });
+    // 🧠 Бизнес-валидация ролей
+    if (dto.role === Role.master && !dto.masterId) {
+      throw new BadRequestException(
+        'Для роли MASTER необходимо указать masterId'
+      );
+    }
+
+    if (dto.role === Role.admin && dto.masterId) {
+      throw new BadRequestException(
+        'Администратор не может быть привязан к мастеру'
+      );
+    }
+
+    // Проверяем мастера
+    if (dto.masterId) {
+      const master = await this.prisma.master.findUnique({
+        where: { id: dto.masterId }
+      });
+
+      if (!master) {
+        throw new NotFoundException('Мастер не найден');
+      }
+    }
+
+    return this.prisma.user.create({
+      data: {
+        login: dto.login,
+        password: await hash(dto.password),
+        role: dto.role,
+        name: dto.name,
+        masterId: dto.masterId ?? null,
+        isActive: true
+      }
+    });
   }
 
-  async update(id: number, dto: UserDto) {
-    let data = dto;
+  async getAllMasters() {
+    return this.prisma.user.findMany({ where: { role: Role.master } });
+  }
 
-    if (dto.password) {
-      data = { ...dto, password: await hash(dto.password) };
+  async delete(id: number) {
+    return this.prisma.user.delete({ where: { id } });
+  }
 
-      return this.prisma.user.update({ where: { id }, data });
-    }
+  async count(): Promise<number> {
+    return this.prisma.user.count();
   }
 }

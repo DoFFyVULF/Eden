@@ -8,6 +8,9 @@ import { ServiceModule } from './service/service.module';
 import { ServicePriceModule } from './service-price/service-price.module';
 import { MasterScheduleModule } from './master-schedule/master-schedule.module';
 import { AppointmentModule } from './appointment/appointment.module';
+import { StatsModule } from './stats/stats.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { AppointmentHistoryModule } from './appointment-history/appointment-history.module';
 
 @Module({
   imports: [
@@ -19,7 +22,10 @@ import { AppointmentModule } from './appointment/appointment.module';
     ServiceModule,
     ServicePriceModule,
     MasterScheduleModule,
-    AppointmentModule
+    AppointmentModule,
+    StatsModule,
+    ScheduleModule.forRoot(),
+    AppointmentHistoryModule,
   ]
 })
 export class AppModule {}

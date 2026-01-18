@@ -3,6 +3,8 @@ import 'reflect-metadata'; // ← В САМОМ ВЕРХУ!
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import { createDefaultAdmin } from './seed/admin.seed';
+import { PrismaService } from './prisma.service';
 import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
@@ -13,7 +15,7 @@ async function bootstrap() {
   app.enableCors({
     origin: ['http://localhost:3000'],
     credentials: true,
-    exposedHeaders: ['set-cookie'],
+    exposedHeaders: ['set-cookie']
   });
 
   app.useGlobalPipes(
@@ -21,9 +23,13 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
+      transformOptions: { enableImplicitConversion: true }
+    })
   );
+
+  const prisma = app.get(PrismaService);
+
+  await createDefaultAdmin(prisma);
 
   await app.listen(process.env.PORT ?? 4200);
 }

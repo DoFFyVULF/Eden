@@ -12,7 +12,9 @@ import {
 import { ServicePriceService } from './service-price.service';
 import { ServicePriceDto } from './dto/service-price.dto';
 import { UpdateServicePriceDto } from './dto/update-service-price.dto';
+import { Auth } from 'src/auth/decorators/auth.decorator';
 
+@Auth()
 @Controller('service-price')
 export class ServicePriceController {
   constructor(private readonly servicePriceService: ServicePriceService) {}
@@ -27,6 +29,12 @@ export class ServicePriceController {
   @Get()
   async getAll() {
     return this.servicePriceService.getAll();
+  }
+
+  @HttpCode(200)
+  @Get('master/:masterId')
+  async getByMaster(@Param('masterId', ParseIntPipe) masterID: number) {
+    return this.servicePriceService.getByMaster(masterID);
   }
 
   @HttpCode(200)

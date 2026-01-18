@@ -1,14 +1,14 @@
-import { axiosClassic } from "@/api/interceptors";
+import { axiosWithAuth } from "@/api/interceptors";
 import { IService } from "@/types/services.types";
 
 export const serviceService = {
   async getAll(): Promise<IService[]> {
-    const { data } = await axiosClassic.get<IService[]>("/service");
+    const { data } = await axiosWithAuth.get<IService[]>("/service");
     return data;
   },
 
   async getById(id: number): Promise<IService> {
-    const { data } = await axiosClassic.get<IService>(`/service/${id}`);
+    const { data } = await axiosWithAuth.get<IService>(`/service/${id}`);
     return data;
   },
 
@@ -19,12 +19,24 @@ export const serviceService = {
     isActive: boolean;
     categoryId: number;
   }): Promise<IService> {
-    const { data } = await axiosClassic.post<IService>("/service", {
-      title: dto.title,
-      description: dto.description,
+    // ✅ Валидация на фронтенде (защита от 400)
+    if (!dto.title?.trim()) {
+      throw new Error("Название услуги обязательно");
+    }
+    if (!dto.description) dto.description = "";
+    if (dto.duration <= 0) {
+      throw new Error("Продолжительность должна быть положительной");
+    }
+    if (dto.categoryId <= 0) {
+      throw new Error("Выберите категорию");
+    }
+
+    const { data } = await axiosWithAuth.post<IService>("/service", {
+      title: dto.title.trim(),
+      description: dto.description.trim(),
       duration: dto.duration,
-      isActive: dto.isActive ?? true,
-      categoryId: dto.categoryId
+      isActive: dto.isActive, 
+      categoryId: dto.categoryId, 
     });
 
     return data;
@@ -39,12 +51,12 @@ export const serviceService = {
       isActive: boolean;
     }
   ): Promise<IService> {
-    const { data } = await axiosClassic.patch<IService>(`/service/${id}`, dto);
+    const { data } = await axiosWithAuth.patch<IService>(`/service/${id}`, dto);
     return data;
   },
 
   async delete(id: number): Promise<{ message: string }> {
-    const { data } = await axiosClassic.delete<{ message: string }>(
+    const { data } = await axiosWithAuth.delete<{ message: string }>(
       `/service/${id}`
     );
     return data;

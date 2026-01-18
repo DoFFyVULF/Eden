@@ -1,55 +1,88 @@
 "use client";
 
 import { ADMIN_ROUTES } from "@/app/lib/admin_routres";
-import Link from "next/link";
+import { adminService, AdminCounts } from "@/services/admin/admin.service";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import ProfileCard from "../profileCard/ProfileCard";
+import { useEffect, useState } from "react";
+import { userService } from "@/services/user/user.service";
+import { IUser } from "@/types/user.types";
 
 export default function AsideMenu() {
   const pathname = usePathname();
+
+  const [counts, setCounts] = useState<AdminCounts | null>(null);
+  const [user, setUser] = useState<IUser | null>(null);
+
+  useEffect(() => {
+    adminService
+      .getCounts()
+      .then((res) => setCounts(res))
+      .catch(console.error);
+
+    userService
+      .getMe()
+      .then((res) => setUser(res.data))
+      .catch(console.error);
+  }, []);
 
   const menuItems = [
     {
       id: 1,
       label: "Записи",
-      count: 12,
+      count: counts?.appointments ?? "-",
       href: ADMIN_ROUTES.APPOINTMENTS.LIST,
       icon: "📅",
     },
     {
       id: 2,
       label: "Сотрудники",
-      count: 8,
-      href: ADMIN_ROUTES.EMPLOYEES.LIST,
+      count: counts?.masters ?? "-",
+      href: ADMIN_ROUTES.MASTERS.LIST,
       icon: "👨‍💼",
     },
     {
       id: 3,
       label: "Расписание",
-      count: 5,
+      count: counts?.schedule ?? "-",
       href: ADMIN_ROUTES.SCHEDULE.OVERVIEW,
       icon: "🗓️",
     },
     {
       id: 4,
-      label: 'Категории услуг',
-      count: '6',
+      label: "Категории услуг",
+      count: counts?.category ?? "-",
       href: ADMIN_ROUTES.CATEGORY.LIST,
-      icon: '📂',
+      icon: "📂",
     },
     {
       id: 5,
       label: "Услуги",
-      count: 15,
+      count: counts?.services ?? "-",
       href: ADMIN_ROUTES.SERVICES.LIST,
       icon: "⚙️",
     },
-     {
+    {
       id: 6,
-      label: "Услуги мастеров",
-      count: 15,
-      href: ADMIN_ROUTES.SERVICES.EDIT,
-      icon: "🔧",
+      label: "Цены услуг",
+      count: counts?.services ?? "-",
+      href: ADMIN_ROUTES.PRICES.MASTER,
+      icon: "⚙️",
+    },
+    {
+      id: 7,
+      label: "История записей",
+      count: counts?.history ?? "-",
+      href: ADMIN_ROUTES.APPOINTMENTS.HISTORY,
+      icon: "⚙️",
+    },
+    {
+      id: 8,
+      label: "Пользователи",
+      count: counts?.users ?? "-",
+      href: ADMIN_ROUTES.USERS,
+      icon: "🧑‍🤝‍🧑",
     },
   ];
 
@@ -152,17 +185,20 @@ export default function AsideMenu() {
             );
           })}
         </ul>
-              {/* ProfileCard */}
-      <div className="p-2 mt-4 border-t border-gray-200">
-        <ProfileCard
-          img="https://cdn01.justjared.com/wp-content/uploads/headlines/2025/10/madison-beer-locket.jpg"
-          name="Бро"
-          lastname="Надо тренироваться"
-        />
-      </div>
+        {/* ProfileCard */}
+        {user && (
+          <div className="mt-6 pt-4 border-t">
+            <ProfileCard
+              img={
+                user.profileImg ??
+                "https://cdn01.justjared.com/wp-content/uploads/headlines/2025/10/madison-beer-locket.jpg"
+              }
+              name={user.name || user.login}
+              role={user.role === "admin" ? "Администратор" : "Мастер"}
+            />
+          </div>
+        )}
       </nav>
-
-
     </div>
   );
 }

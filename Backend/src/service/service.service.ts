@@ -52,4 +52,8 @@ export class ServiceService {
     await this.getById(id);
     return this.prisma.service.delete({ where: { id } });
   }
+
+   async count(): Promise<number> {
+    return this.prisma.service.count();
+  }
 }

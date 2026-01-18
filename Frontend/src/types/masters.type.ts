@@ -1,5 +1,5 @@
 export interface IMaster {
-  id?: number;
+  id: number;
   name: string;
   surname: string;
   middlename: string;
@@ -7,4 +7,6 @@ export interface IMaster {
   photo: string;
   phone?: string;
   isActive?: boolean;
+
+  services?: number[];
 }
