@@ -25,7 +25,7 @@ export default function ProfileCard({
       removeFromStorage();
 
       // 3️⃣ редирект
-      router.push("/administration/auth");
+      router.push("/auth");
       router.refresh(); // ⬅️ важно для layout
     } catch {
       toast.error("Ошибка при выходе");
