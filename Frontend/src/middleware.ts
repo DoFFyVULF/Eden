@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { EnumTokens } from "./services/auth/auth-token.service";
-import { ADMIN_ROUTES } from "./app/lib/admin_routres";
+import { ADMIN_ROUTES } from "./app/lib/admin.routes";
 
 export async function middleware(request: NextRequest) {
   const { url, cookies } = request;

@@ -1,4 +1,4 @@
-import { ADMIN_ROUTES } from "@/app/lib/admin_routres";
+import { ADMIN_ROUTES } from "@/app/lib/admin.routes";
 
 export default function AdminPage() {
 const cards = [

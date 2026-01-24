@@ -1,6 +1,7 @@
 "use client";
 
-import { ADMIN_ROUTES } from "@/app/lib/admin_routres";
+import { ADMIN_ROUTES } from "@/app/lib/admin.routes";
+import { MASTER_ROUTES } from "@/app/lib/master.routes";
 import { authService } from "@/services/auth/auth.service";
 import { IAuthForm } from "@/types/auth.types";
 import { useMutation } from "@tanstack/react-query";
@@ -23,10 +24,31 @@ export function Auth() {
   const { mutate, isPending, error } = useMutation({
     mutationKey: ["auth"],
     mutationFn: (data: IAuthForm) => authService.main("login", data),
-    onSuccess() {
+    onSuccess: async () => {
+      // <-- async здесь!
       toast.success("Успешный вход");
       reset();
-      push(ADMIN_ROUTES.DASHBOARD);
+
+      try {
+        const user = await authService.getMe(); 
+        const role = user.role;
+
+        switch (role) {
+          case "admin":
+            push(ADMIN_ROUTES.DASHBOARD);
+            break;
+          case "master":
+            push(MASTER_ROUTES.DASHBOARD);
+            break;
+          default:
+            push("/auth");
+        }
+
+        window.dispatchEvent(new Event("auth-changed"));
+      } catch (err) {
+        toast.error("Ошибка получения пользователя");
+        push("/auth");
+      }
     },
   });
 
@@ -54,7 +76,9 @@ export function Auth() {
               className="relative block w-full border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md sm:text-sm"
             />
             {errors.login && (
-              <p className="text-red-600 text-sm mt-1">{errors.login.message}</p>
+              <p className="text-red-600 text-sm mt-1">
+                {errors.login.message}
+              </p>
             )}
           </div>
 

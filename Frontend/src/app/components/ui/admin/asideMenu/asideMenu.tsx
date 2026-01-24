@@ -1,6 +1,6 @@
 "use client";
 
-import { ADMIN_ROUTES } from "@/app/lib/admin_routres";
+import { ADMIN_ROUTES } from "@/app/lib/admin.routes";
 import { adminService, AdminCounts } from "@/services/admin/admin.service";
 import { usePathname } from "next/navigation";
 import Link from "next/link";

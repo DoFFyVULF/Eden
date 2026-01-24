@@ -1,12 +1,14 @@
-import { axiosClassic } from "@/api/interceptors";
+import { axiosClassic, axiosWithAuth } from "@/api/interceptors";
 import { IAuthForm, IAuthResponse } from "@/types/auth.types";
 import { removeFromStorage, saveTokenStorage } from "./auth-token.service";
+import { ADMIN_ROUTES } from "@/app/lib/admin.routes";
+import { MASTER_ROUTES } from "@/app/lib/master.routes";
 
 export const authService = {
   async main(type: "login" | "register", data: IAuthForm) {
     const response = await axiosClassic.post<IAuthResponse>(
       `/auth/${type}`,
-      data
+      data,
     );
 
     if (response.data.accessToken) saveTokenStorage(response.data.accessToken);
@@ -16,7 +18,7 @@ export const authService = {
 
   async getNewToken() {
     const response = await axiosClassic.post<IAuthResponse>(
-      "/auth/login/access-token"
+      "/auth/login/access-token",
     );
 
     if (response.data.accessToken) saveTokenStorage(response.data.accessToken);
@@ -25,10 +27,15 @@ export const authService = {
   },
 
   async logout() {
-    const response = await axiosClassic.post<boolean>("/auth/logout");
+    const response = await axiosWithAuth.post<boolean>("/auth/logout");
 
     if (response.data) removeFromStorage();
 
     return response;
+  },
+
+  async getMe() {
+    const response = await axiosWithAuth.get("/auth/me"); 
+    return response.data;
   },
 };

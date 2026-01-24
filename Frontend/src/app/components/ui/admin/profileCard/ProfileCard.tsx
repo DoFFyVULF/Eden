@@ -33,7 +33,7 @@ export default function ProfileCard({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-4 flex items-center space-x-3 border border-gray-200">
+    <div className=" bg-white rounded-xl shadow-sm p-4 flex flex-wrap justify-center text-center items-center space-x-3 border border-gray-200">
       <img
         src={img}
         alt={`${name}`}
