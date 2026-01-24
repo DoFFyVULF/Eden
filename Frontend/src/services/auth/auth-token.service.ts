@@ -13,7 +13,7 @@ export const saveTokenStorage = (accessToken: string) => {
   Cookies.set(EnumTokens.ACCESS_TOKEN, accessToken, {
     sameSite: "strict",
     expires: 1,
-    path: "/",          // ⬅️ важно
+    path: "/", // ⬅️ важно
   });
 
   // 🔔 уведомляем layout
@@ -22,9 +22,13 @@ export const saveTokenStorage = (accessToken: string) => {
 
 export const removeFromStorage = () => {
   Cookies.remove(EnumTokens.ACCESS_TOKEN, {
-    path: "/",          // ⬅️ ОБЯЗАТЕЛЬНО
+    path: "/", // ⬅️ ОБЯЗАТЕЛЬНО
   });
 
   // 🔔 уведомляем layout
   window.dispatchEvent(new Event("auth-changed"));
+};
+
+export const getRoleFromCookie = () => {
+  return Cookies.get("role") || null;
 };

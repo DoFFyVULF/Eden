@@ -15,11 +15,13 @@ export default function AdminAppointments() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [isPlannedAppointmentWindow, setPlannedAppointmentWindow] = useState(false);
+  const [isPlannedAppointmentWindow, setPlannedAppointmentWindow] =
+    useState(false);
   const [isConfirmWindowOpen, setIsConfirmWindowOpen] = useState(false);
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
-  
-  const [editingAppointment, setEditingAppointment] = useState<IAppointment | null>(null);
+
+  const [editingAppointment, setEditingAppointment] =
+    useState<IAppointment | null>(null);
 
   const [sortField, setSortField] = useState<SortField>("time");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
@@ -86,9 +88,13 @@ export default function AdminAppointments() {
       }
 
       if (typeof aValue === "string" && typeof bValue === "string") {
-        return sortOrder === "asc" ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+        return sortOrder === "asc"
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
       }
-      return sortOrder === "asc" ? (aValue as number) - (bValue as number) : (bValue as number) - (aValue as number);
+      return sortOrder === "asc"
+        ? (aValue as number) - (bValue as number)
+        : (bValue as number) - (aValue as number);
     });
 
     return sorted;
@@ -103,8 +109,10 @@ export default function AdminAppointments() {
         (app) =>
           `${app.clientSurname} ${app.clientName}`.toLowerCase().includes(q) ||
           app.service.title.toLowerCase().includes(q) ||
-          `${app.master.surname} ${app.master.name}`.toLowerCase().includes(q) ||
-          app.clientPhone.includes(q)
+          `${app.master.surname} ${app.master.name}`
+            .toLowerCase()
+            .includes(q) ||
+          app.clientPhone.includes(q),
       );
     }
 
@@ -115,26 +123,38 @@ export default function AdminAppointments() {
         completed: AppointmentStatus.Завершен,
         cancelled: AppointmentStatus.Отменен,
       };
-      filtered = filtered.filter((app) => app.status === statusMap[statusFilter]);
+      filtered = filtered.filter(
+        (app) => app.status === statusMap[statusFilter],
+      );
     }
 
     if (dateFilter) {
       filtered = filtered.filter(
-        (app) => new Date(app.appointmentTime).toISOString().split("T")[0] === dateFilter
+        (app) =>
+          new Date(app.appointmentTime).toISOString().split("T")[0] ===
+          dateFilter,
       );
     }
 
     return sortAppointments(filtered);
-  }, [appointments, sortField, sortOrder, statusFilter, dateFilter, searchQuery]);
+  }, [
+    appointments,
+    sortField,
+    sortOrder,
+    statusFilter,
+    dateFilter,
+    searchQuery,
+  ]);
 
   const pendingAppointments = useMemo(
     () => appointments.filter((a) => a.status === AppointmentStatus.Новый),
-    [appointments]
+    [appointments],
   );
 
   const plannedAppointments = useMemo(
-    () => appointments.filter((a) => a.status === AppointmentStatus.Подтвержден),
-    [appointments]
+    () =>
+      appointments.filter((a) => a.status === AppointmentStatus.Подтвержден),
+    [appointments],
   );
 
   const handleWindowConfirm = () => {
@@ -243,18 +263,34 @@ export default function AdminAppointments() {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Управление записями</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Управление записями
+            </h1>
             <p className="text-gray-600">
-              Всего записей: <span className="font-semibold">{filteredAndSortedAppointments.length}</span>
-              {filteredAndSortedAppointments.length !== appointments.length && ` (из ${appointments.length})`}
+              Всего записей:{" "}
+              <span className="font-semibold">
+                {filteredAndSortedAppointments.length}
+              </span>
+              {filteredAndSortedAppointments.length !== appointments.length &&
+                ` (из ${appointments.length})`}
             </p>
           </div>
           <button
             className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2"
             onClick={handleNewAppWindow}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
             </svg>
             Новая запись
           </button>
@@ -264,8 +300,18 @@ export default function AdminAppointments() {
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200">
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1 relative">
-              <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <svg
+                className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
               <input
                 type="text"
@@ -306,8 +352,19 @@ export default function AdminAppointments() {
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <span className="text-sm text-gray-600 font-medium mr-2">Сортировка:</span>
-            {(["time", "client", "service", "master", "date", "status"] as SortField[]).map((field) => (
+            <span className="text-sm text-gray-600 font-medium mr-2">
+              Сортировка:
+            </span>
+            {(
+              [
+                "time",
+                "client",
+                "service",
+                "master",
+                "date",
+                "status",
+              ] as SortField[]
+            ).map((field) => (
               <button
                 key={field}
                 onClick={() => handleSortChange(field)}
@@ -323,7 +380,11 @@ export default function AdminAppointments() {
                 {field === "master" && "Мастер"}
                 {field === "date" && "Дата"}
                 {field === "status" && "Статус"}
-                {sortField === field && <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>}
+                {sortField === field && (
+                  <span className="ml-1">
+                    {sortOrder === "asc" ? "↑" : "↓"}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -336,16 +397,22 @@ export default function AdminAppointments() {
           className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white cursor-pointer hover:-translate-y-1 transition"
           onClick={handleWindowConfirm}
         >
-          <div className="text-3xl font-bold mb-2">{pendingAppointments.length}</div>
+          <div className="text-3xl font-bold mb-2">
+            {pendingAppointments.length}
+          </div>
           <div className="text-blue-100">Новые записи</div>
-          <div className="text-sm text-blue-200 mt-1">Требуют подтверждения</div>
+          <div className="text-sm text-blue-200 mt-1">
+            Требуют подтверждения
+          </div>
         </div>
 
         <div
           className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white cursor-pointer hover:-translate-y-1 transition"
           onClick={handlePlanedAppointments}
         >
-          <div className="text-3xl font-bold mb-2">{plannedAppointments.length}</div>
+          <div className="text-3xl font-bold mb-2">
+            {plannedAppointments.length}
+          </div>
           <div className="text-green-100">Подтвержденные</div>
           <div className="text-sm text-green-200 mt-1">На ближайшее время</div>
         </div>
@@ -357,7 +424,9 @@ export default function AdminAppointments() {
         </div>
 
         <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 text-white hover:-translate-y-1 transition">
-          <div className="text-3xl font-bold mb-2">{filteredAndSortedAppointments.length}</div>
+          <div className="text-3xl font-bold mb-2">
+            {filteredAndSortedAppointments.length}
+          </div>
           <div className="text-orange-100">Показано</div>
           <div className="text-sm text-orange-200 mt-1">После фильтрации</div>
         </div>
@@ -371,7 +440,9 @@ export default function AdminAppointments() {
             <p className="mt-2 text-gray-500">Загрузка...</p>
           </div>
         ) : error ? (
-          <div className="text-center py-8 text-red-600 bg-red-50 rounded-xl">{error}</div>
+          <div className="text-center py-8 text-red-600 bg-red-50 rounded-xl">
+            {error}
+          </div>
         ) : filteredAndSortedAppointments.length > 0 ? (
           filteredAndSortedAppointments.map((appointment) => (
             <AppointmentItem
@@ -403,7 +474,8 @@ export default function AdminAppointments() {
       {/* Пагинация */}
       <div className="flex justify-center items-center gap-2 mt-8">
         <span className="text-gray-500 text-sm">
-          Показано {filteredAndSortedAppointments.length} из {appointments.length}
+          Показано {filteredAndSortedAppointments.length} из{" "}
+          {appointments.length}
         </span>
       </div>
 
