@@ -1,12 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // src/user/user.controller.ts
 import {
   Body,
   Controller,
   Get,
   HttpCode,
+  NotFoundException,
   Post,
   UsePipes,
-  ValidationPipe,
+  ValidationPipe
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UserDto } from './dto/user.dto';
@@ -26,14 +28,20 @@ export class UserController {
   @HttpCode(201)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   async create(@Body() dto: UserDto): Promise<User> {
-   
     return await this.userService.createByAdmin(dto);
   }
 
+  // src/user/user.controller.ts
+
   @Roles(Role.admin, Role.master)
   @Get('me')
-  me(@CurrentUser() user: User) {
-    // явно указываем тип user
-    return user;
+  async me(@CurrentUser('id') id: number) {
+    // Извлекаем id из декоратора
+    const user = await this.userService.getById(id);
+    if (!user) throw new NotFoundException('Пользователь не найден');
+
+    // Убираем пароль перед отправкой
+    const { password, ...result } = user;
+    return result;
   }
 }

@@ -5,5 +5,5 @@ export interface IUser {
   masterId: number;
   role: 'master' | 'admin';
   isActive: boolean;
-  name?: string;
+  name: string;
 }

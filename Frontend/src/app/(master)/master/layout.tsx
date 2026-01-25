@@ -7,7 +7,7 @@ import AsideMenu from "@/app/components/ui/admin/asideMenu/asideMenu";
 import { getAccessToken } from "@/services/auth/auth-token.service";
 import { axiosWithAuth } from "@/api/interceptors";
 
-export default function AdminRootLayout({
+export default function MasterRootLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -56,7 +56,7 @@ export default function AdminRootLayout({
       <div className="bg-white min-h-screen flex ">
         {isAuth && (
           <aside className="w-1/5 flex flex-col border-r border-gray-200">
-            <AsideMenu isAdmin={true} />
+            <AsideMenu isAdmin={false} />
           </aside>
         )}
 
