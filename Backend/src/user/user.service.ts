@@ -70,6 +70,10 @@ export class UserService {
     return this.prisma.user.findMany({ where: { role: Role.master } });
   }
 
+  async getAllAdmins () {
+    return this.prisma.user.findMany({ where: { role: Role.admin } });
+  }
+
   async delete(id: number) {
     return this.prisma.user.delete({ where: { id } });
   }

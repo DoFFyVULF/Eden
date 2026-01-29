@@ -21,6 +21,10 @@ export const userService = {
     return axiosWithAuth.get<IUser[]>("/user/master");
   },
 
+  getAllAdminsUsers() {
+    return axiosWithAuth.get<IUser[]>("/user/admin");
+  },
+
   deleteMasterUser(id: number) {
     return axiosWithAuth.delete(`/user/master/${id}`);
   },

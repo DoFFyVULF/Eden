@@ -23,6 +23,7 @@ import { User } from 'generated/prisma/client';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
+  // Создание администратора (если нужно через API)
   @Roles(Role.admin)
   @Post()
   @HttpCode(201)
@@ -31,16 +32,19 @@ export class UserController {
     return await this.userService.createByAdmin(dto);
   }
 
-  // src/user/user.controller.ts
+  // ПОЛУЧЕНИЕ ВСЕХ АДМИНОВ (То, что вы вызываете с фронтенда)
+  @Roles(Role.admin)
+  @Get('admin') // Путь будет: GET /user/admin
+  async getAllAdmins() {
+    return this.userService.getAllAdmins();
+  }
 
   @Roles(Role.admin, Role.master)
   @Get('me')
   async me(@CurrentUser('id') id: number) {
-    // Извлекаем id из декоратора
     const user = await this.userService.getById(id);
     if (!user) throw new NotFoundException('Пользователь не найден');
 
-    // Убираем пароль перед отправкой
     const { password, ...result } = user;
     return result;
   }
