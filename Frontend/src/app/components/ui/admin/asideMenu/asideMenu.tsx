@@ -8,6 +8,7 @@ import ProfileCard from "../profileCard/ProfileCard";
 import { useEffect, useState, useMemo } from "react";
 import { userService } from "@/services/user/user.service";
 import { IUser } from "@/types/user.types";
+import { MASTER_ROUTES } from "@/app/lib/master.routes";
 
 type AsideMenuProps = {
   isAdmin: boolean;
@@ -101,14 +102,14 @@ export default function AsideMenu({ isAdmin }: AsideMenuProps) {
         id: 1,
         label: "Записи",
         count: counts?.appointments ?? "-",
-        href: ADMIN_ROUTES.APPOINTMENTS.LIST,
+        href: MASTER_ROUTES.APPOINTMENTS,
         icon: "📅",
       },
       {
         id: 2,
         label: "Расписание",
         count: counts?.schedule ?? "-",
-        href: ADMIN_ROUTES.SCHEDULE.OVERVIEW,
+        href: MASTER_ROUTES.SCHEDULE,
         icon: "🗓️",
       },
     ];

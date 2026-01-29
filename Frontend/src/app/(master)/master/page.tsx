@@ -5,6 +5,7 @@ import { userService } from "@/services/user/user.service";
 import { appointmentService } from "@/services/appointment/appointment.service";
 import { IUser } from "@/types/user.types";
 import { Calendar, CheckCircle2, Clock, UserCircle } from "lucide-react";
+import { MASTER_ROUTES } from "@/app/lib/master.routes";
 
 export default function MasterPage() {
   const [user, setUser] = useState<IUser | null>(null);
@@ -89,7 +90,7 @@ export default function MasterPage() {
               <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
                 <span className="text-slate-600">Роль профиля</span>
                 <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full uppercase">
-                  {user?.role}
+                  {user?.role == 'master' ? "Мастер" :  ''}
                 </span>
               </div>
               
@@ -103,7 +104,7 @@ export default function MasterPage() {
             </div>
 
             <button className="w-full mt-8 bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-2xl font-semibold transition-all active:scale-[0.98]">
-              Перейти к расписанию
+              <a href={MASTER_ROUTES.SCHEDULE}>Перейти к расписанию</a>
             </button>
           </div>
 
