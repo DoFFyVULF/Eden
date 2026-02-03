@@ -15,7 +15,7 @@ export default function AdminAppointments() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [isPlannedAppointmentWindow, setPlannedAppointmentWindow] =
+  const [isTodayAppointmentsWindow, setTodayAppointmentsWindow] =
     useState(false);
   const [isConfirmWindowOpen, setIsConfirmWindowOpen] = useState(false);
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
@@ -146,12 +146,24 @@ export default function AdminAppointments() {
     searchQuery,
   ]);
 
+  // Новые записи (требуют подтверждения)
   const pendingAppointments = useMemo(
     () => appointments.filter((a) => a.status === AppointmentStatus.Новый),
     [appointments],
   );
 
-  const plannedAppointments = useMemo(
+  // Подтвержденные записи на сегодня
+  const todayConfirmedAppointments = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    return appointments.filter(
+      (app) =>
+        new Date(app.appointmentTime).toISOString().split("T")[0] === today &&
+        app.status === AppointmentStatus.Подтвержден
+    );
+  }, [appointments]);
+
+  // Все подтвержденные записи
+  const allConfirmedAppointments = useMemo(
     () =>
       appointments.filter((a) => a.status === AppointmentStatus.Подтвержден),
     [appointments],
@@ -159,11 +171,11 @@ export default function AdminAppointments() {
 
   const handleWindowConfirm = () => {
     setIsConfirmWindowOpen(true);
-    setPlannedAppointmentWindow(false);
+    setTodayAppointmentsWindow(false);
   };
 
-  const handlePlanedAppointments = () => {
-    setPlannedAppointmentWindow(true);
+  const handleTodayAppointments = () => {
+    setTodayAppointmentsWindow(true);
     setIsConfirmWindowOpen(false);
   };
 
@@ -173,7 +185,7 @@ export default function AdminAppointments() {
   };
 
   const handleCloseWindow = () => setIsConfirmWindowOpen(false);
-  const handleClosePlannedWindow = () => setPlannedAppointmentWindow(false);
+  const handleCloseTodayWindow = () => setTodayAppointmentsWindow(false);
   const handleCloseNewAppWindow = () => {
     setIsNewAppointmentOpen(false);
     setEditingAppointment(null);
@@ -189,6 +201,23 @@ export default function AdminAppointments() {
       setIsConfirmWindowOpen(false);
     } catch (err) {
       alert("Ошибка подтверждения записи.");
+      console.error(err);
+    }
+  };
+
+  const handleCancelAppointment = async (appointmentId: string) => {
+    if (!window.confirm("Вы уверены, что хотите отменить запись?")) return;
+    
+    try {
+      await appointmentService.update(Number(appointmentId), {
+        status: AppointmentStatus.Отменен,
+      });
+      const updated = await appointmentService.getAll();
+      setAppointments(updated);
+      setIsConfirmWindowOpen(false);
+      setTodayAppointmentsWindow(false);
+    } catch (err) {
+      alert("Ошибка отмены записи.");
       console.error(err);
     }
   };
@@ -408,13 +437,13 @@ export default function AdminAppointments() {
 
         <div
           className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white cursor-pointer hover:-translate-y-1 transition"
-          onClick={handlePlanedAppointments}
+          onClick={handleTodayAppointments}
         >
           <div className="text-3xl font-bold mb-2">
-            {plannedAppointments.length}
+            {todayConfirmedAppointments.length}
           </div>
-          <div className="text-green-100">Подтвержденные</div>
-          <div className="text-sm text-green-200 mt-1">На ближайшее время</div>
+          <div className="text-green-100">На сегодня</div>
+          <div className="text-sm text-green-200 mt-1">Подтвержденные записи</div>
         </div>
 
         <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-6 text-white hover:-translate-y-1 transition">
@@ -457,7 +486,6 @@ export default function AdminAppointments() {
                 status: appointment.status,
                 date: formatDate(appointment.appointmentTime),
                 duration: appointment.service.duration,
-                // Самое важное — передаём оригинальную дату-время
                 rawDateTime: appointment.appointmentTime,
               }}
               onEdit={handleEditAppointment}
@@ -495,17 +523,20 @@ export default function AdminAppointments() {
             status: a.status,
             date: formatDate(a.appointmentTime),
             duration: a.service.duration,
+            rawDateTime: a.appointmentTime,
           }))}
           onConfirm={handleConfirmAppointment}
+          onCancel={handleCancelAppointment}
+          windowType="new"
         />
       )}
 
-      {isPlannedAppointmentWindow && (
+      {isTodayAppointmentsWindow && (
         <AppointmentConfirmWindow
-          title="Подтвержденные записи"
-          isOpen={isPlannedAppointmentWindow}
-          onClose={handleClosePlannedWindow}
-          pendingAppointments={plannedAppointments.map((a) => ({
+          title="Записи на сегодня"
+          isOpen={isTodayAppointmentsWindow}
+          onClose={handleCloseTodayWindow}
+          pendingAppointments={todayConfirmedAppointments.map((a) => ({
             id: a.id.toString(),
             clientName: `${a.clientSurname} ${a.clientName}`,
             service: a.service.title,
@@ -515,9 +546,10 @@ export default function AdminAppointments() {
             status: a.status,
             date: formatDate(a.appointmentTime),
             duration: a.service.duration,
+            rawDateTime: a.appointmentTime,
           }))}
-          onConfirm={handleConfirmAppointment}
-          showAcceptButton={false}
+          onCancel={handleCancelAppointment}
+          windowType="confirmed"
         />
       )}
 

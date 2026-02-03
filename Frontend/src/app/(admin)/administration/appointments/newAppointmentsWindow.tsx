@@ -218,7 +218,7 @@ export default function NewAppointmentsWindow({
           masterId: Number(formData.master),
           serviceId: Number(formData.service),
           appointmentTime,
-          price: priceItem.price, // ← ЧИСЛО!
+          price: priceItem.price,
         };
 
         await appointmentService.update(initialData.id, updateDto);
@@ -231,7 +231,8 @@ export default function NewAppointmentsWindow({
           serviceId: Number(formData.service),
           appointmentTime,
           price: priceItem.price.toString(),
-          status: AppointmentStatus.Новый,
+          // ⬇️⬇️⬇️ ВАЖНОЕ ИЗМЕНЕНИЕ: записи созданные админом сразу подтверждены ⬇️⬇️⬇️
+          status: AppointmentStatus.Подтвержден, // Изменено с "Новый" на "Подтвержден"
         };
 
         await appointmentService.create(createDto);
@@ -256,6 +257,9 @@ export default function NewAppointmentsWindow({
           <h2 className="text-xl font-bold">
             {mode === "edit" ? "Редактирование записи" : "Новая запись"}
           </h2>
+          <p className="text-sm text-blue-100 mt-1">
+            {mode === "create" ? "Созданные записи сразу подтверждаются" : "Редактирование существующей записи"}
+          </p>
         </div>
 
         {error && (
