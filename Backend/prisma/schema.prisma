@@ -1,11 +1,11 @@
 generator client {
-  provider   = "prisma-client"
-  output     = "../generated/prisma"  // or wherever
+  provider = "prisma-client"
+  output   = "../generated/prisma" // or wherever
 }
 
 datasource db {
   provider = "postgresql"
-  url = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -70,10 +70,11 @@ model MasterSchedule {
 
 // done
 model Category {
-  id       Int       @id @default(autoincrement())
-  title    String    @unique
-  isActive Boolean   @default(true) @map("is_active")
-  services Service[]
+  id          Int       @id @default(autoincrement())
+  title       String    @unique
+  description String
+  isActive    Boolean   @default(true) @map("is_active")
+  services    Service[]
 
   @@map("category")
 }

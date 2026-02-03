@@ -20,6 +20,7 @@ export class CategoryService {
   async create(dto: CategoryDto) {
     const category = {
       title: dto.title,
+      description: dto.description,
       isActive: dto.isActive ?? true // значение по умолчанию
     };
 

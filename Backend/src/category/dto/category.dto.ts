@@ -3,7 +3,7 @@ import {
   IsNotEmpty,
   Length,
   IsBoolean,
-  IsOptional
+  IsOptional,
 } from 'class-validator';
 
 export class CategoryDto {
@@ -11,6 +11,10 @@ export class CategoryDto {
   @IsNotEmpty()
   @Length(1, 100)
   title: string;
+
+  @IsString()
+  @IsOptional()
+  description: string;
 
   @IsBoolean()
   @IsOptional()

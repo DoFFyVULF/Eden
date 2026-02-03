@@ -4,7 +4,7 @@ import { categoryService } from "@/services/category/category.service";
 interface CreateCategoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: (category: { id: number; title: string; isActive: boolean }) => void;
+  onSuccess?: (category: { id: number; title: string; description: string; isActive?: boolean }) => void;
 }
 
 export default function CreateCategoryModal({
@@ -42,6 +42,7 @@ export default function CreateCategoryModal({
       try {
         const newCategory = await categoryService.create({
           title: trimmedTitle,
+          description,
           isActive,
         });
 
@@ -58,7 +59,7 @@ export default function CreateCategoryModal({
         setIsLoading(false);
       }
     },
-    [title, isActive, onClose, onSuccess]
+    [title, description, isActive, onClose, onSuccess]
   );
 
   if (!isOpen) return null;
@@ -152,12 +153,8 @@ export default function CreateCategoryModal({
                 placeholder="Введите описание категории"
                 rows={3}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
-                disabled
+                
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Пока не сохраняется — реализация требует обновления DTO и
-                модели.
-              </p>
             </div>
           </div>
 

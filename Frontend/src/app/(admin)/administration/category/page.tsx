@@ -75,6 +75,7 @@ useEffect(() => {
       // Инвертируем isActive и обновляем на бэкенде
       const updated = await categoryService.update(categoryId, {
         title: category.title,
+        description: category.description,
         isActive: !category.isActive,
       });
 
@@ -232,6 +233,7 @@ useEffect(() => {
                 <tr>
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Название</th>
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Описание</th>
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
                 </tr>
               </thead>
@@ -250,6 +252,9 @@ useEffect(() => {
                         }`}>
                           {category.isActive ? 'Активна' : 'Скрыта'}
                         </span>
+                      </td>
+                      <td className='px-4 sm:px-6 py-4 whitespace-nowrap'>
+                        <div className="text-sm font-medium text-gray-900">{category.description}</div>
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex flex-wrap gap-2">

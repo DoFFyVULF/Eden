@@ -12,9 +12,10 @@ export const categoryService = {
     return data;
   },
 
-  async create(dto: { title: string; isActive?: boolean }): Promise<ICategory> {
+  async create(dto: { title: string; description: string; isActive?: boolean }): Promise<ICategory> {
     const { data } = await axiosWithAuth.post<ICategory>("/category", {
       title: dto.title,
+      description: dto.description,
       isActive: dto.isActive ?? true
     });
     return data;
@@ -22,7 +23,7 @@ export const categoryService = {
 
   async update(
     id: number,
-    dto: { title?: string; isActive?: boolean }
+    dto: { title: string; description: string; isActive?: boolean}
   ): Promise<ICategory> {
     const { data } = await axiosWithAuth.patch<ICategory>(`/category/${id}`, dto);
     return data;
