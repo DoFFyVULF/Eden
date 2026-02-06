@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/require-await */
 import {
   Controller,
   Post,
@@ -11,9 +8,10 @@ import {
   HttpCode,
   UsePipes,
   ValidationPipe,
+  Put
 } from '@nestjs/common';
 import { UserService } from './user.service';
-import { UserDto } from './dto/user.dto';
+import { UserDto, ChangePasswordDto } from './dto/user.dto';
 import { Auth } from 'src/auth/decorators/auth.decorator';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { Role } from 'generated/prisma/enums';
@@ -28,17 +26,15 @@ export class MasterUserController {
   @HttpCode(201)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   async create(@Body() dto: UserDto) {
-    // dto должен содержать login, password и masterId
     return await this.userService.createByAdmin({
       ...dto,
-      role: Role.master, // принудительно мастер
+      role: Role.master,
     });
   }
 
   @Roles(Role.admin)
   @Get()
   async getAll() {
-    // Получаем всех пользователей с ролью MASTER
     return this.userService.getAllMasters();
   }
 
@@ -47,5 +43,20 @@ export class MasterUserController {
   @HttpCode(204)
   async delete(@Param('id') id: string) {
     return this.userService.delete(Number(id));
+  }
+
+  /**
+   * 🔐 Изменение пароля мастера
+   * PUT /user/master/:id/password
+   */
+  @Roles(Role.admin)
+  @Put(':id/password')
+  @HttpCode(200)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  async changeMasterPassword(
+    @Param('id') id: string,
+    @Body() dto: ChangePasswordDto
+  ) {
+    return this.userService.changePassword(Number(id), dto);
   }
 }

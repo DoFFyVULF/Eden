@@ -32,6 +32,10 @@ export const ADMIN_ROUTES = {
     LIST: '/administration/category'
   },
 
+  ANALYTICS: {
+    DASHBOARD: '/administration/analytics'
+  },
+
   USERS: '/administration/user',
 
 } as const;

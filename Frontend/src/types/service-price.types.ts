@@ -18,6 +18,7 @@ export interface IServicePrice {
     id: number;
     name: string;
     surname: string;
+    specialization?: string; // Добавьте это поле
   };
 }
 
@@ -35,6 +36,7 @@ export interface UIServicePrice {
   // Мастер
   masterId: number;
   masterFullName: string;
+  masterSpecialization: string; // Добавьте эту строку
 
   // Кастомизация
   durationOverride?: number | null;

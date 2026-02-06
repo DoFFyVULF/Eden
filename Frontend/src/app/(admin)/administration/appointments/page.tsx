@@ -6,6 +6,27 @@ import AppointmentConfirmWindow from "./appointmentsConfirWnd";
 import NewAppointmentsWindow from "./newAppointmentsWindow";
 import { appointmentService } from "@/services/appointment/appointment.service";
 import { IAppointment, AppointmentStatus } from "@/types/appointment.types";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Search, 
+  Filter, 
+  Calendar, 
+  UserCheck, 
+  Clock, 
+  Users, 
+  CalendarDays,
+  CheckCircle,
+  XCircle,
+  Clock4,
+  AlertCircle,
+  Plus,
+  ChevronUp,
+  ChevronDown,
+  TrendingUp,
+  RefreshCw,
+  Download,
+  MoreVertical
+} from "lucide-react";
 
 type SortField = "status" | "time" | "client" | "service" | "date" | "master";
 type SortOrder = "asc" | "desc";
@@ -14,14 +35,14 @@ export default function AdminAppointments() {
   const [appointments, setAppointments] = useState<IAppointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const [isTodayAppointmentsWindow, setTodayAppointmentsWindow] =
-    useState(false);
+  const [isTodayAppointmentsWindow, setTodayAppointmentsWindow] = useState(false);
   const [isConfirmWindowOpen, setIsConfirmWindowOpen] = useState(false);
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  const [editingAppointment, setEditingAppointment] =
-    useState<IAppointment | null>(null);
+  const [editingAppointment, setEditingAppointment] = useState<IAppointment | null>(null);
 
   const [sortField, setSortField] = useState<SortField>("time");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
@@ -29,21 +50,22 @@ export default function AdminAppointments() {
   const [dateFilter, setDateFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  useEffect(() => {
-    const loadAppointments = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const data = await appointmentService.getAll();
-        setAppointments(data);
-      } catch (err) {
-        console.error("Ошибка загрузки записей:", err);
-        setError("Не удалось загрузить записи. Проверьте соединение.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const loadAppointments = async () => {
+    setIsRefreshing(true);
+    setError(null);
+    try {
+      const data = await appointmentService.getAll();
+      setAppointments(data);
+    } catch (err) {
+      console.error("Ошибка загрузки записей:", err);
+      setError("Не удалось загрузить записи. Проверьте соединение.");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
+  useEffect(() => {
     loadAppointments();
   }, []);
 
@@ -146,13 +168,12 @@ export default function AdminAppointments() {
     searchQuery,
   ]);
 
-  // Новые записи (требуют подтверждения)
+  // Статистика
   const pendingAppointments = useMemo(
     () => appointments.filter((a) => a.status === AppointmentStatus.Новый),
     [appointments],
   );
 
-  // Подтвержденные записи на сегодня
   const todayConfirmedAppointments = useMemo(() => {
     const today = new Date().toISOString().split("T")[0];
     return appointments.filter(
@@ -162,13 +183,18 @@ export default function AdminAppointments() {
     );
   }, [appointments]);
 
-  // Все подтвержденные записи
   const allConfirmedAppointments = useMemo(
     () =>
       appointments.filter((a) => a.status === AppointmentStatus.Подтвержден),
     [appointments],
   );
 
+  const completedAppointments = useMemo(
+    () => appointments.filter((a) => a.status === AppointmentStatus.Завершен),
+    [appointments],
+  );
+
+  // Обработчики
   const handleWindowConfirm = () => {
     setIsConfirmWindowOpen(true);
     setTodayAppointmentsWindow(false);
@@ -196,8 +222,7 @@ export default function AdminAppointments() {
       await appointmentService.update(Number(appointmentId), {
         status: AppointmentStatus.Подтвержден,
       });
-      const updated = await appointmentService.getAll();
-      setAppointments(updated);
+      await loadAppointments();
       setIsConfirmWindowOpen(false);
     } catch (err) {
       alert("Ошибка подтверждения записи.");
@@ -212,8 +237,7 @@ export default function AdminAppointments() {
       await appointmentService.update(Number(appointmentId), {
         status: AppointmentStatus.Отменен,
       });
-      const updated = await appointmentService.getAll();
-      setAppointments(updated);
+      await loadAppointments();
       setIsConfirmWindowOpen(false);
       setTodayAppointmentsWindow(false);
     } catch (err) {
@@ -246,8 +270,7 @@ export default function AdminAppointments() {
     if (!window.confirm("Удалить запись?")) return;
     try {
       await appointmentService.delete(Number(id));
-      const updated = await appointmentService.getAll();
-      setAppointments(updated);
+      await loadAppointments();
     } catch (err) {
       console.error("Ошибка удаления:", err);
       alert("Не удалось удалить запись");
@@ -286,296 +309,457 @@ export default function AdminAppointments() {
     });
   };
 
+  // Иконки для статусов
+  const getStatusIcon = (status: AppointmentStatus) => {
+    switch (status) {
+      case AppointmentStatus.Новый:
+        return <AlertCircle className="w-4 h-4 text-amber-500" />;
+      case AppointmentStatus.Подтвержден:
+        return <CheckCircle className="w-4 h-4 text-emerald-500" />;
+      case AppointmentStatus.Завершен:
+        return <Clock4 className="w-4 h-4 text-blue-500" />;
+      case AppointmentStatus.Отменен:
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
       {/* Заголовок и управление */}
       <div className="mb-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Управление записями
-            </h1>
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-3 mb-2"
+            >
+              <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl">
+                <CalendarDays className="w-6 h-6 text-white" />
+              </div>
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+                Управление записями
+              </h1>
+            </motion.div>
             <p className="text-gray-600">
               Всего записей:{" "}
-              <span className="font-semibold">
-                {filteredAndSortedAppointments.length}
+              <span className="font-semibold text-gray-800">
+                {appointments.length}
               </span>
-              {filteredAndSortedAppointments.length !== appointments.length &&
-                ` (из ${appointments.length})`}
+              {filteredAndSortedAppointments.length !== appointments.length && (
+                <span className="ml-2">
+                  (показано {filteredAndSortedAppointments.length})
+                </span>
+              )}
             </p>
           </div>
-          <button
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2"
-            onClick={handleNewAppWindow}
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          
+          <div className="flex flex-col sm:flex-row gap-3">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-all duration-300 shadow-sm"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            Новая запись
-          </button>
+              <Filter className="w-4 h-4" />
+              Фильтры
+              {isFilterOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </motion.button>
+            
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={loadAppointments}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-all duration-300 shadow-sm"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              Обновить
+            </motion.button>
+            
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleNewAppWindow}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-purple-700"
+            >
+              <Plus className="w-5 h-5" />
+              Новая запись
+            </motion.button>
+          </div>
         </div>
 
-        {/* Фильтры */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1 relative">
-              <svg
-                className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              <input
-                type="text"
-                placeholder="Поиск по клиентам, услугам, мастерам..."
-                className="w-full pl-10 pr-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-
-            <select
-              className="px-4 py-3 text-black border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 bg-white"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+        {/* Расширенные фильтры */}
+        <AnimatePresence>
+          {isFilterOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
             >
-              <option value="">Все статусы</option>
-              <option value="new">Новые</option>
-              <option value="confirmed">Подтвержденные</option>
-              <option value="completed">Завершенные</option>
-              <option value="cancelled">Отмененные</option>
-            </select>
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Поиск */}
+                  <div className="relative">
+                    <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Поиск по клиентам, услугам, мастерам..."
+                      className="w-full pl-10 pr-4 py-3 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 placeholder-gray-500 transition-all duration-300"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
 
-            <input
-              type="date"
-              className="px-4 py-3 text-black border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-            />
+                  {/* Фильтр по статусу */}
+                  <select
+                    className="w-full px-4 py-3 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-300"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                  >
+                    <option value="">Все статусы</option>
+                    <option value="new">Новые ⚡</option>
+                    <option value="confirmed">Подтвержденные ✅</option>
+                    <option value="completed">Завершенные 🏁</option>
+                    <option value="cancelled">Отмененные ❌</option>
+                  </select>
 
-            {(statusFilter || dateFilter || searchQuery) && (
-              <button
-                onClick={clearFilters}
-                className="px-4 py-3 text-red-600 border border-red-300 rounded-xl hover:bg-red-50"
-              >
-                Сбросить
-              </button>
-            )}
-          </div>
+                  {/* Фильтр по дате */}
+                  <div className="relative">
+                    <Calendar className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="date"
+                      className="w-full pl-10 pr-4 py-3 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-300"
+                      value={dateFilter}
+                      onChange={(e) => setDateFilter(e.target.value)}
+                    />
+                  </div>
+                </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            <span className="text-sm text-gray-600 font-medium mr-2">
-              Сортировка:
-            </span>
-            {(
-              [
-                "time",
-                "client",
-                "service",
-                "master",
-                "date",
-                "status",
-              ] as SortField[]
-            ).map((field) => (
-              <button
-                key={field}
-                onClick={() => handleSortChange(field)}
-                className={`px-3 py-1 text-sm rounded-lg border transition-colors ${
-                  sortField === field
-                    ? "bg-blue-100 text-blue-700 border-blue-300"
-                    : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
-                }`}
-              >
-                {field === "time" && "Время"}
-                {field === "client" && "Клиент"}
-                {field === "service" && "Услуга"}
-                {field === "master" && "Мастер"}
-                {field === "date" && "Дата"}
-                {field === "status" && "Статус"}
-                {sortField === field && (
-                  <span className="ml-1">
-                    {sortOrder === "asc" ? "↑" : "↓"}
-                  </span>
+                {/* Сортировка */}
+                <div className="mt-6">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Сортировка:</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {(
+                      [
+                        { field: "time", label: "Время", icon: Clock },
+                        { field: "client", label: "Клиент", icon: Users },
+                        { field: "service", label: "Услуга", icon: TrendingUp },
+                        { field: "master", label: "Мастер", icon: UserCheck },
+                        { field: "date", label: "Дата", icon: Calendar },
+                        { field: "status", label: "Статус", icon: AlertCircle },
+                      ] as const
+                    ).map(({ field, label, icon: Icon }) => (
+                      <motion.button
+                        key={field}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleSortChange(field)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all duration-300 ${
+                          sortField === field
+                            ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white border-transparent shadow-lg"
+                            : "bg-white/80 backdrop-blur-sm text-gray-700 border-gray-300/50 hover:bg-gray-50"
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span className="font-medium">{label}</span>
+                        {sortField === field && (
+                          <span className="ml-1">
+                            {sortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </span>
+                        )}
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Кнопки управления фильтрами */}
+                {(statusFilter || dateFilter || searchQuery) && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex justify-end mt-6 pt-4 border-t border-gray-200/50"
+                  >
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={clearFilters}
+                      className="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-300/50 rounded-lg hover:bg-red-50/50 transition-all duration-300"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      Сбросить фильтры
+                    </motion.button>
+                  </motion.div>
                 )}
-              </button>
-            ))}
-          </div>
-        </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Статистика */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div
-          className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white cursor-pointer hover:-translate-y-1 transition"
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <motion.div
+          whileHover={{ scale: 1.02, y: -2 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
           onClick={handleWindowConfirm}
+          className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-6 text-white cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
         >
-          <div className="text-3xl font-bold mb-2">
-            {pendingAppointments.length}
+          <div className="absolute top-0 right-0 p-4 opacity-20">
+            <AlertCircle className="w-16 h-16" />
           </div>
-          <div className="text-blue-100">Новые записи</div>
-          <div className="text-sm text-blue-200 mt-1">
-            Требуют подтверждения
+          <div className="relative z-10">
+            <div className="text-4xl font-bold mb-2">{pendingAppointments.length}</div>
+            <div className="text-amber-100 font-medium">Новые записи</div>
+            <div className="text-sm text-amber-200/80 mt-2">Требуют подтверждения</div>
           </div>
-        </div>
+        </motion.div>
 
-        <div
-          className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white cursor-pointer hover:-translate-y-1 transition"
+        <motion.div
+          whileHover={{ scale: 1.02, y: -2 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
           onClick={handleTodayAppointments}
+          className="bg-gradient-to-br from-emerald-500 to-green-500 rounded-2xl p-6 text-white cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
         >
-          <div className="text-3xl font-bold mb-2">
-            {todayConfirmedAppointments.length}
+          <div className="absolute top-0 right-0 p-4 opacity-20">
+            <CheckCircle className="w-16 h-16" />
           </div>
-          <div className="text-green-100">На сегодня</div>
-          <div className="text-sm text-green-200 mt-1">Подтвержденные записи</div>
+          <div className="relative z-10">
+            <div className="text-4xl font-bold mb-2">{todayConfirmedAppointments.length}</div>
+            <div className="text-emerald-100 font-medium">На сегодня</div>
+            <div className="text-sm text-emerald-200/80 mt-2">Подтвержденные записи</div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          whileHover={{ scale: 1.02, y: -2 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 p-4 opacity-20">
+            <CalendarDays className="w-16 h-16" />
+          </div>
+          <div className="relative z-10">
+            <div className="text-4xl font-bold mb-2">{allConfirmedAppointments.length}</div>
+            <div className="text-blue-100 font-medium">Подтверждено</div>
+            <div className="text-sm text-blue-200/80 mt-2">Все предстоящие записи</div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          whileHover={{ scale: 1.02, y: -2 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 p-4 opacity-20">
+            <Clock4 className="w-16 h-16" />
+          </div>
+          <div className="relative z-10">
+            <div className="text-4xl font-bold mb-2">{completedAppointments.length}</div>
+            <div className="text-purple-100 font-medium">Завершено</div>
+            <div className="text-sm text-purple-200/80 mt-2">Выполненные записи</div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Список записей */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50 overflow-hidden">
+        {/* Заголовок таблицы */}
+        <div className="p-4 border-b border-gray-200/50">
+          <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
+            <div className="col-span-3">Клиент</div>
+            <div className="col-span-2">Услуга</div>
+            <div className="col-span-2">Мастер</div>
+            <div className="col-span-2">Дата и время</div>
+            <div className="col-span-2">Статус</div>
+            <div className="col-span-1 text-center">Действия</div>
+          </div>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-6 text-white hover:-translate-y-1 transition">
-          <div className="text-3xl font-bold mb-2">{appointments.length}</div>
-          <div className="text-purple-100">Всего записей</div>
-          <div className="text-sm text-purple-200 mt-1">В системе</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 text-white hover:-translate-y-1 transition">
-          <div className="text-3xl font-bold mb-2">
-            {filteredAndSortedAppointments.length}
-          </div>
-          <div className="text-orange-100">Показано</div>
-          <div className="text-sm text-orange-200 mt-1">После фильтрации</div>
+        {/* Тело таблицы */}
+        <div className="divide-y divide-gray-100/50">
+          {isLoading ? (
+            <div className="p-8 text-center">
+              <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent"></div>
+              <p className="mt-4 text-gray-500">Загрузка записей...</p>
+            </div>
+          ) : error ? (
+            <div className="p-8 text-center">
+              <div className="inline-flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mb-4">
+                <XCircle className="w-6 h-6 text-red-600" />
+              </div>
+              <p className="text-red-600 font-medium">{error}</p>
+              <button
+                onClick={loadAppointments}
+                className="mt-4 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:opacity-90 transition-opacity"
+              >
+                Попробовать снова
+              </button>
+            </div>
+          ) : filteredAndSortedAppointments.length > 0 ? (
+            <AnimatePresence>
+              {filteredAndSortedAppointments.map((appointment, index) => (
+                <motion.div
+                  key={appointment.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="hover:bg-gray-50/50 transition-colors duration-200"
+                >
+                  <AppointmentItem
+                    appointment={{
+                      id: appointment.id.toString(),
+                      clientName: `${appointment.clientSurname} ${appointment.clientName}`,
+                      service: appointment.service.title,
+                      time: formatTime(appointment.appointmentTime),
+                      price: `${appointment.price.toLocaleString()} ₽`,
+                      master: `${appointment.master.surname} ${appointment.master.name}`,
+                      status: appointment.status,
+                      date: formatDate(appointment.appointmentTime),
+                      duration: appointment.service.duration,
+                      rawDateTime: appointment.appointmentTime,
+                    }}
+                    onEdit={handleEditAppointment}
+                    onDelete={handleDeleteAppointment}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          ) : (
+            <div className="p-8 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+                <Search className="w-8 h-8 text-gray-400" />
+              </div>
+              <p className="text-gray-500 font-medium">Записи не найдены</p>
+              <p className="text-gray-400 text-sm mt-1">
+                Попробуйте изменить параметры поиска или фильтрации
+              </p>
+              {(statusFilter || dateFilter || searchQuery) && (
+                <button
+                  onClick={clearFilters}
+                  className="mt-4 px-4 py-2 text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Сбросить фильтры
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Список */}
-      <div className="space-y-4">
-        {isLoading ? (
-          <div className="text-center py-8">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
-            <p className="mt-2 text-gray-500">Загрузка...</p>
+      {/* Футер с информацией */}
+      <div className="mt-8 flex flex-col md:flex-row md:items-center justify-between gap-4 text-sm text-gray-500">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+            <span>Новые</span>
           </div>
-        ) : error ? (
-          <div className="text-center py-8 text-red-600 bg-red-50 rounded-xl">
-            {error}
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+            <span>Подтвержденные</span>
           </div>
-        ) : filteredAndSortedAppointments.length > 0 ? (
-          filteredAndSortedAppointments.map((appointment) => (
-            <AppointmentItem
-              key={appointment.id}
-              appointment={{
-                id: appointment.id.toString(),
-                clientName: `${appointment.clientSurname} ${appointment.clientName}`,
-                service: appointment.service.title,
-                time: formatTime(appointment.appointmentTime),
-                price: `${appointment.price.toLocaleString()} ₽`,
-                master: `${appointment.master.surname} ${appointment.master.name}`,
-                status: appointment.status,
-                date: formatDate(appointment.appointmentTime),
-                duration: appointment.service.duration,
-                rawDateTime: appointment.appointmentTime,
-              }}
-              onEdit={handleEditAppointment}
-              onDelete={handleDeleteAppointment}
-            />
-          ))
-        ) : (
-          <div className="text-center py-8 text-gray-500">
-            Записи не найдены. Попробуйте изменить фильтры.
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+            <span>Завершенные</span>
           </div>
-        )}
-      </div>
-
-      {/* Пагинация */}
-      <div className="flex justify-center items-center gap-2 mt-8">
-        <span className="text-gray-500 text-sm">
-          Показано {filteredAndSortedAppointments.length} из{" "}
-          {appointments.length}
-        </span>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+            <span>Отмененные</span>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <span>
+            Загружено: {appointments.length} записей
+          </span>
+          <button className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium">
+            <Download className="w-4 h-4" />
+            Экспорт в CSV
+          </button>
+        </div>
       </div>
 
       {/* Модальные окна */}
-      {isConfirmWindowOpen && (
-        <AppointmentConfirmWindow
-          title="Подтверждение записи"
-          isOpen={isConfirmWindowOpen}
-          onClose={handleCloseWindow}
-          pendingAppointments={pendingAppointments.map((a) => ({
-            id: a.id.toString(),
-            clientName: `${a.clientSurname} ${a.clientName}`,
-            service: a.service.title,
-            time: formatTime(a.appointmentTime),
-            price: `${a.price.toLocaleString()} ₽`,
-            master: `${a.master.surname} ${a.master.name}`,
-            status: a.status,
-            date: formatDate(a.appointmentTime),
-            duration: a.service.duration,
-            rawDateTime: a.appointmentTime,
-          }))}
-          onConfirm={handleConfirmAppointment}
-          onCancel={handleCancelAppointment}
-          windowType="new"
-        />
-      )}
+      <AnimatePresence>
+        {isConfirmWindowOpen && (
+          <AppointmentConfirmWindow
+            title="Подтверждение записи"
+            isOpen={isConfirmWindowOpen}
+            onClose={handleCloseWindow}
+            pendingAppointments={pendingAppointments.map((a) => ({
+              id: a.id.toString(),
+              clientName: `${a.clientSurname} ${a.clientName}`,
+              service: a.service.title,
+              time: formatTime(a.appointmentTime),
+              price: `${a.price.toLocaleString()} ₽`,
+              master: `${a.master.surname} ${a.master.name}`,
+              status: a.status,
+              date: formatDate(a.appointmentTime),
+              duration: a.service.duration,
+              rawDateTime: a.appointmentTime,
+            }))}
+            onConfirm={handleConfirmAppointment}
+            onCancel={handleCancelAppointment}
+            windowType="new"
+          />
+        )}
 
-      {isTodayAppointmentsWindow && (
-        <AppointmentConfirmWindow
-          title="Записи на сегодня"
-          isOpen={isTodayAppointmentsWindow}
-          onClose={handleCloseTodayWindow}
-          pendingAppointments={todayConfirmedAppointments.map((a) => ({
-            id: a.id.toString(),
-            clientName: `${a.clientSurname} ${a.clientName}`,
-            service: a.service.title,
-            time: formatTime(a.appointmentTime),
-            price: `${a.price.toLocaleString()} ₽`,
-            master: `${a.master.surname} ${a.master.name}`,
-            status: a.status,
-            date: formatDate(a.appointmentTime),
-            duration: a.service.duration,
-            rawDateTime: a.appointmentTime,
-          }))}
-          onCancel={handleCancelAppointment}
-          windowType="confirmed"
-        />
-      )}
+        {isTodayAppointmentsWindow && (
+          <AppointmentConfirmWindow
+            title="Записи на сегодня"
+            isOpen={isTodayAppointmentsWindow}
+            onClose={handleCloseTodayWindow}
+            pendingAppointments={todayConfirmedAppointments.map((a) => ({
+              id: a.id.toString(),
+              clientName: `${a.clientSurname} ${a.clientName}`,
+              service: a.service.title,
+              time: formatTime(a.appointmentTime),
+              price: `${a.price.toLocaleString()} ₽`,
+              master: `${a.master.surname} ${a.master.name}`,
+              status: a.status,
+              date: formatDate(a.appointmentTime),
+              duration: a.service.duration,
+              rawDateTime: a.appointmentTime,
+            }))}
+            onCancel={handleCancelAppointment}
+            windowType="confirmed"
+          />
+        )}
 
-      {isNewAppointmentOpen && (
-        <NewAppointmentsWindow
-          isOpen={isNewAppointmentOpen}
-          onClose={handleCloseNewAppWindow}
-          onSuccess={() => {
-            appointmentService.getAll().then(setAppointments);
-          }}
-          mode={editingAppointment ? "edit" : "create"}
-          initialData={
-            editingAppointment
-              ? {
-                  id: editingAppointment.id,
-                  clientSurname: editingAppointment.clientSurname,
-                  clientName: editingAppointment.clientName,
-                  clientPhone: editingAppointment.clientPhone,
-                  masterId: editingAppointment.master.id,
-                  serviceId: editingAppointment.service.id,
-                  appointmentTime: editingAppointment.appointmentTime,
-                }
-              : undefined
-          }
-        />
-      )}
+        {isNewAppointmentOpen && (
+          <NewAppointmentsWindow
+            isOpen={isNewAppointmentOpen}
+            onClose={handleCloseNewAppWindow}
+            onSuccess={() => {
+              loadAppointments();
+            }}
+            mode={editingAppointment ? "edit" : "create"}
+            initialData={
+              editingAppointment
+                ? {
+                    id: editingAppointment.id,
+                    clientSurname: editingAppointment.clientSurname,
+                    clientName: editingAppointment.clientName,
+                    clientPhone: editingAppointment.clientPhone,
+                    masterId: editingAppointment.master.id,
+                    serviceId: editingAppointment.service.id,
+                    appointmentTime: editingAppointment.appointmentTime,
+                  }
+                : undefined
+            }
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

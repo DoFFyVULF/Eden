@@ -9,7 +9,7 @@ export const userService = {
   }) {
     return axiosWithAuth.post<IUser>("/user/master", {
       ...data,
-      role: "master", // Добавляем роль, чтобы пройти валидацию @IsEnum(Role)
+      role: "master",
     });
   },
 
@@ -28,4 +28,19 @@ export const userService = {
   deleteMasterUser(id: number) {
     return axiosWithAuth.delete(`/user/master/${id}`);
   },
+
+  // Изменение пароля текущего пользователя
+  changeMyPassword(password: string) {
+    return axiosWithAuth.put("/user/me/password", { password });
+  },
+
+  // Сброс пароля другого пользователя (только админ)
+  resetUserPassword(userId: number, password: string) {
+    return axiosWithAuth.put(`/user/master/${userId}/password`, { password });
+  },
+
+  // Альтернативный вариант через основной контроллер
+  resetPassword(userId: number, password: string) {
+    return axiosWithAuth.put(`/user/${userId}/password`, { password });
+  }
 };

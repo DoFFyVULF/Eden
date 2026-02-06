@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-// src/user/user.controller.ts
 import {
   Body,
   Controller,
@@ -7,11 +5,13 @@ import {
   HttpCode,
   NotFoundException,
   Post,
+  Put,
+  Param,
   UsePipes,
   ValidationPipe
 } from '@nestjs/common';
 import { UserService } from './user.service';
-import { UserDto } from './dto/user.dto';
+import { UserDto, ChangePasswordDto } from './dto/user.dto';
 import { Auth } from 'src/auth/decorators/auth.decorator';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
@@ -23,7 +23,7 @@ import { User } from 'generated/prisma/client';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  // Создание администратора (если нужно через API)
+  // Создание администратора
   @Roles(Role.admin)
   @Post()
   @HttpCode(201)
@@ -32,9 +32,9 @@ export class UserController {
     return await this.userService.createByAdmin(dto);
   }
 
-  // ПОЛУЧЕНИЕ ВСЕХ АДМИНОВ (То, что вы вызываете с фронтенда)
+  // ПОЛУЧЕНИЕ ВСЕХ АДМИНОВ
   @Roles(Role.admin)
-  @Get('admin') // Путь будет: GET /user/admin
+  @Get('admin')
   async getAllAdmins() {
     return this.userService.getAllAdmins();
   }
@@ -45,7 +45,38 @@ export class UserController {
     const user = await this.userService.getById(id);
     if (!user) throw new NotFoundException('Пользователь не найден');
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...result } = user;
     return result;
+  }
+
+  /**
+   * 🔐 Изменение пароля текущего пользователя
+   * PUT /user/me/password
+   */
+  @Roles(Role.admin, Role.master)
+  @Put('me/password')
+  @HttpCode(200)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  async changeMyPassword(
+    @CurrentUser('id') userId: number,
+    @Body() dto: ChangePasswordDto
+  ) {
+    return this.userService.changePassword(userId, dto);
+  }
+
+  /**
+   * 🔐 Сброс пароля другого пользователя (только админ)
+   * PUT /user/:id/password
+   */
+  @Roles(Role.admin)
+  @Put(':id/password')
+  @HttpCode(200)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  async resetPassword(
+    @Param('id') id: string,
+    @Body() dto: ChangePasswordDto
+  ) {
+    return this.userService.changePassword(Number(id), dto);
   }
 }

@@ -1,23 +1,58 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Search, 
+  Filter, 
+  Plus, 
+  MoreVertical, 
+  Edit, 
+  Trash2, 
+  Eye, 
+  EyeOff, 
+  RefreshCw,
+  TrendingUp,
+  FolderTree,
+  CheckCircle,
+  XCircle,
+  ChevronDown,
+  Sparkles,
+  Layers,
+  BarChart3
+} from 'lucide-react';
 import { categoryService } from '@/services/category/category.service';
 import { ICategory } from '@/types/category.types';
 import CreateCategoryModal from './CreateCategoryModal';
+
+// Расширяем интерфейс или создаем локальный тип
+type CategoryWithServicesCount = ICategory & {
+  _count?: {
+    services?: number;
+  };
+};
 
 export default function Category() {
   const [categories, setCategories] = useState<ICategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<ICategory | null>(null);
+  const [servicesCount, setServicesCount] = useState<Record<number, number>>({});
 
-useEffect(() => {
-  const fetchCategories = async () => {
-    try {
+  const loadCategories = async (showLoading = true) => {
+    if (showLoading) {
       setLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
+    
+    try {
       const data = await categoryService.getAll();
       
       if (!Array.isArray(data)) {
@@ -25,34 +60,51 @@ useEffect(() => {
       }
 
       setCategories(data);
+      setError(null);
+      
+      // Если в данных есть подсчет услуг, извлекаем его
+      const counts: Record<number, number> = {};
+      data.forEach(category => {
+        // Проверяем, есть ли поле services в категории
+        if ('services' in category && Array.isArray((category as any).services)) {
+          counts[category.id] = (category as any).services.length;
+        } else if ('_count' in category && (category as any)._count?.services) {
+          counts[category.id] = (category as any)._count.services;
+        } else {
+          counts[category.id] = 0; // Значение по умолчанию
+        }
+      });
+      setServicesCount(counts);
     } catch (err: any) {
       setError(err.message || 'Ошибка загрузки');
       console.error(err);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
-  fetchCategories();
-}, []);
+  useEffect(() => {
+    loadCategories();
+  }, []);
 
   // 📊 Статистика
   const stats = useMemo(() => {
-    // Подсчитываем услуги по категориям — пока заглушка (0), т.к. нет связи с сервисами
-    // Когда добавишь `/category/:id/services` — можно будет уточнить
+    const totalServices = Object.values(servicesCount).reduce((sum, count) => sum + count, 0);
+    
     return {
       total: categories.length,
       active: categories.filter(cat => cat.isActive).length,
       inactive: categories.filter(cat => !cat.isActive).length,
-      totalServices: 0, // ← замени позже на реальный подсчёт
+      totalServices,
     };
-  }, [categories]);
+  }, [categories, servicesCount]);
 
   // 🔍 Фильтрация
   const filteredCategories = useMemo(() => {
     return categories.filter(category => {
-      const matchesSearch = category.title.toLowerCase().includes(searchQuery.toLowerCase());
-      // Добавь description, если будет в ICategory
+      const matchesSearch = category.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          category.description?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === "" || 
                           (statusFilter === "active" && category.isActive) ||
                           (statusFilter === "inactive" && !category.isActive);
@@ -64,15 +116,15 @@ useEffect(() => {
   const clearFilters = () => {
     setSearchQuery("");
     setStatusFilter("");
+    setIsFilterOpen(false);
   };
 
-  // 🔄 Переключение статуса (активность)
+  // 🔄 Переключение статуса
   const toggleCategoryStatus = useCallback(async (categoryId: number) => {
     const category = categories.find(c => c.id === categoryId);
     if (!category) return;
 
     try {
-      // Инвертируем isActive и обновляем на бэкенде
       const updated = await categoryService.update(categoryId, {
         title: category.title,
         description: category.description,
@@ -95,6 +147,14 @@ useEffect(() => {
     try {
       await categoryService.delete(categoryId);
       setCategories(prev => prev.filter(cat => cat.id !== categoryId));
+      setSelectedCategory(null);
+      
+      // Удаляем счетчик услуг для удаленной категории
+      setServicesCount(prev => {
+        const newCounts = { ...prev };
+        delete newCounts[categoryId];
+        return newCounts;
+      });
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Ошибка при удалении категории';
       alert(msg);
@@ -105,21 +165,24 @@ useEffect(() => {
   // ✅ После создания — обновляем список
   const handleCategoryCreated = useCallback(async () => {
     try {
-      const updated = await categoryService.getAll();
-      setCategories(updated);
-      alert('Категория успешно создана!');
+      await loadCategories(false);
     } catch (err) {
-      alert('Категория создана, но список не обновлён. Обновите страницу.');
+      console.error('Ошибка обновления списка:', err);
     }
   }, []);
 
-  // 🖼️ Рендер
+  // Получение количества услуг для категории
+  const getServicesCount = (categoryId: number) => {
+    return servicesCount[categoryId] || 0;
+  };
+
+  // 🖼️ Рендер состояний
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-6">
         <div className="text-center">
-          <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-          <p className="mt-4 text-gray-600">Загрузка категорий...</p>
+          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+          <p className="mt-4 text-gray-600 font-medium">Загрузка категорий...</p>
         </div>
       </div>
     );
@@ -127,15 +190,18 @@ useEffect(() => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-        <div className="bg-white p-8 rounded-2xl shadow-lg text-center max-w-md">
-          <div className="text-red-500 text-5xl mb-4">⚠️</div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Ошибка загрузки</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-6">
+        <div className="bg-white/80 backdrop-blur-sm p-8 rounded-3xl shadow-2xl border border-gray-200/50 text-center max-w-md">
+          <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <XCircle className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Ошибка загрузки</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
           <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition"
+            onClick={() => loadCategories()}
+            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-300"
           >
+            <RefreshCw className="w-4 h-4 inline mr-2" />
             Повторить
           </button>
         </div>
@@ -144,151 +210,377 @@ useEffect(() => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
-      <div className="max-w-8xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
         {/* Заголовок и управление */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                Управление категориями
-              </h1>
-              <p className="text-gray-600 mt-1">
-                Всего: <span className="font-semibold">{stats.total}</span>
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-3 mb-2"
+              >
+                <div className="p-2.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl">
+                  <FolderTree className="w-6 h-6 text-white" />
+                </div>
+                <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+                  Управление категориями
+                </h1>
+              </motion.div>
+              <p className="text-gray-600">
+                Всего категорий: <span className="font-semibold text-gray-800">{categories.length}</span>
+                {filteredCategories.length !== categories.length && (
+                  <span className="ml-2">
+                    (показано {filteredCategories.length})
+                  </span>
+                )}
               </p>
             </div>
-            <button
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2 whitespace-nowrap"
-              onClick={() => setIsModalOpen(true)}
-            >
-              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Новая категория
-            </button>
-          </div>
-
-          {/* Фильтры */}
-          <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-gray-200">
+            
             <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1">
-                <div className="relative">
-                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <input
-                    type="text"
-                    placeholder="Поиск по названию..."
-                    className="w-full pl-10 pr-4 py-2.5 sm:py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-              </div>
-              <select 
-                className="px-4 py-2.5 sm:py-3 text-black border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-medium hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
               >
-                <option value="">Все статусы</option>
-                <option value="active">Активные</option>
-                <option value="inactive">Неактивные</option>
-              </select>
-              {(searchQuery || statusFilter) && (
-                <button
-                  onClick={clearFilters}
-                  className="px-4 py-2.5 sm:py-3 text-red-600 border border-red-300 rounded-xl hover:bg-red-50 transition-colors whitespace-nowrap"
-                >
-                  Сбросить
-                </button>
-              )}
+                <Filter className="w-4 h-4" />
+                Фильтры
+                {isFilterOpen ? <ChevronDown className="w-4 h-4 rotate-180" /> : <ChevronDown className="w-4 h-4" />}
+              </motion.button>
+              
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => loadCategories(false)}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-medium hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                Обновить
+              </motion.button>
+              
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-purple-700"
+              >
+                <Plus className="w-5 h-5" />
+                Новая категория
+              </motion.button>
             </div>
           </div>
+
+          {/* Расширенные фильтры */}
+          <AnimatePresence>
+            {isFilterOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Поиск */}
+                    <div className="relative">
+                      <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Поиск по названию или описанию..."
+                        className="w-full pl-10 pr-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 placeholder-gray-500 transition-all duration-300"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Фильтр по статусу */}
+                    <select
+                      className="w-full px-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-300"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                      <option value="">Все статусы</option>
+                      <option value="active">Активные ✅</option>
+                      <option value="inactive">Неактивные ❌</option>
+                    </select>
+                  </div>
+
+                  {/* Кнопки управления фильтрами */}
+                  {(statusFilter || searchQuery) && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex justify-end mt-6 pt-4 border-t border-gray-200/50"
+                    >
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={clearFilters}
+                        className="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-300/50 rounded-lg hover:bg-red-50/50 transition-all duration-300"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Сбросить фильтры
+                      </motion.button>
+                    </motion.div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Статистика */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          {[
-            { label: 'Всего', value: stats.total, color: 'blue', desc: 'категорий' },
-            { label: 'Активные', value: stats.active, color: 'green', desc: 'доступны' },
-            { label: 'Скрыты', value: stats.inactive, color: 'red', desc: 'неактивны' },
-            { label: 'Услуг', value: stats.totalServices, color: 'purple', desc: 'в категории' },
-          ].map((stat, i) => (
-            <div 
-              key={i}
-              className={`bg-gradient-to-br from-${stat.color}-500 to-${stat.color}-600 rounded-2xl p-4 sm:p-6 text-white hover:-translate-y-1 transition-all duration-200`}
-            >
-              <div className="text-2xl sm:text-3xl font-bold">{stat.value}</div>
-              <div className="text-${stat.color}-100 text-sm mt-1">{stat.label}</div>
-              <div className="text-xs text-${stat.color}-200 mt-0.5">{stat.desc}</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <motion.div
+            whileHover={{ scale: 1.02, y: -2 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-4 opacity-20">
+              <Layers className="w-16 h-16" />
             </div>
-          ))}
+            <div className="relative z-10">
+              <div className="text-4xl font-bold mb-2">{stats.total}</div>
+              <div className="text-blue-100 font-medium">Всего категорий</div>
+              <div className="text-sm text-blue-200/80 mt-2">В системе</div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ scale: 1.02, y: -2 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-gradient-to-br from-emerald-500 to-green-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-4 opacity-20">
+              <CheckCircle className="w-16 h-16" />
+            </div>
+            <div className="relative z-10">
+              <div className="text-4xl font-bold mb-2">{stats.active}</div>
+              <div className="text-emerald-100 font-medium">Активные</div>
+              <div className="text-sm text-emerald-200/80 mt-2">Доступны для выбора</div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ scale: 1.02, y: -2 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-4 opacity-20">
+              <EyeOff className="w-16 h-16" />
+            </div>
+            <div className="relative z-10">
+              <div className="text-4xl font-bold mb-2">{stats.inactive}</div>
+              <div className="text-amber-100 font-medium">Неактивные</div>
+              <div className="text-sm text-amber-200/80 mt-2">Скрыты от клиентов</div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ scale: 1.02, y: -2 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-4 opacity-20">
+              <BarChart3 className="w-16 h-16" />
+            </div>
+            <div className="relative z-10">
+              <div className="text-4xl font-bold mb-2">{stats.totalServices}</div>
+              <div className="text-purple-100 font-medium">Всего услуг</div>
+              <div className="text-sm text-purple-200/80 mt-2">В категориях</div>
+            </div>
+          </motion.div>
         </div>
 
-        {/* Таблица */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Название</th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Описание</th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredCategories.length > 0 ? (
-                  filteredCategories.map((category) => (
-                    <tr key={category.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{category.title}</div>
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2.5 py-1 text-xs font-semibold rounded-full ${
+        {/* Карточки категорий */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          <AnimatePresence>
+            {filteredCategories.length > 0 ? (
+              filteredCategories.map((category, index) => (
+                <motion.div
+                  key={category.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  whileHover={{ scale: 1.01, y: -2 }}
+                  className="bg-gradient-to-br from-white to-gray-50/50 rounded-3xl border border-gray-200/50 p-6 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm overflow-hidden group"
+                >
+                  {/* Заголовок и статус */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-xl ${
+                        category.isActive 
+                          ? 'bg-gradient-to-br from-emerald-500/10 to-green-500/10' 
+                          : 'bg-gradient-to-br from-amber-500/10 to-orange-500/10'
+                      }`}>
+                        <FolderTree className={`w-5 h-5 ${
+                          category.isActive ? 'text-emerald-600' : 'text-amber-600'
+                        }`} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-gray-900 text-lg">{category.title}</h3>
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full mt-1 ${
                           category.isActive 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-gray-100 text-gray-600'
+                            ? 'bg-emerald-100 text-emerald-700' 
+                            : 'bg-amber-100 text-amber-700'
                         }`}>
+                          {category.isActive ? <CheckCircle className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
                           {category.isActive ? 'Активна' : 'Скрыта'}
                         </span>
-                      </td>
-                      <td className='px-4 sm:px-6 py-4 whitespace-nowrap'>
-                        <div className="text-sm font-medium text-gray-900">{category.description}</div>
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() => toggleCategoryStatus(category.id)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                              category.isActive
-                                ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                                : 'bg-green-100 text-green-700 hover:bg-green-200'
-                            }`}
+                      </div>
+                    </div>
+                    
+                    {/* Действия */}
+                    <div className="relative">
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => setSelectedCategory(
+                          selectedCategory?.id === category.id ? null : category
+                        )}
+                        className={`p-1.5 rounded-lg transition-all ${
+                          selectedCategory?.id === category.id 
+                            ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white' 
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </motion.button>
+                      
+                      {/* Выпадающее меню */}
+                      <AnimatePresence>
+                        {selectedCategory?.id === category.id && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                            className="absolute right-0 top-full mt-2 w-48 bg-white/90 backdrop-blur-lg rounded-2xl shadow-2xl border border-gray-200/50 overflow-hidden z-50"
                           >
-                            {category.isActive ? 'Скрыть' : 'Показать'}
-                          </button>
-                          <button
-                            onClick={() => deleteCategory(category.id)}
-                            className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-medium hover:bg-red-200 transition-colors"
-                          >
-                            Удалить
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            <div className="p-2">
+                              <motion.button
+                                whileHover={{ x: 5 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => toggleCategoryStatus(category.id)}
+                                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50/50 transition-all duration-200 text-gray-700 hover:text-blue-600"
+                              >
+                                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                                  {category.isActive ? (
+                                    <EyeOff className="w-4 h-4 text-blue-600" />
+                                  ) : (
+                                    <Eye className="w-4 h-4 text-blue-600" />
+                                  )}
+                                </div>
+                                <div className="text-left">
+                                  <p className="font-medium">{category.isActive ? 'Скрыть' : 'Показать'}</p>
+                                  <p className="text-xs text-gray-500">Изменить статус</p>
+                                </div>
+                              </motion.button>
+                              
+                              <motion.button
+                                whileHover={{ x: 5 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => deleteCategory(category.id)}
+                                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50/50 transition-all duration-200 text-gray-700 hover:text-red-600 mt-1"
+                              >
+                                <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                                  <Trash2 className="w-4 h-4 text-red-600" />
+                                </div>
+                                <div className="text-left">
+                                  <p className="font-medium">Удалить</p>
+                                  <p className="text-xs text-gray-500">Удалить категорию</p>
+                                </div>
+                              </motion.button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  {/* Описание */}
+                  {category.description && (
+                    <div className="mb-6">
+                      <p className="text-sm text-gray-600 line-clamp-2">{category.description}</p>
+                    </div>
+                  )}
+
+                  {/* Информация */}
+                  <div className="flex items-center justify-between text-sm text-gray-500">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4" />
+                      <span>{getServicesCount(category.id)} услуг</span>
+                    </div>
+                    <span className="text-xs bg-gray-100 px-2 py-1 rounded-full">
+                      ID: {category.id}
+                    </span>
+                  </div>
+                </motion.div>
+              ))
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="col-span-full bg-white/80 backdrop-blur-sm rounded-2xl p-8 text-center border border-gray-200/50"
+              >
+                <div className="w-16 h-16 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Search className="w-8 h-8 text-gray-400" />
+                </div>
+                <p className="text-gray-500 font-medium">Категории не найдены</p>
+                <p className="text-gray-400 text-sm mt-1">
+                  {searchQuery || statusFilter 
+                    ? "Попробуйте изменить параметры поиска" 
+                    : "Создайте первую категорию"}
+                </p>
+                {searchQuery || statusFilter ? (
+                  <button
+                    onClick={clearFilters}
+                    className="mt-4 px-4 py-2 text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Сбросить фильтры
+                  </button>
                 ) : (
-                  <tr>
-                    <td colSpan={3} className="px-4 sm:px-6 py-8 text-center text-gray-500">
-                      {searchQuery || statusFilter 
-                        ? 'Категории не найдены по заданным фильтрам.' 
-                        : 'Пока нет категорий. Создайте первую!'}
-                    </td>
-                  </tr>
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="mt-4 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:opacity-90 transition-opacity"
+                  >
+                    Создать категорию
+                  </button>
                 )}
-              </tbody>
-            </table>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Информация внизу */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 text-sm text-gray-500">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+              <span>Активные</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+              <span>Скрытые</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <span>
+              Загружено: {categories.length} категорий
+            </span>
+            <span className="text-blue-600 font-medium">
+              {stats.totalServices} услуг всего
+            </span>
           </div>
         </div>
 

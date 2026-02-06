@@ -1,4 +1,3 @@
-// src/user/user.service.ts
 import {
   BadRequestException,
   Injectable,
@@ -6,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { hash } from 'argon2';
-import { UserDto } from './dto/user.dto';
+import { UserDto, ChangePasswordDto } from './dto/user.dto';
 import { Role } from 'generated/prisma/enums';
 
 @Injectable()
@@ -30,7 +29,6 @@ export class UserService {
       throw new BadRequestException('Пользователь уже существует');
     }
 
-    // 🧠 Бизнес-валидация ролей
     if (dto.role === Role.master && !dto.masterId) {
       throw new BadRequestException(
         'Для роли MASTER необходимо указать masterId'
@@ -43,7 +41,6 @@ export class UserService {
       );
     }
 
-    // Проверяем мастера
     if (dto.masterId) {
       const master = await this.prisma.master.findUnique({
         where: { id: dto.masterId }
@@ -66,11 +63,29 @@ export class UserService {
     });
   }
 
+  /**
+   * 🔐 Изменение пароля пользователя
+   */
+  async changePassword(userId: number, dto: ChangePasswordDto) {
+    const user = await this.getById(userId);
+    if (!user) {
+      throw new NotFoundException('Пользователь не найден');
+    }
+
+    // Обновляем пароль
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: await hash(dto.password)
+      }
+    });
+  }
+
   async getAllMasters() {
     return this.prisma.user.findMany({ where: { role: Role.master } });
   }
 
-  async getAllAdmins () {
+  async getAllAdmins() {
     return this.prisma.user.findMany({ where: { role: Role.admin } });
   }
 

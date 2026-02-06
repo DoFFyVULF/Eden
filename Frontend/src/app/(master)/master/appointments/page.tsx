@@ -1,11 +1,36 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { appointmentService } from "@/services/appointment/appointment.service";
 import { userService } from "@/services/user/user.service";
 import { IAppointment, AppointmentStatus } from "@/types/appointment.types";
 import { IUser } from "@/types/user.types";
-import AppointmentItem from "@/app/(admin)/administration/appointments/AppointmentItem";
+import {
+  Search,
+  Filter,
+  Calendar,
+  Clock,
+  Users,
+  UserCheck,
+  CheckCircle,
+  XCircle,
+  Clock4,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  TrendingUp,
+  RefreshCw,
+  CalendarDays,
+  Target,
+  Award,
+  BarChart3,
+  Sparkles,
+  Eye,
+  Loader2,
+  Shield,
+  Calendar as CalendarIcon,
+} from "lucide-react";
 
 type SortField = "status" | "time" | "client" | "service" | "date";
 type SortOrder = "asc" | "desc";
@@ -14,7 +39,9 @@ export default function MasterAppointments() {
   const [currentUser, setCurrentUser] = useState<IUser | null>(null);
   const [appointments, setAppointments] = useState<IAppointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const [sortField, setSortField] = useState<SortField>("time");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
@@ -22,38 +49,41 @@ export default function MasterAppointments() {
   const [dateFilter, setDateFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  useEffect(() => {
-    const loadData = async () => {
+  const loadData = async (showLoading = true) => {
+    if (showLoading) {
       setIsLoading(true);
-      setError(null);
+    } else {
+      setIsRefreshing(true);
+    }
+    
+    setError(null);
+    
+    try {
+      const userData = await userService.getMe();
+      console.log("Пользователь загружен:", userData.data);
+      setCurrentUser(userData.data);
       
-      try {
-        // Получаем информацию о текущем пользователе
-        const userData = await userService.getMe();
-        console.log("Пользователь загружен:", userData.data);
-        setCurrentUser(userData.data);
-        
-        // Получаем все записи
-        const allAppointments = await appointmentService.getAll();
-        console.log("Все записи:", allAppointments);
-        
-        // Фильтруем записи только для текущего мастера
-        const masterAppointments = allAppointments.filter(
-          (appointment) => {
-            return appointment.master.id === (userData.data.masterId || userData.data.id);
-          }
-        );
-        
-        console.log("Отфильтрованные записи мастера:", masterAppointments);
-        setAppointments(masterAppointments);
-      } catch (err) {
-        console.error("Ошибка загрузки данных:", err);
-        setError("Не удалось загрузить данные. Проверьте соединение.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      const allAppointments = await appointmentService.getAll();
+      console.log("Все записи:", allAppointments);
+      
+      const masterAppointments = allAppointments.filter(
+        (appointment) => {
+          return appointment.master.id === (userData.data.masterId || userData.data.id);
+        }
+      );
+      
+      console.log("Отфильтрованные записи мастера:", masterAppointments);
+      setAppointments(masterAppointments);
+    } catch (err) {
+      console.error("Ошибка загрузки данных:", err);
+      setError("Не удалось загрузить данные. Проверьте соединение.");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
+  useEffect(() => {
     loadData();
   }, []);
 
@@ -191,9 +221,9 @@ export default function MasterAppointments() {
   const formatDate = (isoString: string): string => {
     const date = new Date(isoString);
     return date.toLocaleDateString("ru-RU", {
-      year: "numeric",
-      month: "2-digit",
       day: "2-digit",
+      month: "long",
+      year: "numeric",
     });
   };
 
@@ -205,214 +235,419 @@ export default function MasterAppointments() {
     });
   };
 
+  const getStatusIcon = (status: AppointmentStatus) => {
+    switch (status) {
+      case AppointmentStatus.Новый:
+        return <AlertCircle className="w-4 h-4 text-amber-500" />;
+      case AppointmentStatus.Подтвержден:
+        return <CheckCircle className="w-4 h-4 text-emerald-500" />;
+      case AppointmentStatus.Завершен:
+        return <Clock4 className="w-4 h-4 text-blue-500" />;
+      case AppointmentStatus.Отменен:
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      default:
+        return null;
+    }
+  };
+
+  const getStatusColor = (status: AppointmentStatus) => {
+    switch (status) {
+      case AppointmentStatus.Новый:
+        return "bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-amber-200";
+      case AppointmentStatus.Подтвержден:
+        return "bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200";
+      case AppointmentStatus.Завершен:
+        return "bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border-blue-200";
+      case AppointmentStatus.Отменен:
+        return "bg-gradient-to-r from-rose-100 to-red-100 text-rose-700 border-rose-200";
+      default:
+        return "bg-gray-100 text-gray-700 border-gray-200";
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      {/* Заголовок и информация о мастере */}
-      <div className="mb-6 md:mb-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
-              Мои записи
-            </h1>
-            <p className="text-gray-600">
-              Приветствую,{" "}
-              <span className="font-semibold">
-                {currentUser?.name || "Мастер"}
-              </span>
-              ! Здесь вы можете просмотреть свои записи.
-            </p>
-          </div>
-          <div className="text-left md:text-right">
-            <p className="text-gray-600">
-              Всего ваших записей:{" "}
-              <span className="font-semibold">
-                {filteredAndSortedAppointments.length}
-              </span>
-              {filteredAndSortedAppointments.length !== appointments.length &&
-                ` (из ${appointments.length})`}
-            </p>
-            <p className="text-sm text-gray-500 mt-1">
-              Только просмотр — редактирование недоступно
-            </p>
-          </div>
-        </div>
-
-        {/* Фильтры */}
-        <div className="bg-white rounded-xl md:rounded-2xl p-4 shadow-sm border border-gray-200">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1 relative">
-              <svg
-                className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
+      <div className="max-w-8xl mx-auto">
+        {/* Заголовок и управление */}
+        <div className="mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+            <div>
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-3 mb-2"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              <input
-                type="text"
-                placeholder="Поиск по клиентам, услугам, телефону..."
-                className="w-full pl-10 pr-4 py-3 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+                <div className="p-2.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl">
+                  <CalendarDays className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+                    Мои записи
+                  </h1>
+                  <p className="text-gray-600 mt-1">
+                    Добро пожаловать,{" "}
+                    <span className="font-semibold text-gray-900">
+                      {currentUser?.name || "Мастер"}
+                    </span>
+                    ! Управляйте своими записями.
+                  </p>
+                </div>
+              </motion.div>
             </div>
-
-            <select
-              className="px-4 py-3 text-black border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="">Все статусы</option>
-              <option value="new">Новые</option>
-              <option value="confirmed">Подтвержденные</option>
-              <option value="completed">Завершенные</option>
-              <option value="cancelled">Отмененные</option>
-            </select>
-
-            <input
-              type="date"
-              className="px-4 py-3 text-black border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-            />
-
-            {(statusFilter || dateFilter || searchQuery) && (
-              <button
-                onClick={clearFilters}
-                className="px-4 py-3 text-red-600 border border-red-300 rounded-xl hover:bg-red-50 transition-colors"
+            
+            <div className="flex flex-col sm:flex-row gap-3">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-medium hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
               >
-                Сбросить
-              </button>
+                <Filter className="w-4 h-4" />
+                Фильтры
+                {isFilterOpen ? <ChevronDown className="w-4 h-4 rotate-180" /> : <ChevronDown className="w-4 h-4" />}
+              </motion.button>
+              
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => loadData(false)}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-medium hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                Обновить
+              </motion.button>
+            </div>
+          </div>
+
+          {/* Расширенные фильтры */}
+          <AnimatePresence>
+            {isFilterOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Поиск */}
+                    <div className="relative">
+                      <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Поиск по клиентам, услугам..."
+                        className="w-full pl-10 pr-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 placeholder-gray-500 transition-all duration-300"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Фильтр по статусу */}
+                    <select
+                      className="w-full px-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-300"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                      <option value="">Все статусы</option>
+                      <option value="new">Новые ⚡</option>
+                      <option value="confirmed">Подтвержденные ✅</option>
+                      <option value="completed">Завершенные 🏁</option>
+                      <option value="cancelled">Отмененные ❌</option>
+                    </select>
+
+                    {/* Фильтр по дате */}
+                    <div className="relative">
+                      <Calendar className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="date"
+                        className="w-full pl-10 pr-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-300"
+                        value={dateFilter}
+                        onChange={(e) => setDateFilter(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Сортировка */}
+                  <div className="mt-6">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Сортировка:</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {(
+                        [
+                          { field: "time" as SortField, label: "Время", icon: Clock },
+                          { field: "client" as SortField, label: "Клиент", icon: Users },
+                          { field: "service" as SortField, label: "Услуга", icon: TrendingUp },
+                          { field: "date" as SortField, label: "Дата", icon: CalendarIcon },
+                          { field: "status" as SortField, label: "Статус", icon: AlertCircle },
+                        ] as const
+                      ).map(({ field, label, icon: Icon }) => (
+                        <motion.button
+                          key={field}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleSortChange(field)}
+                          className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-xl transition-all duration-300 border ${
+                            sortField === field
+                              ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md border-transparent"
+                              : "bg-white/80 text-gray-700 border-gray-300/50 hover:bg-gray-50/80"
+                          }`}
+                        >
+                          <Icon className="w-3 h-3" />
+                          {label}
+                          {sortField === field && (
+                            <span className="ml-1">
+                              {sortOrder === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            </span>
+                          )}
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Кнопки управления фильтрами */}
+                  {(statusFilter || dateFilter || searchQuery) && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex justify-end mt-6 pt-4 border-t border-gray-200/50"
+                    >
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={clearFilters}
+                        className="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-300/50 rounded-lg hover:bg-red-50/50 transition-all duration-300"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Сбросить фильтры
+                      </motion.button>
+                    </motion.div>
+                  )}
+                </div>
+              </motion.div>
             )}
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <span className="text-sm text-gray-600 font-medium mr-2">
-              Сортировка:
-            </span>
-            {(
-              [
-                "time",
-                "client",
-                "service",
-                "date",
-                "status",
-              ] as SortField[]
-            ).map((field) => (
-              <button
-                key={field}
-                onClick={() => handleSortChange(field)}
-                className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                  sortField === field
-                    ? "bg-blue-100 text-blue-700 border-blue-300"
-                    : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
-                }`}
-              >
-                {field === "time" && "Время"}
-                {field === "client" && "Клиент"}
-                {field === "service" && "Услуга"}
-                {field === "date" && "Дата"}
-                {field === "status" && "Статус"}
-                {sortField === field && (
-                  <span className="ml-1">
-                    {sortOrder === "asc" ? "↑" : "↓"}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Статистика */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl md:rounded-2xl p-4 md:p-6 text-white hover:-translate-y-1 transition-transform duration-200">
-          <div className="text-2xl md:text-3xl font-bold mb-2">{todayAppointments.length}</div>
-          <div className="text-blue-100 text-sm md:text-base">Сегодня</div>
-          <div className="text-xs md:text-sm text-blue-200 mt-1">
-            Подтвержденные записи на сегодня
-          </div>
+          </AnimatePresence>
         </div>
 
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl md:rounded-2xl p-4 md:p-6 text-white hover:-translate-y-1 transition-transform duration-200">
-          <div className="text-2xl md:text-3xl font-bold mb-2">{newAppointments.length}</div>
-          <div className="text-green-100 text-sm md:text-base">Новые</div>
-          <div className="text-xs md:text-sm text-green-200 mt-1">
-            Требуют подтверждения
-          </div>
+        {/* Статистика */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <motion.div
+            whileHover={{ scale: 1.02, y: -2 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-4 opacity-20">
+              <CalendarDays className="w-16 h-16" />
+            </div>
+            <div className="relative z-10">
+              <div className="text-4xl font-bold mb-2">{todayAppointments.length}</div>
+              <div className="text-blue-100 font-medium">На сегодня</div>
+              <div className="text-sm text-blue-200/80 mt-2">Подтвержденные записи</div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ scale: 1.02, y: -2 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-4 opacity-20">
+              <AlertCircle className="w-16 h-16" />
+            </div>
+            <div className="relative z-10">
+              <div className="text-4xl font-bold mb-2">{newAppointments.length}</div>
+              <div className="text-amber-100 font-medium">Новые</div>
+              <div className="text-sm text-amber-200/80 mt-2">Требуют внимания</div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ scale: 1.02, y: -2 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-4 opacity-20">
+              <BarChart3 className="w-16 h-16" />
+            </div>
+            <div className="relative z-10">
+              <div className="text-4xl font-bold mb-2">{appointments.length}</div>
+              <div className="text-purple-100 font-medium">Всего</div>
+              <div className="text-sm text-purple-200/80 mt-2">Ваши записи за все время</div>
+            </div>
+          </motion.div>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl md:rounded-2xl p-4 md:p-6 text-white hover:-translate-y-1 transition-transform duration-200">
-          <div className="text-2xl md:text-3xl font-bold mb-2">{appointments.length}</div>
-          <div className="text-purple-100 text-sm md:text-base">Всего</div>
-          <div className="text-xs md:text-sm text-purple-200 mt-1">
-            Ваших записей за все время
-          </div>
-        </div>
-      </div>
-
-      {/* Список записей */}
-      <div className="space-y-4">
+        {/* Карточки записей */}
         {isLoading ? (
-          <div className="text-center py-8 md:py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 md:h-10 md:w-10 border-2 border-blue-600 border-t-transparent"></div>
-            <p className="mt-3 text-gray-500">Загрузка записей...</p>
+          <div className="text-center py-20">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+            <p className="mt-4 text-gray-500 font-medium">Загрузка записей...</p>
           </div>
         ) : error ? (
-          <div className="text-center py-8 md:py-12 text-red-600 bg-red-50 rounded-xl">
-            <svg className="w-12 h-12 mx-auto mb-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.346 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-            {error}
-          </div>
-        ) : filteredAndSortedAppointments.length > 0 ? (
-          filteredAndSortedAppointments.map((appointment) => (
-            <AppointmentItem
-              key={appointment.id}
-              appointment={{
-                id: appointment.id.toString(),
-                clientName: `${appointment.clientSurname} ${appointment.clientName}`,
-                service: appointment.service.title,
-                time: formatTime(appointment.appointmentTime),
-                price: `${appointment.price.toLocaleString()} ₽`,
-                master: `${appointment.master.surname} ${appointment.master.name}`,
-                status: appointment.status,
-                date: formatDate(appointment.appointmentTime),
-                duration: appointment.service.duration,
-                rawDateTime: appointment.appointmentTime,
-              }}
-              hideActions={true} // Для мастера скрываем кнопки редактирования/удаления
-            />
-          ))
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="col-span-full bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-gray-200/50"
+          >
+            <div className="w-20 h-20 bg-gradient-to-r from-red-200 to-red-300 rounded-full flex items-center justify-center mx-auto mb-6">
+              <XCircle className="w-10 h-10 text-red-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Ошибка загрузки</h3>
+            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+              {error}
+            </p>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => loadData(true)}
+              className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 inline-flex items-center gap-2"
+            >
+              <RefreshCw className="w-5 h-5" />
+              Попробовать снова
+            </motion.button>
+          </motion.div>
+        ) : filteredAndSortedAppointments.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="col-span-full bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-gray-200/50"
+          >
+            <div className="w-20 h-20 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CalendarDays className="w-10 h-10 text-gray-400" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+              {appointments.length === 0 ? "Записей пока нет" : "Ничего не найдено"}
+            </h3>
+            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+              {appointments.length === 0 
+                ? "У вас пока нет запланированных записей." 
+                : "Попробуйте изменить параметры поиска или фильтрации"}
+            </p>
+            {(searchQuery || dateFilter || statusFilter) && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={clearFilters}
+                className="px-6 py-2.5 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-300 inline-flex items-center gap-2"
+              >
+                <XCircle className="w-4 h-4" />
+                Сбросить фильтры
+              </motion.button>
+            )}
+          </motion.div>
         ) : (
-          <div className="text-center py-8 md:py-12 text-gray-500">
-            <svg className="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            {appointments.length === 0 
-              ? "У вас пока нет записей." 
-              : "Записи не найдены. Попробуйте изменить фильтры."}
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
+            <AnimatePresence>
+              {filteredAndSortedAppointments.map((appointment, index) => (
+                <motion.div
+                  key={appointment.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  whileHover={{ scale: 1.01, y: -2 }}
+                  className="bg-gradient-to-br from-white to-gray-50/50 rounded-3xl border border-gray-200/50 p-5 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm group"
+                >
+                  {/* Верхняя часть с датой и статусом */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <div className="text-sm text-gray-500 mb-1">Запланировано</div>
+                      <div className="text-xl font-bold text-gray-900">
+                        {formatDate(appointment.appointmentTime)}
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        {formatTime(appointment.appointmentTime)}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(appointment.status)}
+                      <span className={`px-3 py-1 text-xs font-bold rounded-full border ${getStatusColor(appointment.status)}`}>
+                        {appointment.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Разделитель */}
+                  <div className="h-px bg-gradient-to-r from-transparent via-gray-300/50 to-transparent my-4" />
+
+                  {/* Клиент */}
+                  <div className="mb-4">
+                    <div className="text-xs text-gray-600 mb-2">Клиент</div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                        {appointment.clientName[0]?.toUpperCase() || "К"}
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm font-bold text-gray-900">
+                          {appointment.clientSurname} {appointment.clientName}
+                        </div>
+                        <div className="text-xs text-gray-600">{appointment.clientPhone}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Услуга и детали */}
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="bg-gradient-to-br from-blue-50/50 to-cyan-50/50 rounded-xl p-3 border border-blue-200/30">
+                      <div className="text-xs text-gray-600 mb-1">Услуга</div>
+                      <div className="text-sm font-bold text-gray-900 truncate">{appointment.service.title}</div>
+                      <div className="text-xs text-gray-500 mt-1">{appointment.service.duration} мин.</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-emerald-50/50 to-green-50/50 rounded-xl p-3 border border-emerald-200/30">
+                      <div className="text-xs text-gray-600 mb-1">Стоимость</div>
+                      <div className="text-lg font-bold text-emerald-700">{appointment.price.toLocaleString()} ₽</div>
+                    </div>
+                  </div>
+
+                  {/* Информация */}
+                  <div className="pt-4 border-t border-gray-200/50">
+                    <div className="text-xs text-gray-500 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <UserCheck className="w-3.5 h-3.5" />
+                        <span>Мастер: {appointment.master.surname} {appointment.master.name}</span>
+                      </div>
+                      <span>ID: {appointment.id}</span>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
         )}
-      </div>
 
-      {/* Пагинация/информация */}
-      {filteredAndSortedAppointments.length > 0 && (
-        <div className="flex flex-col md:flex-row justify-between items-center gap-2 mt-6 md:mt-8 pt-4 md:pt-6 border-t border-gray-200">
-          <span className="text-gray-500 text-sm">
-            Показано {filteredAndSortedAppointments.length} из {appointments.length} записей
-          </span>
-          <div className="text-xs md:text-sm text-gray-400">
-            {currentUser?.login && `Ваш логин: ${currentUser.login}`}
+        {/* Информация внизу */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 text-sm text-gray-500">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500"></div>
+              <span>Новые</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-500 to-green-500"></div>
+              <span>Подтвержденные</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500"></div>
+              <span>Завершенные</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <span>
+              Показано: {filteredAndSortedAppointments.length} из {appointments.length}
+            </span>
+            {currentUser?.login && (
+              <span className="text-blue-600 font-medium flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                Ваш логин: {currentUser.login}
+              </span>
+            )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
