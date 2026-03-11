@@ -3,4 +3,9 @@ export interface ICategory {
     title: string;
     description: string;
     isActive: boolean;
+
+
+    _count?: {
+        services: number;
+    }
 }

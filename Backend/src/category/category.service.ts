@@ -9,7 +9,12 @@ export class CategoryService {
 
   async getAll() {
     return this.prisma.category.findMany({
-      orderBy: { title: 'asc' }
+      orderBy: { title: 'asc' },
+      include: {
+        _count: {
+          select: { services: true }
+        }
+      }
     });
   }
 
