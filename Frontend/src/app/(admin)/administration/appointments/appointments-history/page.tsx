@@ -32,6 +32,91 @@ import {
 type SortField = "time" | "client" | "service" | "master" | "date" | "price";
 type SortOrder = "asc" | "desc";
 
+// 📦 Компонент пагинации
+function Pagination({
+  currentPage,
+  totalPages,
+  onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) pages.push(i);
+        pages.push("...");
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push("...");
+        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push("...");
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+        pages.push("...");
+        pages.push(totalPages);
+      }
+    }
+    return pages;
+  };
+
+  return (
+    <div className="flex items-center justify-center gap-2 mt-6 flex-wrap">
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+        disabled={currentPage === 1}
+        className="px-4 py-2 rounded-xl border border-gray-300/50 bg-white/80 text-gray-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50/80 transition-all duration-300"
+      >
+        ← Назад
+      </motion.button>
+
+      {getPageNumbers().map((page, idx) =>
+        page === "..." ? (
+          <span key={`ellipsis-${idx}`} className="px-3 py-2 text-gray-400 font-medium">
+            ...
+          </span>
+        ) : (
+          <motion.button
+            key={page}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => onPageChange(page as number)}
+            className={`px-4 py-2 rounded-xl font-medium transition-all duration-300 min-w-[40px] ${
+              currentPage === page
+                ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg"
+                : "border border-gray-300/50 bg-white/80 text-gray-700 hover:bg-gray-50/80"
+            }`}
+          >
+            {page}
+          </motion.button>
+        )
+      )}
+
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+        disabled={currentPage === totalPages}
+        className="px-4 py-2 rounded-xl border border-gray-300/50 bg-white/80 text-gray-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50/80 transition-all duration-300"
+      >
+        Вперёд →
+      </motion.button>
+    </div>
+  );
+}
+
 export default function AppointmentsHistoryPage() {
   const [appointments, setAppointments] = useState<IAppointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,56 +130,65 @@ export default function AppointmentsHistoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [masterFilter, setMasterFilter] = useState("");
 
+  // 📄 Пагинация
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 9;
+
   const loadCompleted = async (showLoading = true) => {
-  if (showLoading) {
-    setIsLoading(true);
-  } else {
-    setIsRefreshing(true);
-  }
-  setError(null);
-  try {
-    const data = await appointmentService.getCompleted();
-    
-    // Валидация и очистка данных
-    const validatedData = data.map(item => {
-      // Безопасная обработка цены
-      const priceStr = String(item.price || '0');
-      const priceValue = parseFloat(priceStr.replace(/[^0-9.-]+/g, '')) || 0;
+    if (showLoading) {
+      setIsLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
+    setError(null);
+    try {
+      const data = await appointmentService.getCompleted();
       
-      return {
-        ...item,
-        price: Math.abs(priceValue) > 10000000 ? 0 : Math.abs(priceValue), // Защита от аномалий
-        clientName: item.clientName || '',
-        clientSurname: item.clientSurname || '',
-        clientPhone: item.clientPhone || '',
-        appointmentTime: item.appointmentTime || new Date().toISOString(),
-        service: {
-          ...item.service,
-          title: item.service?.title || 'Неизвестная услуга',
-          duration: Number(item.service?.duration) || 0,
-        },
-        master: {
-          ...item.master,
-          name: item.master?.name || 'Неизвестный',
-          surname: item.master?.surname || 'мастер',
-          id: Number(item.master?.id) || 0,
-        }
-      };
-    });
-    
-    setAppointments(validatedData);
-  } catch (e) {
-    console.error('Ошибка загрузки записей:', e);
-    setError("Не удалось загрузить историю записей");
-  } finally {
-    setIsLoading(false);
-    setIsRefreshing(false);
-  }
-};
+      // Валидация и очистка данных
+      const validatedData = data.map(item => {
+        // Безопасная обработка цены
+        const priceStr = String(item.price || '0');
+        const priceValue = parseFloat(priceStr.replace(/[^0-9.-]+/g, '')) || 0;
+        
+        return {
+          ...item,
+          price: Math.abs(priceValue) > 10000000 ? 0 : Math.abs(priceValue),
+          clientName: item.clientName || '',
+          clientSurname: item.clientSurname || '',
+          clientPhone: item.clientPhone || '',
+          appointmentTime: item.appointmentTime || new Date().toISOString(),
+          service: {
+            ...item.service,
+            title: item.service?.title || 'Неизвестная услуга',
+            duration: Number(item.service?.duration) || 0,
+          },
+          master: {
+            ...item.master,
+            name: item.master?.name || 'Неизвестный',
+            surname: item.master?.surname || 'мастер',
+            id: Number(item.master?.id) || 0,
+          }
+        };
+      });
+      
+      setAppointments(validatedData);
+    } catch (e) {
+      console.error('Ошибка загрузки записей:', e);
+      setError("Не удалось загрузить историю записей");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     loadCompleted();
   }, []);
+
+  // 🔄 Сброс на первую страницу при изменении фильтров/сортировки
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, dateFilter, masterFilter, sortField, sortOrder]);
 
   // Для отладки
   useEffect(() => {
@@ -171,7 +265,6 @@ export default function AppointmentsHistoryPage() {
           bv = `${b.master.surname} ${b.master.name}`.toLowerCase();
           break;
         case "price":
-          // Убеждаемся, что это числа
           av = Number(a.price) || 0;
           bv = Number(b.price) || 0;
           break;
@@ -191,17 +284,26 @@ export default function AppointmentsHistoryPage() {
     return sorted;
   }, [appointments, sortField, sortOrder, dateFilter, searchQuery, masterFilter]);
 
+  // 📄 Пагинированные данные
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredAndSorted.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredAndSorted, currentPage]);
+
+  // 📄 Общее количество страниц
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredAndSorted.length / ITEMS_PER_PAGE);
+  }, [filteredAndSorted.length]);
+
   // Статистика
   const stats = useMemo(() => {
     const total = appointments.length;
     
-    // Безопасное вычисление выручки
     const totalRevenue = appointments.reduce((sum, a) => {
       const price = Number(a.price) || 0;
-      // Проверяем на аномальные значения
-      if (price > 10000000) { // Если цена больше 10 млн, вероятно ошибка
+      if (price > 10000000) {
         console.warn('Подозрительно высокая цена:', a);
-        return sum; // Пропускаем эту запись
+        return sum;
       }
       return sum + price;
     }, 0);
@@ -232,7 +334,6 @@ export default function AppointmentsHistoryPage() {
       }
     ).length;
 
-    // Находим самый популярный сервис
     const serviceCounts: Record<string, number> = {};
     appointments.forEach(a => {
       const serviceTitle = a.service?.title || 'Неизвестная услуга';
@@ -321,19 +422,23 @@ export default function AppointmentsHistoryPage() {
     link.click();
   };
 
-  // Проверяем данные на аномалии
   const hasDataIssues = useMemo(() => {
-    if (stats.totalRevenue > 1000000000) { // Если выручка больше 1 млрд, вероятно ошибка
+    if (stats.totalRevenue > 1000000000) {
       return true;
     }
     
-    // Проверяем отдельные записи на аномальные цены
     const suspiciousAppointments = appointments.filter(a => 
       Number(a.price) > 10000000 || Number(a.price) < 0
     );
     
     return suspiciousAppointments.length > 0;
   }, [appointments, stats.totalRevenue]);
+
+  // 📄 Обработчик перехода на страницу с прокруткой вверх
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
@@ -637,92 +742,113 @@ export default function AppointmentsHistoryPage() {
             )}
           </motion.div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
-            <AnimatePresence>
-              {filteredAndSorted.map((appointment, index) => {
-                const price = Number(appointment.price) || 0;
-                const hasSuspiciousPrice = price > 10000000 || price < 0;
-                
-                return (
-                  <motion.div
-                    key={appointment.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    whileHover={{ scale: 1.01, y: -2 }}
-                    className={`bg-gradient-to-br from-white to-gray-50/50 rounded-3xl border ${hasSuspiciousPrice ? 'border-red-300/50' : 'border-gray-200/50'} p-5 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm group relative`}
-                  >
-                    {hasSuspiciousPrice && (
-                      <div className="absolute top-2 right-2 px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full z-10">
-                        Ошибка в цене
-                      </div>
-                    )}
-                    
-                    {/* Верхняя часть с датой и статусом */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <div className="text-sm text-gray-500 mb-1">Завершено</div>
-                        <div className="text-xl font-bold text-gray-900">
-                          {formatDate(appointment.appointmentTime)}
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
+              <AnimatePresence>
+                {/* 📄 Используем paginatedData вместо filteredAndSorted */}
+                {paginatedData.map((appointment, index) => {
+                  const price = Number(appointment.price) || 0;
+                  const hasSuspiciousPrice = price > 10000000 || price < 0;
+                  
+                  return (
+                    <motion.div
+                      key={appointment.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      whileHover={{ scale: 1.01, y: -2 }}
+                      className={`bg-gradient-to-br from-white to-gray-50/50 rounded-3xl border ${hasSuspiciousPrice ? 'border-red-300/50' : 'border-gray-200/50'} p-5 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm group relative`}
+                    >
+                      {hasSuspiciousPrice && (
+                        <div className="absolute top-2 right-2 px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full z-10">
+                          Ошибка в цене
                         </div>
-                        <div className="text-sm text-gray-600 mt-1">
-                          {formatTime(appointment.appointmentTime)}
-                        </div>
-                      </div>
-                      <span className="px-3 py-1 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 text-xs font-bold rounded-full">
-                        Завершена
-                      </span>
-                    </div>
-
-                    {/* Разделитель */}
-                    <div className="h-px bg-gradient-to-r from-transparent via-gray-300/50 to-transparent my-4" />
-
-                    {/* Клиент */}
-                    <div className="mb-4">
-                      <div className="text-xs text-gray-600 mb-2">Клиент</div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
-                          {appointment.clientName[0]?.toUpperCase() || "К"}
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-sm font-bold text-gray-900">
-                            {appointment.clientSurname} {appointment.clientName}
+                      )}
+                      
+                      {/* Верхняя часть с датой и статусом */}
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <div className="text-sm text-gray-500 mb-1">Завершено</div>
+                          <div className="text-xl font-bold text-gray-900">
+                            {formatDate(appointment.appointmentTime)}
                           </div>
-                          <div className="text-xs text-gray-600">{appointment.clientPhone}</div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            {formatTime(appointment.appointmentTime)}
+                          </div>
+                        </div>
+                        <span className="px-3 py-1 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 text-xs font-bold rounded-full">
+                          Завершена
+                        </span>
+                      </div>
+
+                      {/* Разделитель */}
+                      <div className="h-px bg-gradient-to-r from-transparent via-gray-300/50 to-transparent my-4" />
+
+                      {/* Клиент */}
+                      <div className="mb-4">
+                        <div className="text-xs text-gray-600 mb-2">Клиент</div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                            {appointment.clientName[0]?.toUpperCase() || "К"}
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-sm font-bold text-gray-900">
+                              {appointment.clientSurname} {appointment.clientName}
+                            </div>
+                            <div className="text-xs text-gray-600">{appointment.clientPhone}</div>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Услуга и мастер */}
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div className="bg-gradient-to-br from-blue-50/50 to-cyan-50/50 rounded-xl p-3 border border-blue-200/30">
-                        <div className="text-xs text-gray-600 mb-1">Услуга</div>
-                        <div className="text-sm font-bold text-gray-900 truncate">{appointment.service.title}</div>
-                        <div className="text-xs text-gray-500 mt-1">{appointment.service.duration} мин.</div>
-                      </div>
-                      <div className="bg-gradient-to-br from-purple-50/50 to-pink-50/50 rounded-xl p-3 border border-purple-200/30">
-                        <div className="text-xs text-gray-600 mb-1">Мастер</div>
-                        <div className="text-sm font-bold text-gray-900">{appointment.master.surname} {appointment.master.name}</div>
-                      </div>
-                    </div>
-
-                    {/* Цена и информация */}
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-200/50">
-                      <div className={`rounded-xl p-3 border ${hasSuspiciousPrice ? 'bg-red-50/50 border-red-200/30' : 'bg-gradient-to-br from-emerald-50/50 to-green-50/50 border-emerald-200/30'}`}>
-                        <div className="text-xs text-gray-600">Стоимость</div>
-                        <div className={`text-lg font-bold ${hasSuspiciousPrice ? 'text-red-700' : 'text-emerald-700'}`}>
-                          {hasSuspiciousPrice ? 'Ошибка' : price.toLocaleString('ru-RU')} ₽
+                      {/* Услуга и мастер */}
+                      <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="bg-gradient-to-br from-blue-50/50 to-cyan-50/50 rounded-xl p-3 border border-blue-200/30">
+                          <div className="text-xs text-gray-600 mb-1">Услуга</div>
+                          <div className="text-sm font-bold text-gray-900 truncate">{appointment.service.title}</div>
+                          <div className="text-xs text-gray-500 mt-1">{appointment.service.duration} мин.</div>
+                        </div>
+                        <div className="bg-gradient-to-br from-purple-50/50 to-pink-50/50 rounded-xl p-3 border border-purple-200/30">
+                          <div className="text-xs text-gray-600 mb-1">Мастер</div>
+                          <div className="text-sm font-bold text-gray-900">{appointment.master.surname} {appointment.master.name}</div>
                         </div>
                       </div>
-                      <div className="text-xs text-gray-500">
-                        ID: {appointment.id}
+
+                      {/* Цена и информация */}
+                      <div className="flex items-center justify-between pt-4 border-t border-gray-200/50">
+                        <div className={`rounded-xl p-3 border ${hasSuspiciousPrice ? 'bg-red-50/50 border-red-200/30' : 'bg-gradient-to-br from-emerald-50/50 to-green-50/50 border-emerald-200/30'}`}>
+                          <div className="text-xs text-gray-600">Стоимость</div>
+                          <div className={`text-lg font-bold ${hasSuspiciousPrice ? 'text-red-700' : 'text-emerald-700'}`}>
+                            {hasSuspiciousPrice ? 'Ошибка' : price.toLocaleString('ru-RU')} ₽
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          ID: {appointment.id}
+                        </div>
                       </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+
+            {/* 📄 Пагинация */}
+            {filteredAndSorted.length > ITEMS_PER_PAGE && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+              />
+            )}
+
+            {/* 📄 Инфо о пагинации */}
+            {filteredAndSorted.length > 0 && (
+              <div className="text-center text-sm text-gray-500 mt-3">
+                Страница {currentPage} из {totalPages} • 
+                Показано {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
+                {Math.min(currentPage * ITEMS_PER_PAGE, filteredAndSorted.length)} из {filteredAndSorted.length}
+              </div>
+            )}
+          </>
         )}
 
         {/* Информация внизу */}
