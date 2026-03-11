@@ -12,6 +12,22 @@ export const masterService = {
     return data;
   },
 
+  // В master.service.ts
+  async getActiveMastersCount(): Promise<number> {
+    try {
+      // Получаем всех мастеров с сервера
+      const { data } = await axiosWithAuth.get<IMaster[]>("/master");
+
+      // Фильтруем активных на клиенте
+      const activeMasters = data.filter((master) => master.isActive === true);
+
+      // Возвращаем количество
+      return activeMasters.length;
+    } catch (error) {
+      return 0; // Возвращаем 0 в случае ошибки
+    }
+  },
+
   async create(dto: {
     name: string;
     surname: string;
@@ -44,7 +60,7 @@ export const masterService = {
       photo?: string;
       phone?: string;
       isActive?: boolean;
-    }
+    },
   ): Promise<IMaster> {
     const { data } = await axiosWithAuth.patch<IMaster>(`/master/${id}`, dto);
     return data;

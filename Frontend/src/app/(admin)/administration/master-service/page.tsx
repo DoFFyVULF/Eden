@@ -126,7 +126,7 @@ export default function MasterService() {
           categoryName: categoryMap.get(service.categoryId) ?? "Не указана",
           masterId: master.id,
           masterFullName: `${master.surname} ${master.name}`,
-          masterSpecialization: master.specialization || "", // Добавьте fallback значение
+          masterSpecialization: master.specialization || "",
           durationOverride: p.durationOverride ?? null,
         };
       });
@@ -208,14 +208,33 @@ export default function MasterService() {
     const total = prices.length;
     const active = prices.filter((p) => p.isActive).length;
     const inactive = total - active;
-    const avgPrice =
-      total > 0
-        ? Math.round(prices.reduce((sum, p) => sum + p.price, 0) / total)
-        : 0;
-    const maxPrice = total > 0 ? Math.max(...prices.map((p) => p.price)) : 0;
-    const minPrice = total > 0 ? Math.min(...prices.map((p) => p.price)) : 0;
+    
+    // Исправленный расчет средней цены
+    const totalSum = prices.reduce((sum, p) => {
+      // Убедимся, что price это число
+      const price = Number(p.price);
+      return sum + (isNaN(price) ? 0 : price);
+    }, 0);
+    
+    const avgPrice = total > 0 ? Math.round(totalSum / total) : 0;
+    
+    // Исправленный расчет мин/макс цен
+    const validPrices = prices
+      .map(p => Number(p.price))
+      .filter(price => !isNaN(price) && price > 0);
+    
+    const maxPrice = validPrices.length > 0 ? Math.max(...validPrices) : 0;
+    const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
 
-    return { total, active, inactive, avgPrice, maxPrice, minPrice };
+    return { 
+      total, 
+      active, 
+      inactive, 
+      avgPrice, 
+      maxPrice, 
+      minPrice,
+      totalSum // Для отладки, можно убрать
+    };
   }, [prices]);
 
   const openModalForAdd = () => {
@@ -258,7 +277,6 @@ export default function MasterService() {
     const { name, value, type } = e.target;
 
     if (name === "durationOverride") {
-      // Для durationOverride явно обрабатываем как number | null
       const numValue =
         value === "" || value === "null" ? null : parseInt(value) || 0;
       setFormData((prev) => ({ ...prev, [name]: numValue }));
@@ -377,6 +395,14 @@ export default function MasterService() {
     return sortOrder === "asc" ? "↑" : "↓";
   };
 
+  // Для отладки - добавим проверку цен
+  useEffect(() => {
+    if (prices.length > 0) {
+      console.log("Все цены:", prices.map(p => ({id: p.id, price: p.price, type: typeof p.price})));
+      console.log("Статистика:", stats);
+    }
+  }, [prices, stats]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
       <div className="max-w-8xl mx-auto">
@@ -406,6 +432,10 @@ export default function MasterService() {
                     (показано {filteredAndSortedPrices.length})
                   </span>
                 )}
+                {/* Для отладки: сумма цен и средняя */}
+                <span className="ml-4 text-sm text-gray-500">
+                  Сумма: {stats.totalSum?.toLocaleString()} ₽
+                </span>
               </p>
             </div>
 
@@ -698,108 +728,90 @@ export default function MasterService() {
                 return (
                   <motion.div
                     key={price.id}
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    whileHover={{ scale: 1.01, y: -2 }}
-                    className="bg-gradient-to-br from-white to-gray-50/50 rounded-3xl border border-gray-200/50 p-5 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm group"
+                    whileHover={{ scale: 1.01 }}
                   >
-                    {/* Верхняя часть */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1">
-                          {price.serviceTitle}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`w-6 h-6 rounded-xl bg-gradient-to-br ${getCategoryColor(price.categoryId)} flex items-center justify-center`}
+                    <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow transition-all duration-200">
+                      {/* Заголовок */}
+                      <div className="mb-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span
+                            className={`text-xs font-medium px-2 py-1 rounded ${price.isActive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}
                           >
-                            <Tag className="w-3 h-3 text-white" />
-                          </div>
-                          <span className="text-sm text-gray-600">
-                            {price.categoryName}
+                            {price.isActive ? "Активна" : "Неактивна"}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            #{price.id}
                           </span>
                         </div>
+                        <h3 className="font-semibold text-gray-900 text-base mb-1">
+                          {price.serviceTitle}
+                        </h3>
+                        <div className="text-sm text-gray-600">
+                          {price.categoryName}
+                        </div>
                       </div>
-                      <span
-                        className={`px-3 py-1 text-xs font-bold rounded-full ${
-                          price.isActive
-                            ? "bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700"
-                            : "bg-gradient-to-r from-rose-100 to-red-100 text-rose-700"
-                        }`}
-                      >
-                        {price.isActive ? "Активна" : "Неактивна"}
-                      </span>
-                    </div>
 
-                    {/* Мастер */}
-                    <div className="flex items-center gap-3 mb-4 p-3 bg-gradient-to-r from-gray-50/50 to-white/30 rounded-xl border border-gray-200/30">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
-                        {master ? getMasterInitial(master) : "ММ"}
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-sm font-bold text-gray-900">
-                          {price.masterFullName}
+                      {/* Мастер */}
+                      <div className="flex items-center gap-2 mb-4 p-2 bg-gray-50 rounded-lg">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                          {master ? getMasterInitial(master) : "М"}
                         </div>
-                        <div className="text-xs text-gray-600">
-                          {price.masterSpecialization ||
-                            "Специализация не указана"}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Цена и длительность */}
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                      <div className="bg-gradient-to-br from-amber-50/50 to-orange-50/50 rounded-xl p-3 border border-amber-200/30">
-                        <div className="text-xs text-gray-600 mb-1">Цена</div>
-                        <div className="text-xl font-bold text-gray-900">
-                          {price.price.toLocaleString()} ₽
-                        </div>
-                      </div>
-                      <div className="bg-gradient-to-br from-blue-50/50 to-cyan-50/50 rounded-xl p-3 border border-blue-200/30">
-                        <div className="text-xs text-gray-600 mb-1">
-                          Длительность
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="text-lg font-bold text-gray-900">
-                            {displayDuration} мин.
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">
+                            {price.masterFullName}
                           </div>
-                          {isOverride && (
-                            <span className="text-xs bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-1.5 py-0.5 rounded">
-                              индив.
-                            </span>
-                          )}
-                        </div>
-                        {isOverride && serviceDuration && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            Базовая: {serviceDuration} мин.
+                          <div className="text-xs text-gray-500 truncate">
+                            {price.masterSpecialization || "Без специализации"}
                           </div>
-                        )}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Действия */}
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-200/50">
-                      <div className="flex gap-2">
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
+                      {/* Цена и длительность */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {Number(price.price).toLocaleString()} ₽
+                          </div>
+                          <div className="text-xs text-gray-500">Цена</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="flex items-center gap-1 justify-end">
+                            <div className="text-lg font-bold text-gray-900">
+                              {displayDuration} мин.
+                            </div>
+                            {isOverride && (
+                              <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
+                                инд.
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {isOverride && serviceDuration
+                              ? `Стандарт: ${serviceDuration} мин.`
+                              : "Длительность"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Действия */}
+                      <div className="flex gap-2 pt-3 border-t border-gray-100">
+                        <button
                           onClick={() => openModalForEdit(price)}
-                          className="p-2 bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-600 hover:text-blue-700 rounded-xl border border-blue-200/50 transition-all duration-300"
+                          className="flex-1 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1"
                         >
                           <Edit className="w-4 h-4" />
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
+                          Изменить
+                        </button>
+                        <button
                           onClick={() => deletePrice(price.id)}
-                          className="p-2 bg-gradient-to-r from-rose-50 to-red-50 text-rose-600 hover:text-rose-700 rounded-xl border border-rose-200/50 transition-all duration-300"
+                          className="flex-1 py-2 text-sm font-medium text-gray-600 hover:text-rose-600 hover:bg-gray-50 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1"
                         >
                           <Trash2 className="w-4 h-4" />
-                        </motion.button>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        ID: {price.id}
+                          Удалить
+                        </button>
                       </div>
                     </div>
                   </motion.div>

@@ -58,7 +58,7 @@ export default function MasterSchedule() {
     } else {
       setIsRefreshing(true);
     }
-    
+
     try {
       const userData = await userService.getMe();
       setCurrentUser(userData.data);
@@ -145,12 +145,14 @@ export default function MasterSchedule() {
   // Статистика
   const stats = useMemo(() => {
     const totalWeeklyDays = Object.keys(weeklySchedules).length;
-    const todaySchedules = schedules.filter((s) => s.dayOfWeek === todayDayOfWeek).length;
+    const todaySchedules = schedules.filter(
+      (s) => s.dayOfWeek === todayDayOfWeek,
+    ).length;
     const totalSchedules = schedules.length;
     const totalSpecific = specificSchedules.length;
     const upcomingSpecific = upcomingSpecificSchedules.length;
     const todaySpecific = specificSchedules.filter(
-      (s) => new Date(s.startTime).toDateString() === new Date().toDateString()
+      (s) => new Date(s.startTime).toDateString() === new Date().toDateString(),
     ).length;
 
     return {
@@ -161,7 +163,13 @@ export default function MasterSchedule() {
       upcomingSpecific,
       todaySpecific,
     };
-  }, [schedules, weeklySchedules, specificSchedules, upcomingSpecificSchedules, todayDayOfWeek]);
+  }, [
+    schedules,
+    weeklySchedules,
+    specificSchedules,
+    upcomingSpecificSchedules,
+    todayDayOfWeek,
+  ]);
 
   const getDayColor = (dayIndex: number) => {
     if (dayIndex === todayDayOfWeek) return "from-blue-500 to-cyan-500";
@@ -208,7 +216,7 @@ export default function MasterSchedule() {
                 </div>
               </motion.div>
             </div>
-            
+
             <div className="flex flex-col sm:flex-row gap-3">
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -218,16 +226,22 @@ export default function MasterSchedule() {
               >
                 <Filter className="w-4 h-4" />
                 Детали
-                {isFilterOpen ? <ChevronDown className="w-4 h-4 rotate-180" /> : <ChevronDown className="w-4 h-4" />}
+                {isFilterOpen ? (
+                  <ChevronDown className="w-4 h-4 rotate-180" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
               </motion.button>
-              
+
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => loadData(false)}
                 className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-medium hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
               >
-                <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+                />
                 Обновить
               </motion.button>
             </div>
@@ -237,8 +251,10 @@ export default function MasterSchedule() {
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 mb-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Режим просмотра:</h3>
-                <div className="flex gap-2">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                  Режим просмотра:
+                </h3>
+                <div className="flex gap-2 not-sm:flex-col">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -267,13 +283,15 @@ export default function MasterSchedule() {
                   </motion.button>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-200/50">
                   <Shield className="w-4 h-4 text-emerald-600" />
                 </div>
                 <div className="text-sm">
-                  <div className="font-medium text-gray-900">Только просмотр</div>
+                  <div className="font-medium text-gray-900">
+                    Только просмотр
+                  </div>
                   <div className="text-gray-500">Редактирование недоступно</div>
                 </div>
               </div>
@@ -296,9 +314,13 @@ export default function MasterSchedule() {
                   <CalendarDays className="w-16 h-16" />
                 </div>
                 <div className="relative z-10">
-                  <div className="text-4xl font-bold mb-2">{stats.totalWeeklyDays}</div>
+                  <div className="text-4xl font-bold mb-2">
+                    {stats.totalWeeklyDays}
+                  </div>
                   <div className="text-blue-100 font-medium">Дней в неделе</div>
-                  <div className="text-sm text-blue-200/80 mt-2">С рабочими сменами</div>
+                  <div className="text-sm text-blue-200/80 mt-2">
+                    С рабочими сменами
+                  </div>
                 </div>
               </motion.div>
 
@@ -313,9 +335,15 @@ export default function MasterSchedule() {
                   <Clock className="w-16 h-16" />
                 </div>
                 <div className="relative z-10">
-                  <div className="text-4xl font-bold mb-2">{stats.todaySchedules}</div>
-                  <div className="text-emerald-100 font-medium">Смен сегодня</div>
-                  <div className="text-sm text-emerald-200/80 mt-2">Запланировано на сегодня</div>
+                  <div className="text-4xl font-bold mb-2">
+                    {stats.todaySchedules}
+                  </div>
+                  <div className="text-emerald-100 font-medium">
+                    Смен сегодня
+                  </div>
+                  <div className="text-sm text-emerald-200/80 mt-2">
+                    Запланировано на сегодня
+                  </div>
                 </div>
               </motion.div>
 
@@ -330,9 +358,13 @@ export default function MasterSchedule() {
                   <BarChart3 className="w-16 h-16" />
                 </div>
                 <div className="relative z-10">
-                  <div className="text-4xl font-bold mb-2">{stats.totalSchedules}</div>
+                  <div className="text-4xl font-bold mb-2">
+                    {stats.totalSchedules}
+                  </div>
                   <div className="text-purple-100 font-medium">Всего смен</div>
-                  <div className="text-sm text-purple-200/80 mt-2">В расписании</div>
+                  <div className="text-sm text-purple-200/80 mt-2">
+                    В расписании
+                  </div>
                 </div>
               </motion.div>
             </>
@@ -349,9 +381,15 @@ export default function MasterSchedule() {
                   <CalendarRange className="w-16 h-16" />
                 </div>
                 <div className="relative z-10">
-                  <div className="text-4xl font-bold mb-2">{stats.totalSpecific}</div>
-                  <div className="text-amber-100 font-medium">Специальных дат</div>
-                  <div className="text-sm text-amber-200/80 mt-2">Всего смен на даты</div>
+                  <div className="text-4xl font-bold mb-2">
+                    {stats.totalSpecific}
+                  </div>
+                  <div className="text-amber-100 font-medium">
+                    Специальных дат
+                  </div>
+                  <div className="text-sm text-amber-200/80 mt-2">
+                    Всего смен на даты
+                  </div>
                 </div>
               </motion.div>
 
@@ -366,9 +404,13 @@ export default function MasterSchedule() {
                   <TrendingUp className="w-16 h-16" />
                 </div>
                 <div className="relative z-10">
-                  <div className="text-4xl font-bold mb-2">{stats.upcomingSpecific}</div>
+                  <div className="text-4xl font-bold mb-2">
+                    {stats.upcomingSpecific}
+                  </div>
                   <div className="text-indigo-100 font-medium">Предстоящие</div>
-                  <div className="text-sm text-indigo-200/80 mt-2">Будущие специальные смены</div>
+                  <div className="text-sm text-indigo-200/80 mt-2">
+                    Будущие специальные смены
+                  </div>
                 </div>
               </motion.div>
 
@@ -383,9 +425,13 @@ export default function MasterSchedule() {
                   <Zap className="w-16 h-16" />
                 </div>
                 <div className="relative z-10">
-                  <div className="text-4xl font-bold mb-2">{stats.todaySpecific}</div>
+                  <div className="text-4xl font-bold mb-2">
+                    {stats.todaySpecific}
+                  </div>
                   <div className="text-rose-100 font-medium">Сегодня</div>
-                  <div className="text-sm text-rose-200/80 mt-2">Специальные смены сегодня</div>
+                  <div className="text-sm text-rose-200/80 mt-2">
+                    Специальные смены сегодня
+                  </div>
                 </div>
               </motion.div>
             </>
@@ -395,7 +441,9 @@ export default function MasterSchedule() {
         {loading ? (
           <div className="text-center py-20">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-            <p className="mt-4 text-gray-500 font-medium">Загрузка расписания...</p>
+            <p className="mt-4 text-gray-500 font-medium">
+              Загрузка расписания...
+            </p>
           </div>
         ) : viewMode === "weekly" ? (
           <>
@@ -418,7 +466,9 @@ export default function MasterSchedule() {
                     {/* Заголовок дня */}
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${getDayColor(index)} flex items-center justify-center`}>
+                        <div
+                          className={`w-10 h-10 rounded-xl bg-gradient-to-br ${getDayColor(index)} flex items-center justify-center`}
+                        >
                           <Calendar className="w-5 h-5 text-white" />
                         </div>
                         <div>
@@ -441,10 +491,11 @@ export default function MasterSchedule() {
                     <div className="space-y-3">
                       {weeklySchedules[index]?.map((item) => {
                         const duration = Math.round(
-                          (new Date(item.endTime).getTime() - new Date(item.startTime).getTime()) /
-                          (1000 * 60 * 60)
+                          (new Date(item.endTime).getTime() -
+                            new Date(item.startTime).getTime()) /
+                            (1000 * 60 * 60),
                         );
-                        
+
                         return (
                           <motion.div
                             key={item.id}
@@ -455,7 +506,8 @@ export default function MasterSchedule() {
                               <div className="flex items-center gap-2">
                                 <Clock className="w-4 h-4 text-blue-500" />
                                 <span className="font-bold text-gray-900">
-                                  {formatTime(item.startTime)} — {formatTime(item.endTime)}
+                                  {formatTime(item.startTime)} —{" "}
+                                  {formatTime(item.endTime)}
                                 </span>
                               </div>
                               <CheckCircle className="w-4 h-4 text-emerald-500" />
@@ -477,7 +529,9 @@ export default function MasterSchedule() {
                         <div className="text-center py-6 border-2 border-dashed border-gray-200/50 rounded-2xl">
                           <XCircle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                           <p className="text-gray-400 font-medium">Выходной</p>
-                          <p className="text-gray-300 text-sm mt-1">Нет запланированных смен</p>
+                          <p className="text-gray-300 text-sm mt-1">
+                            Нет запланированных смен
+                          </p>
                         </div>
                       )}
                     </div>
@@ -493,10 +547,14 @@ export default function MasterSchedule() {
                   <CalendarDays className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-1">Еженедельное расписание</h4>
+                  <h4 className="font-semibold text-gray-900 mb-1">
+                    Еженедельное расписание
+                  </h4>
                   <p className="text-gray-600 text-sm">
-                    Это ваше регулярное расписание на каждую неделю. Смены, отмеченные синим цветом — сегодняшние. 
-                    Для просмотра изменений в конкретные даты переключитесь на вкладку «Конкретные даты».
+                    Это ваше регулярное расписание на каждую неделю. Смены,
+                    отмеченные синим цветом — сегодняшние. Для просмотра
+                    изменений в конкретные даты переключитесь на вкладку
+                    «Конкретные даты».
                   </p>
                 </div>
               </div>
@@ -505,99 +563,239 @@ export default function MasterSchedule() {
         ) : (
           <>
             {/* Конкретные даты */}
-            <div className="bg-gradient-to-br from-white to-gray-50/50 rounded-3xl border border-gray-200/50 shadow-lg backdrop-blur-sm overflow-hidden mb-8">
+            {/* Конкретные даты */}
+            <div className="bg-gradient-to-br from-white/90 to-white/50 rounded-2xl border border-gray-200/30 shadow-sm backdrop-blur-sm overflow-hidden mb-8">
               {specificSchedules.length > 0 ? (
-                <div className="divide-y divide-gray-100/50">
-                  {specificSchedules.map((item, index) => {
-                    const scheduleDate = new Date(item.startTime);
-                    const isToday = scheduleDate.toDateString() === new Date().toDateString();
-                    const isPast = scheduleDate < new Date();
-                    const isUpcoming = scheduleDate >= new Date();
-                    const duration = Math.round(
-                      (new Date(item.endTime).getTime() - new Date(item.startTime).getTime()) /
-                      (1000 * 60 * 60)
-                    );
+                <div className="p-4 md:p-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl">
+                        <CalendarRange className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900">
+                          Специальные смены
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {specificSchedules.length}{" "}
+                          {specificSchedules.length === 1
+                            ? "смена"
+                            : specificSchedules.length < 5
+                              ? "смены"
+                              : "смен"}{" "}
+                          на конкретные даты
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full">
+                        {upcomingSpecificSchedules.length} предстоит
+                      </span>
+                      <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1.5 rounded-full">
+                        {specificSchedules.length -
+                          upcomingSpecificSchedules.length}{" "}
+                        прошло
+                      </span>
+                    </div>
+                  </div>
 
-                    return (
-                      <motion.div
-                        key={item.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className={`p-5 transition-all duration-200 group hover:bg-gray-50/50 ${
-                          isToday ? "bg-gradient-to-r from-blue-50/30 to-cyan-50/30" : ""
-                        }`}
-                      >
-                        <div className="flex items-start gap-4">
-                          {/* Дата */}
-                          <div className={`w-14 h-14 rounded-xl flex-shrink-0 bg-gradient-to-br ${
-                            isToday ? "from-blue-500 to-cyan-500" :
-                            isPast ? "from-gray-400 to-gray-500" :
-                            "from-purple-500 to-indigo-600"
-                          } flex flex-col items-center justify-center text-white shadow-lg`}>
-                            <span className="text-[10px] uppercase font-bold leading-none mb-0.5">
-                              {scheduleDate.toLocaleDateString("ru-RU", { month: "short" })}
-                            </span>
-                            <span className="text-xl font-black leading-none">
-                              {scheduleDate.getDate()}
-                            </span>
-                          </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {specificSchedules.map((item, index) => {
+                      const scheduleDate = new Date(item.startTime);
+                      const isToday =
+                        scheduleDate.toDateString() ===
+                        new Date().toDateString();
+                      const isPast = scheduleDate < new Date();
+                      const isUpcoming = scheduleDate >= new Date();
+                      const duration = Math.round(
+                        (new Date(item.endTime).getTime() -
+                          new Date(item.startTime).getTime()) /
+                          (1000 * 60 * 60),
+                      );
 
-                          {/* Информация */}
-                          <div className="flex-1">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                              <h3 className="font-bold text-gray-900">
-                                {formatDate(item.startTime)}
-                              </h3>
-                              <div className="flex items-center gap-2">
-                                <span className={`px-3 py-1 text-xs font-bold rounded-full ${
-                                  isToday ? "bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700" :
-                                  isPast ? "bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700" :
-                                  "bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700"
-                                }`}>
-                                  {isToday ? "СЕГОДНЯ" : isPast ? "ПРОШЛО" : "ПРЕДСТОИТ"}
-                                </span>
-                                <span className="text-xs bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 px-2 py-1 rounded-full font-medium">
-                                  Специальная
-                                </span>
-                              </div>
-                            </div>
+                      return (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          whileHover={{ y: -2 }}
+                          className={`group relative overflow-hidden rounded-xl border transition-all duration-200 hover:shadow-md ${
+                            isToday
+                              ? "border-blue-300/50 bg-gradient-to-br from-blue-50/50 to-cyan-50/30"
+                              : isPast
+                                ? "border-gray-200/50 bg-white/50"
+                                : "border-emerald-200/50 bg-gradient-to-br from-emerald-50/30 to-green-50/20"
+                          }`}
+                        >
+                          {/* Цветной индикатор */}
+                          <div
+                            className={`absolute top-0 left-0 right-0 h-1 ${
+                              isToday
+                                ? "bg-gradient-to-r from-blue-500 to-cyan-500"
+                                : isPast
+                                  ? "bg-gradient-to-r from-gray-400 to-gray-500"
+                                  : "bg-gradient-to-r from-emerald-500 to-green-500"
+                            }`}
+                          />
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="bg-gradient-to-r from-blue-50/50 to-cyan-50/50 rounded-xl p-3 border border-blue-200/30">
-                                <div className="text-xs text-gray-600 mb-1">Время работы</div>
-                                <div className="flex items-center gap-2">
-                                  <Clock className="w-4 h-4 text-blue-500" />
-                                  <span className="font-bold text-gray-900">
-                                    {formatTime(item.startTime)} — {formatTime(item.endTime)}
+                          <div className="p-4">
+                            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                              {/* Дата в кружке */}
+                              <div className="flex-shrink-0">
+                                <div
+                                  className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center ${
+                                    isToday
+                                      ? "bg-gradient-to-br from-blue-500 to-cyan-500 shadow-lg"
+                                      : isPast
+                                        ? "bg-gradient-to-br from-gray-400 to-gray-500"
+                                        : "bg-gradient-to-br from-emerald-500 to-green-500 shadow-lg"
+                                  } text-white not-sm:w-full`}
+                                >
+                                  <span className="text-[10px] uppercase font-bold leading-none mb-0.5">
+                                    {scheduleDate.toLocaleDateString("ru-RU", {
+                                      month: "short",
+                                    })}
+                                  </span>
+                                  <span className="text-lg font-black leading-none">
+                                    {scheduleDate.getDate()}
                                   </span>
                                 </div>
                               </div>
 
-                              <div className="bg-gradient-to-r from-emerald-50/50 to-green-50/50 rounded-xl p-3 border border-emerald-200/30">
-                                <div className="text-xs text-gray-600 mb-1">Длительность</div>
-                                <div className="flex items-center gap-2">
-                                  <Watch className="w-4 h-4 text-emerald-500" />
-                                  <span className="font-bold text-gray-900">{duration} часов</span>
+                              {/* Основная информация */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-3">
+                                  <div className="flex-1">
+                                    <h4 className="font-bold text-gray-900 text-sm sm:text-base mb-1">
+                                      {formatDate(item.startTime)}
+                                    </h4>
+                                    <p className="text-xs sm:text-sm text-gray-600">
+                                      {scheduleDate.toLocaleDateString(
+                                        "ru-RU",
+                                        { weekday: "long" },
+                                      )}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span
+                                      className={`px-2 py-1 text-[10px] sm:text-xs font-medium rounded-full ${
+                                        isToday
+                                          ? "bg-blue-100 text-blue-700"
+                                          : isPast
+                                            ? "bg-gray-100 text-gray-600"
+                                            : "bg-emerald-100 text-emerald-700"
+                                      }`}
+                                    >
+                                      {isToday
+                                        ? "СЕГОДНЯ"
+                                        : isPast
+                                          ? "ПРОШЛО"
+                                          : "ПРЕДСТОИТ"}
+                                    </span>
+                                    <span className="text-[10px] sm:text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-medium">
+                                      СПЕЦИАЛЬНАЯ
+                                    </span>
+                                  </div>
                                 </div>
+
+                                {/* Время и длительность */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  <div className="flex items-center gap-3 p-2 bg-gray-50/50 rounded-lg">
+                                    <div
+                                      className={`p-1.5 rounded-lg ${
+                                        isToday
+                                          ? "bg-blue-100"
+                                          : isPast
+                                            ? "bg-gray-100"
+                                            : "bg-emerald-100"
+                                      }`}
+                                    >
+                                      <Clock
+                                        className={`w-4 h-4 ${
+                                          isToday
+                                            ? "text-blue-500"
+                                            : isPast
+                                              ? "text-gray-500"
+                                              : "text-emerald-500"
+                                        }`}
+                                      />
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-gray-600">
+                                        Время работы
+                                      </div>
+                                      <div className="text-sm font-medium text-gray-900">
+                                        {formatTime(item.startTime)} —{" "}
+                                        {formatTime(item.endTime)}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-3 p-2 bg-gray-50/50 rounded-lg">
+                                    <div
+                                      className={`p-1.5 rounded-lg ${
+                                        isToday
+                                          ? "bg-cyan-100"
+                                          : isPast
+                                            ? "bg-gray-100"
+                                            : "bg-green-100"
+                                      }`}
+                                    >
+                                      <Watch
+                                        className={`w-4 h-4 ${
+                                          isToday
+                                            ? "text-cyan-500"
+                                            : isPast
+                                              ? "text-gray-500"
+                                              : "text-green-500"
+                                        }`}
+                                      />
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-gray-600">
+                                        Длительность
+                                      </div>
+                                      <div className="text-sm font-medium text-gray-900">
+                                        {duration}{" "}
+                                        {duration === 1
+                                          ? "час"
+                                          : duration < 5
+                                            ? "часа"
+                                            : "часов"}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Индикатор для сегодняшней смены */}
+                                {isToday && (
+                                  <div className="mt-3 flex items-center gap-2 text-xs text-blue-600">
+                                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                                    <span className="font-medium">
+                                      Смена активна сегодня
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
+                        </motion.div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
-                <div className="p-12 text-center">
-                  <div className="w-16 h-16 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="p-8 md:p-12 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
                     <CalendarRange className="w-8 h-8 text-gray-400" />
                   </div>
                   <h3 className="text-lg font-bold text-gray-900 mb-2">
                     Нет специальных смен
                   </h3>
-                  <p className="text-gray-500 max-w-md mx-auto">
-                    Ваше расписание состоит только из регулярных еженедельных смен
+                  <p className="text-gray-600 max-w-md mx-auto">
+                    Ваше расписание состоит только из регулярных еженедельных
+                    смен
                   </p>
                 </div>
               )}
@@ -610,10 +808,14 @@ export default function MasterSchedule() {
                   <CalendarRange className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-1">Специальные смены</h4>
+                  <h4 className="font-semibold text-gray-900 mb-1">
+                    Специальные смены
+                  </h4>
                   <p className="text-gray-600 text-sm">
-                    Здесь отображаются смены, назначенные на конкретные даты. Смены выделенные синим — сегодняшние. 
-                    Серым цветом отмечены прошедшие смены. Для просмотра регулярного расписания вернитесь на вкладку «Еженедельное».
+                    Здесь отображаются смены, назначенные на конкретные даты.
+                    Смены выделенные синим — сегодняшние. Серым цветом отмечены
+                    прошедшие смены. Для просмотра регулярного расписания
+                    вернитесь на вкладку «Еженедельное».
                   </p>
                 </div>
               </div>
@@ -623,7 +825,7 @@ export default function MasterSchedule() {
 
         {/* Информация внизу */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 text-sm text-gray-500 mt-8">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 not-sm:flex-col">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500"></div>
               <span>Сегодняшний день</span>
@@ -637,16 +839,19 @@ export default function MasterSchedule() {
               <span>Специальные смены</span>
             </div>
           </div>
-          
-          <div className="flex items-center gap-4">
+
+          <div className="flex items-center gap-4 mt-8">
             <span>
-              Показано: {viewMode === "weekly" 
-                ? `${Object.keys(weeklySchedules).length} из 7 дней` 
+              Показано:{" "}
+              {viewMode === "weekly"
+                ? `${Object.keys(weeklySchedules).length} из 7 дней`
                 : `${specificSchedules.length} специальных дат`}
             </span>
             <span className="text-blue-600 font-medium flex items-center gap-2">
               <Users className="w-4 h-4" />
-              {currentUser?.login ? `Логин: ${currentUser.login}` : "Режим просмотра"}
+              {currentUser?.login
+                ? `Логин: ${currentUser.login}`
+                : "Режим просмотра"}
             </span>
           </div>
         </div>

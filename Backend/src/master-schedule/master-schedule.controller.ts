@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import {
   Controller,
   Get,
@@ -12,6 +13,7 @@ import {
 import { MasterScheduleService } from './master-schedule.service';
 import { MasterScheduleDto } from './dto/master-schedule.dto';
 import { UpdateMasterScheduleDto } from './dto/update-master-schedule.dto';
+import { MasterTimeOffDto } from './dto/master-time-off.dto';
 import { Auth } from 'src/auth/decorators/auth.decorator';
 
 @Auth()
@@ -50,5 +52,33 @@ export class MasterScheduleController {
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.masterScheduleService.remove(id);
+  }
+
+  // === Эндпоинты для отпусков ===
+
+  @HttpCode(201)
+  @Post(':masterId/time-off')
+  createTimeOff(
+    @Param('masterId', ParseIntPipe) masterId: number,
+    @Body() dto: MasterTimeOffDto
+  ) {
+    return this.masterScheduleService.createTimeOff(masterId, dto);
+  }
+
+  @HttpCode(200)
+  @Get(':masterId/time-off')
+  getTimeOff(@Param('masterId', ParseIntPipe) masterId: number) {
+    return this.masterScheduleService.getTimeOffForMaster(masterId);
+  }
+
+  @Get(':masterId/status')
+  async getMasterStatus(@Param('masterId', ParseIntPipe) masterId: number) {
+    return this.masterScheduleService.getMasterCurrentStatus(masterId);
+  }
+
+  @HttpCode(200)
+  @Delete('time-off/:id')
+  deleteTimeOff(@Param('id', ParseIntPipe) id: number) {
+    return this.masterScheduleService.deleteTimeOff(id);
   }
 }

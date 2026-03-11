@@ -132,7 +132,7 @@ export default function MasterSchedulePage() {
     return new Date(dateStr).toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
-    });
+    })
   };
 
   const getMasterDisplayName = (item: IMasterSchedule): string => {
@@ -480,7 +480,7 @@ export default function MasterSchedulePage() {
 
             {/* Индивидуальные даты */}
             <div className="space-y-6">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-2 pr-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl">
                     <CalendarRange className="w-5 h-5 text-white" />
@@ -488,9 +488,6 @@ export default function MasterSchedulePage() {
                   <h2 className="text-2xl font-bold text-gray-900">
                     Индивидуальные даты
                   </h2>
-                </div>
-                <div className="text-sm font-medium text-gray-600 bg-gradient-to-r from-gray-50 to-white/50 px-4 py-2 rounded-xl border border-gray-200/50">
-                  Особые дни
                 </div>
               </div>
 

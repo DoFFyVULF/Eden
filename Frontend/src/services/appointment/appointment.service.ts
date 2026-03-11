@@ -34,6 +34,14 @@ export const appointmentService = {
     return data;
   },
 
+  async complete(id: number): Promise<IAppointment> {
+    const { data } = await axiosWithAuth.patch<IAppointment>(
+      `/appointment/${id}`,
+      { status: "Завершен" }
+    );
+    return data;
+  },
+
   async delete(id: number): Promise<{ message: string }> {
     const { data } = await axiosWithAuth.delete<{ message: string }>(
       `/appointment/${id}`

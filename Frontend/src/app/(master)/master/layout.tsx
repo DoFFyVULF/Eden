@@ -13,9 +13,21 @@ export default function MasterRootLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-
   const [isAuth, setIsAuth] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Определяем мобильное устройство
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const checkAuth = async () => {
     const accessToken = getAccessToken();
@@ -38,8 +50,6 @@ export default function MasterRootLayout({
 
   useEffect(() => {
     checkAuth();
-
-    // 🔥 слушаем login / logout
     window.addEventListener("auth-changed", checkAuth);
 
     return () => {
@@ -53,20 +63,35 @@ export default function MasterRootLayout({
 
   return (
     <QueryProvider>
-      <div className="bg-white min-h-screen flex ">
+      <div className="min-h-screen master-layout bg-gray-50">
         {isAuth && (
-          <aside className="w-1/5 flex flex-col border-r border-gray-200">
-            <AsideMenu isAdmin={false} />
-          </aside>
+          <>
+            {/* Для десктопа - aside занимает часть экрана */}
+            <div className="hidden lg:flex">
+              <div className="flex-none">
+                <AsideMenu isAdmin={false} />
+              </div>
+              <main className="flex-1 p-6 lg:p-8 overflow-auto">
+                {children}
+              </main>
+            </div>
+            
+            {/* Для мобилки - контент занимает весь экран */}
+            <div className="lg:hidden">
+              <AsideMenu isAdmin={false} />
+              <main className="p-4 pt-0">
+                {children}
+              </main>
+            </div>
+          </>
         )}
 
-        <div
-          className={`${
-            isAuth ? "w-4/5 p-6 overflow-auto" : "w-full p-6"
-          } transition-all duration-300`}
-        >
-          {children}
-        </div>
+        {/* Если не авторизован */}
+        {!isAuth && (
+          <div className="w-full p-6">
+            {children}
+          </div>
+        )}
       </div>
     </QueryProvider>
   );

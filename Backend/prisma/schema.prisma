@@ -20,6 +20,13 @@ enum AppointmentStatus {
   Отменен
 }
 
+enum TimeOffType {
+  vacation // Отпуск
+  sick_leave // Больничный
+  day_off // Отгул/выходной по приказу
+  other // Другое
+}
+
 // done
 model User {
   id         Int      @id @default(autoincrement())
@@ -49,6 +56,7 @@ model Master {
   appointments    Appointment[]
   masterSchedules MasterSchedule[]
   users           User[]
+  masterTimeOffs  MasterTimeOff[]
 
   @@map("master")
 }
@@ -66,6 +74,24 @@ model MasterSchedule {
   @@index([masterID, dayOfWeek])
   @@index([startTime, endTime])
   @@map("master_schedule")
+}
+
+model MasterTimeOff {
+  id       Int    @id @default(autoincrement())
+  master   Master @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  masterId Int    @map("master_id")
+
+  startDate DateTime @map("start_date") // 2026-04-01 00:00:00
+  endDate   DateTime @map("end_date") // 2026-04-14 23:59:59
+
+  type    TimeOffType @default(vacation)
+  comment String? // Необязательно: "Еду на море", "Больничный лист №123"
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([masterId, startDate, endDate])
+  @@index([masterId, type])
+  @@map("master_time_off")
 }
 
 // done

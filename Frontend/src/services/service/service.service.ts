@@ -12,6 +12,14 @@ export const serviceService = {
     return data;
   },
 
+  async getCount(): Promise<number> {
+    const { data } = await axiosWithAuth.get<IService[]>("/service");
+    
+    const serviceCount = data.filter(service => service.isActive === true)
+
+    return serviceCount.length;
+  },
+
   async create(dto: {
     title: string;
     description: string;

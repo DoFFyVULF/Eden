@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Search, 
-  Filter, 
-  Plus, 
-  Users, 
-  UserPlus, 
-  Star, 
-  Phone, 
-  Mail, 
+import { useState, useEffect, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Search,
+  Filter,
+  Plus,
+  Users,
+  UserPlus,
+  Star,
+  Phone,
+  Mail,
   Scissors,
   MoreVertical,
   Edit,
@@ -24,39 +24,442 @@ import {
   Award,
   Crown,
   RefreshCw,
-  Zap
-} from 'lucide-react';
+  Zap,
+  X,
+  Clock,
+  AlertCircle,
+  Info,
+} from "lucide-react";
 import EmployeesCard from "@/app/(admin)/administration/master/CreateMasterModal";
-import { masterService } from '@/services/master/master.service';
-import { IMaster } from '@/types/masters.type';
-import { formatPhoneNumber } from '@/app/lib/formatPhoneNumber';
+import { masterService } from "@/services/master/master.service";
+import { masterScheduleService } from "@/services/schedule/schedule.service";
+import { MasterStatusInfo } from "@/types/schedule.types";
+import { IMaster } from "@/types/masters.type";
+import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber";
 
+// === Типы для модального окна отпуска ===
+type VacationType = "vacation" | "sick_leave" | "day_off" | "other";
+
+type VacationFormData = {
+  masterId: number;
+  startDate: string;
+  endDate: string;
+  type: VacationType;
+  comment?: string;
+};
+
+// === Компонент: Бейдж отпуска с подсказкой ===
+function VacationBadge({
+  period,
+}: {
+  period: NonNullable<MasterStatusInfo["currentPeriod"]>;
+}) {
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  const getTypeConfig = (type: VacationType) => {
+    const configs: Record<
+      VacationType,
+      { label: string; color: string; icon: string }
+    > = {
+      vacation: {
+        label: "Отпуск",
+        color: "bg-blue-100 text-blue-700 border-blue-200",
+        icon: "🌴",
+      },
+      sick_leave: {
+        label: "Больничный",
+        color: "bg-rose-100 text-rose-700 border-rose-200",
+        icon: "🤒",
+      },
+      day_off: {
+        label: "Отгул",
+        color: "bg-amber-100 text-amber-700 border-amber-200",
+        icon: "📅",
+      },
+      other: {
+        label: "Недоступен",
+        color: "bg-gray-100 text-gray-700 border-gray-200",
+        icon: "⚙️",
+      },
+    };
+    return configs[type] || configs.other;
+  };
+
+  const config = getTypeConfig(period.type as VacationType);
+  const endDate = new Date(period.endDate);
+  const formattedEndDate = endDate.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "short",
+  });
+
+  return (
+    <div className="relative inline-block">
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        className={`px-3 py-1.5 rounded-full text-xs font-medium border ${config.color} flex items-center gap-1.5 cursor-help`}
+      >
+        <span>{config.icon}</span>
+        <span>{config.label}</span>
+        <span className="opacity-70">•</span>
+        <span>до {formattedEndDate}</span>
+      </motion.button>
+
+      <AnimatePresence>
+        {showTooltip && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-xl shadow-xl z-50 pointer-events-none"
+          >
+            <div className="font-medium mb-1">{config.label}</div>
+            <div className="text-gray-300 space-y-0.5">
+              <div>
+                📅 Начало:{" "}
+                {new Date(period.startDate).toLocaleDateString("ru-RU")}
+              </div>
+              <div>🔚 Окончание: {endDate.toLocaleDateString("ru-RU")}</div>
+              {period.comment && (
+                <div className="pt-1 border-t border-gray-700 mt-1">
+                  💬 {period.comment}
+                </div>
+              )}
+            </div>
+            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-3 h-3 bg-gray-900 rotate-45" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// === Компонент модального окна отпуска ===
+function MasterVacationModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  master,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: VacationFormData) => Promise<void>;
+  master: IMaster | null;
+}) {
+  const [formData, setFormData] = useState<VacationFormData>({
+    masterId: master?.id || 0,
+    startDate: "",
+    endDate: "",
+    type: "vacation",
+    comment: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen && master) {
+      setFormData({
+        masterId: master.id,
+        startDate: "",
+        endDate: "",
+        type: "vacation",
+        comment: "",
+      });
+      setError(null);
+    }
+  }, [isOpen, master]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.startDate || !formData.endDate) {
+      setError("Пожалуйста, укажите даты начала и окончания");
+      return;
+    }
+
+    if (new Date(formData.endDate) < new Date(formData.startDate)) {
+      setError("Дата окончания не может быть раньше даты начала");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      await onSubmit(formData);
+      onClose();
+    } catch (err: any) {
+      setError(err.message || "Ошибка при добавлении периода");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getTypeLabel = (type: VacationType) => {
+    const labels: Record<VacationType, string> = {
+      vacation: "🌴 Отпуск",
+      sick_leave: "🤒 Больничный",
+      day_off: "📅 Отгул",
+      other: "⚙️ Другое",
+    };
+    return labels[type];
+  };
+
+  const getTypeColor = (type: VacationType) => {
+    const colors: Record<VacationType, string> = {
+      vacation: "from-blue-500 to-cyan-500",
+      sick_leave: "from-rose-500 to-red-500",
+      day_off: "from-amber-500 to-orange-500",
+      other: "from-gray-500 to-gray-600",
+    };
+    return colors[type];
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+          />
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg z-50 p-4"
+          >
+            <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-200/50 overflow-hidden">
+              <div
+                className={`bg-gradient-to-r ${master ? getTypeColor(formData.type) : "from-blue-500 to-purple-500"} p-6 text-white`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/20 rounded-xl">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold">
+                        Период недоступности
+                      </h3>
+                      <p className="text-white/80 text-sm">
+                        {master
+                          ? `${master.surname} ${master.name}`
+                          : "Выберите мастера"}
+                      </p>
+                    </div>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={onClose}
+                    className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </motion.button>
+                </div>
+              </div>
+
+              <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Тип периода
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(
+                      [
+                        "vacation",
+                        "sick_leave",
+                        "day_off",
+                        "other",
+                      ] as VacationType[]
+                    ).map((type) => (
+                      <motion.button
+                        key={type}
+                        type="button"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() =>
+                          setFormData((prev) => ({ ...prev, type }))
+                        }
+                        className={`p-3 rounded-xl border-2 text-left transition-all ${
+                          formData.type === type
+                            ? `border-transparent bg-gradient-to-r ${getTypeColor(type)} text-white shadow-lg`
+                            : "border-gray-200 hover:border-gray-300 bg-gray-50 text-gray-700"
+                        }`}
+                      >
+                        <span className="text-sm font-medium">
+                          {getTypeLabel(type)}
+                        </span>
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Начало
+                    </label>
+                    <input
+                      type="datetime-local"
+                      className="w-full px-4 py-3 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all"
+                      value={formData.startDate}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          startDate: e.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Окончание
+                    </label>
+                    <input
+                      type="datetime-local"
+                      className="w-full px-4 py-3 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all"
+                      value={formData.endDate}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          endDate: e.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Комментарий{" "}
+                    <span className="text-gray-400">(необязательно)</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    className="w-full px-4 py-3 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 placeholder-gray-400 transition-all resize-none"
+                    placeholder="Например: ежегодный отпуск, больничный лист №..."
+                    value={formData.comment}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        comment: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <AnimatePresence>
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm"
+                    >
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <span>{error}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="flex gap-3 pt-2">
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={onClose}
+                    className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                    disabled={isSubmitting}
+                  >
+                    Отмена
+                  </motion.button>
+                  <motion.button
+                    type="submit"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    disabled={isSubmitting}
+                    className={`flex-1 px-4 py-3 bg-gradient-to-r ${getTypeColor(formData.type)} text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Clock className="w-4 h-4 animate-spin" />
+                        Сохранение...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        Добавить период
+                      </>
+                    )}
+                  </motion.button>
+                </div>
+              </form>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// === Основной компонент страницы ===
 export default function Employees() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isVacationModalOpen, setIsVacationModalOpen] = useState(false);
   const [editingMaster, setEditingMaster] = useState<IMaster | null>(null);
+  const [vacationMaster, setVacationMaster] = useState<IMaster | null>(null);
   const [masters, setMasters] = useState<IMaster[]>([]);
+  const [masterStatuses, setMasterStatuses] = useState<
+    Record<number, MasterStatusInfo>
+  >({});
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [specializationFilter, setSpecializationFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [specializationFilter, setSpecializationFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedMaster, setSelectedMaster] = useState<IMaster | null>(null);
 
-  // Загрузка данных
   const loadMasters = async (showLoading = true) => {
-    if (showLoading) {
-      setLoading(true);
-    } else {
-      setIsRefreshing(true);
-    }
-    
+    if (showLoading) setLoading(true);
+    else setIsRefreshing(true);
+
     try {
       const data = await masterService.getAll();
       setMasters(data);
+
+      // Загружаем статусы отпусков для каждого мастера
+      const statuses: Record<number, MasterStatusInfo> = {};
+      await Promise.all(
+        data.map(async (master) => {
+          try {
+            if (master.id) {
+              statuses[master.id] = await masterScheduleService.getMasterStatus(
+                master.id,
+              );
+            }
+          } catch {
+            if (master.id) {
+              statuses[master.id] = { isOnTimeOff: false, currentPeriod: null };
+            }
+          }
+        }),
+      );
+      setMasterStatuses(statuses);
     } catch (error) {
-      console.error('Ошибка загрузки мастеров:', error);
+      console.error("Ошибка загрузки мастеров:", error);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -65,98 +468,140 @@ export default function Employees() {
 
   useEffect(() => {
     loadMasters();
+
+    // Проверка статусов каждые 5 минут (автоматическое обновление при окончании отпуска)
+    const interval = setInterval(
+      () => {
+        loadMasters(false);
+      },
+      5 * 60 * 1000,
+    );
+
+    return () => clearInterval(interval);
   }, []);
 
-  // Фильтрация мастеров
   const filteredMasters = useMemo(() => {
-    return masters.filter(master => {
-      const matchesSearch = 
+    return masters.filter((master) => {
+      const matchesSearch =
         master.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         master.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
         master.middlename?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        master.specialization.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        master.specialization
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
         (master.phone && master.phone.includes(searchTerm));
 
-      const matchesSpecialization = 
-        !specializationFilter || 
-        master.specialization.toLowerCase().includes(specializationFilter.toLowerCase());
+      const matchesSpecialization =
+        !specializationFilter ||
+        master.specialization
+          .toLowerCase()
+          .includes(specializationFilter.toLowerCase());
 
-      const matchesStatus = 
-        !statusFilter || 
-        (statusFilter === 'active' && master.isActive) ||
-        (statusFilter === 'inactive' && !master.isActive);
+      const matchesStatus =
+        !statusFilter ||
+        (statusFilter === "active" && master.isActive) ||
+        (statusFilter === "inactive" && !master.isActive);
 
       return matchesSearch && matchesSpecialization && matchesStatus;
     });
   }, [masters, searchTerm, specializationFilter, statusFilter]);
 
-  // Статистика
   const stats = useMemo(() => {
     const totalMasters = masters.length;
-    const activeMasters = masters.filter(master => master.isActive).length;
-    const inactiveMasters = masters.filter(master => !master.isActive).length;
-    
-    const averageRating = masters.length > 0 
-      ? Number((masters.reduce((acc, master) => acc + 4.8, 0) / masters.length).toFixed(1))
-      : 0;
+    const mastersOnTimeOff = Object.values(masterStatuses).filter(
+      (s) => s.isOnTimeOff,
+    ).length;
+    const activeMasters = masters.filter(
+      (m) => m.isActive && !masterStatuses[m.id!]?.isOnTimeOff,
+    ).length;
+    const inactiveMasters = masters.filter((m) => !m.isActive).length;
+    const averageRating =
+      masters.length > 0
+        ? Number(
+            (
+              masters.reduce((acc, master) => acc + 4.8, 0) / masters.length
+            ).toFixed(1),
+          )
+        : 0;
 
-    return { totalMasters, activeMasters, inactiveMasters, averageRating };
-  }, [masters]);
+    return {
+      totalMasters,
+      activeMasters,
+      inactiveMasters,
+      averageRating,
+      mastersOnTimeOff,
+    };
+  }, [masters, masterStatuses]);
 
-  // Специализации для фильтра
   const specializations = [
-    "парикмахер", "массажист", "косметолог", "маникюр", "визажист", "стилист"
+    "парикмахер",
+    "массажист",
+    "косметолог",
+    "маникюр",
+    "визажист",
+    "стилист",
   ];
 
   const handleCreateMaster = async (masterData: any) => {
     try {
-      const cleanedPhone = masterData.phone?.replace(/\D/g, '') || '';
-      await masterService.create({
-        ...masterData,
-        phone: cleanedPhone
-      });
+      const cleanedPhone = masterData.phone?.replace(/\D/g, "") || "";
+      await masterService.create({ ...masterData, phone: cleanedPhone });
       await loadMasters(false);
       setIsCreateModalOpen(false);
     } catch (error) {
-      console.error('Ошибка создания мастера:', error);
+      console.error("Ошибка создания мастера:", error);
       throw error;
     }
   };
 
-  // Функция для открытия формы редактирования
   const handleEditMaster = (master: IMaster) => {
     setEditingMaster(master);
     setIsEditModalOpen(true);
     setSelectedMaster(null);
   };
 
-  // Функция для обновления мастера
   const handleUpdateMaster = async (masterData: any) => {
     try {
-      const cleanedPhone = masterData.phone?.replace(/\D/g, '') || '';
+      const cleanedPhone = masterData.phone?.replace(/\D/g, "") || "";
       await masterService.update(editingMaster!.id!, {
         ...masterData,
-        phone: cleanedPhone
+        phone: cleanedPhone,
       });
       await loadMasters(false);
       setIsEditModalOpen(false);
       setEditingMaster(null);
     } catch (error) {
-      console.error('Ошибка обновления мастера:', error);
+      console.error("Ошибка обновления мастера:", error);
+      throw error;
+    }
+  };
+
+  const handleAddVacation = async (formData: VacationFormData) => {
+    try {
+      await masterScheduleService.createTimeOff({
+        masterId: formData.masterId,
+        startDate: new Date(formData.startDate).toISOString(),
+        endDate: new Date(formData.endDate).toISOString(),
+        type: formData.type,
+        comment: formData.comment || undefined,
+      });
+      await loadMasters(false);
+    } catch (error: any) {
+      console.error("Ошибка добавления периода:", error);
       throw error;
     }
   };
 
   const handleDeleteMaster = async (id: number) => {
-    if (!window.confirm('Вы уверены, что хотите удалить этого мастера?')) return;
-    
+    if (!window.confirm("Вы уверены, что хотите удалить этого мастера?"))
+      return;
     try {
       await masterService.delete(id);
       await loadMasters(false);
       setSelectedMaster(null);
     } catch (error) {
-      console.error('Ошибка удаления мастера:', error);
-      alert('Ошибка при удалении мастера');
+      console.error("Ошибка удаления мастера:", error);
+      alert("Ошибка при удалении мастера");
     }
   };
 
@@ -165,33 +610,36 @@ export default function Employees() {
       await masterService.update(master.id!, { isActive: !master.isActive });
       await loadMasters(false);
     } catch (error) {
-      console.error('Ошибка изменения статуса:', error);
-      alert('Ошибка при изменении статуса мастера');
+      console.error("Ошибка изменения статуса:", error);
+      alert("Ошибка при изменении статуса мастера");
     }
   };
 
-  // Безопасное форматирование телефона
+  const openVacationModal = (master: IMaster) => {
+    setVacationMaster(master);
+    setIsVacationModalOpen(true);
+    setSelectedMaster(null);
+  };
+
   const safeFormatPhone = (phone: string | undefined): string => {
-    if (!phone) return 'Не указан';
+    if (!phone) return "Не указан";
     return formatPhoneNumber(phone);
   };
 
-  // Получение инициалов
   const getInitials = (master: IMaster) => {
     return `${master.name[0]}${master.surname[0]}`.toUpperCase();
   };
 
-  // Получение цвета для специализации
   const getSpecializationColor = (specialization: string) => {
     const colors: Record<string, string> = {
-      'парикмахер': 'from-blue-500 to-cyan-500',
-      'массажист': 'from-emerald-500 to-green-500',
-      'косметолог': 'from-purple-500 to-pink-500',
-      'маникюр': 'from-amber-500 to-orange-500',
-      'визажист': 'from-rose-500 to-red-500',
-      'стилист': 'from-indigo-500 to-blue-500',
+      парикмахер: "from-blue-500 to-cyan-500",
+      массажист: "from-emerald-500 to-green-500",
+      косметолог: "from-purple-500 to-pink-500",
+      маникюр: "from-amber-500 to-orange-500",
+      визажист: "from-rose-500 to-red-500",
+      стилист: "from-indigo-500 to-blue-500",
     };
-    return colors[specialization.toLowerCase()] || 'from-gray-500 to-gray-600';
+    return colors[specialization.toLowerCase()] || "from-gray-500 to-gray-600";
   };
 
   return (
@@ -214,7 +662,15 @@ export default function Employees() {
                 </h1>
               </motion.div>
               <p className="text-gray-600">
-                Всего сотрудников: <span className="font-semibold text-gray-800">{stats.totalMasters}</span>
+                Всего сотрудников:{" "}
+                <span className="font-semibold text-gray-800">
+                  {stats.totalMasters}
+                </span>
+                {stats.mastersOnTimeOff > 0 && (
+                  <span className="ml-2 text-amber-600">
+                    • {stats.mastersOnTimeOff} в отпуске
+                  </span>
+                )}
                 {filteredMasters.length !== stats.totalMasters && (
                   <span className="ml-2">
                     (показано {filteredMasters.length})
@@ -222,7 +678,7 @@ export default function Employees() {
                 )}
               </p>
             </div>
-            
+
             <div className="flex flex-col sm:flex-row gap-3">
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -232,19 +688,25 @@ export default function Employees() {
               >
                 <Filter className="w-4 h-4" />
                 Фильтры
-                {isFilterOpen ? <ChevronDown className="w-4 h-4 rotate-180" /> : <ChevronDown className="w-4 h-4" />}
+                {isFilterOpen ? (
+                  <ChevronDown className="w-4 h-4 rotate-180" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
               </motion.button>
-              
+
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => loadMasters(false)}
                 className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-medium hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
               >
-                <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+                />
                 Обновить
               </motion.button>
-              
+
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -268,7 +730,6 @@ export default function Employees() {
               >
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 mb-6">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Поиск */}
                     <div className="relative">
                       <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
@@ -280,21 +741,19 @@ export default function Employees() {
                       />
                     </div>
 
-                    {/* Фильтр по специализации */}
                     <select
                       className="w-full px-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-300"
                       value={specializationFilter}
                       onChange={(e) => setSpecializationFilter(e.target.value)}
                     >
                       <option value="">Все специализации</option>
-                      {specializations.map(spec => (
+                      {specializations.map((spec) => (
                         <option key={spec} value={spec} className="capitalize">
                           {spec.charAt(0).toUpperCase() + spec.slice(1)}
                         </option>
                       ))}
                     </select>
 
-                    {/* Фильтр по статусу */}
                     <select
                       className="w-full px-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-300"
                       value={statusFilter}
@@ -324,9 +783,13 @@ export default function Employees() {
               <Users className="w-16 h-16" />
             </div>
             <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">{stats.totalMasters}</div>
+              <div className="text-4xl font-bold mb-2">
+                {stats.totalMasters}
+              </div>
               <div className="text-blue-100 font-medium">Всего сотрудников</div>
-              <div className="text-sm text-blue-200/80 mt-2">Зарегистрировано в системе</div>
+              <div className="text-sm text-blue-200/80 mt-2">
+                Зарегистрировано в системе
+              </div>
             </div>
           </motion.div>
 
@@ -341,9 +804,13 @@ export default function Employees() {
               <Zap className="w-16 h-16" />
             </div>
             <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">{stats.activeMasters}</div>
+              <div className="text-4xl font-bold mb-2">
+                {stats.activeMasters}
+              </div>
               <div className="text-emerald-100 font-medium">Активные</div>
-              <div className="text-sm text-emerald-200/80 mt-2">Сейчас работают</div>
+              <div className="text-sm text-emerald-200/80 mt-2">
+                Сейчас работают
+              </div>
             </div>
           </motion.div>
 
@@ -358,9 +825,13 @@ export default function Employees() {
               <Star className="w-16 h-16" />
             </div>
             <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">{stats.averageRating}</div>
+              <div className="text-4xl font-bold mb-2">
+                {stats.averageRating}
+              </div>
               <div className="text-amber-100 font-medium">Средний рейтинг</div>
-              <div className="text-sm text-amber-200/80 mt-2">По отзывам клиентов</div>
+              <div className="text-sm text-amber-200/80 mt-2">
+                По отзывам клиентов
+              </div>
             </div>
           </motion.div>
 
@@ -375,9 +846,13 @@ export default function Employees() {
               <Shield className="w-16 h-16" />
             </div>
             <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">{stats.inactiveMasters}</div>
+              <div className="text-4xl font-bold mb-2">
+                {stats.inactiveMasters}
+              </div>
               <div className="text-rose-100 font-medium">Неактивные</div>
-              <div className="text-sm text-rose-200/80 mt-2">Недоступны для записи</div>
+              <div className="text-sm text-rose-200/80 mt-2">
+                Недоступны для записи
+              </div>
             </div>
           </motion.div>
         </div>
@@ -388,152 +863,207 @@ export default function Employees() {
             {loading ? (
               <div className="col-span-full py-12 text-center">
                 <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-                <p className="mt-4 text-gray-500 font-medium">Загрузка сотрудников...</p>
+                <p className="mt-4 text-gray-500 font-medium">
+                  Загрузка сотрудников...
+                </p>
               </div>
             ) : filteredMasters.length > 0 ? (
-              filteredMasters.map((master, index) => (
-                <motion.div
-                  key={master.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  whileHover={{ scale: 1.01, y: -2 }}
-                  className="bg-gradient-to-br from-white to-gray-50/50 rounded-3xl border border-gray-200/50 p-5 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm  group"
-                >
-                  {/* Верхняя часть с аватаром и статусом */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${getSpecializationColor(master.specialization)} flex items-center justify-center text-white font-bold text-xl shadow-lg`}>
-                          {master.photo ? (
-                            <img 
-                              src={master.photo} 
-                              alt={`${master.name} ${master.surname}`}
-                              className="w-full h-full rounded-2xl object-cover"
-                            />
-                          ) : (
-                            getInitials(master)
-                          )}
-                        </div>
-                        <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white ${
-                          master.isActive ? 'bg-emerald-500' : 'bg-rose-500'
-                        }`}>
-                          <div className="absolute inset-0 rounded-full bg-white/30 animate-ping" />
-                        </div>
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-gray-900 text-lg leading-tight">
-                          {master.surname} {master.name}
-                        </h3>
-                        <p className="text-sm text-gray-600">{master.specialization}</p>
-                      </div>
-                    </div>
-                    
-                    {/* Действия */}
-                    <div className="relative">
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => setSelectedMaster(
-                          selectedMaster?.id === master.id ? null : master
-                        )}
-                        className={`p-1.5 rounded-lg transition-all ${
-                          selectedMaster?.id === master.id 
-                            ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white' 
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </motion.button>
-                      
-                      {/* Выпадающее меню */}
-                      <AnimatePresence>
-                        {selectedMaster?.id === master.id && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: -10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                            className="absolute right-0 top-full mt-2 w-56 bg-white/90 backdrop-blur-lg rounded-2xl shadow-2xl border border-gray-200/50 overflow-hidden z-50"
+              filteredMasters.map((master, index) => {
+                const status = masterStatuses[master.id!];
+                const isOnTimeOff = status?.isOnTimeOff && status.currentPeriod;
+
+                return (
+                  <motion.div
+                    key={master.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    whileHover={{ scale: 1.01, y: -2 }}
+                    className="bg-gradient-to-br from-white to-gray-50/50 rounded-3xl border border-gray-200/50 p-5 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm group"
+                  >
+                    {/* Верхняя часть с аватаром и статусом */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div
+                            className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${getSpecializationColor(master.specialization)} flex items-center justify-center text-white font-bold text-xl shadow-lg`}
                           >
-                            <div className="p-2">
-                              <motion.button
-                                whileHover={{ x: 5 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => handleToggleStatus(master)}
-                                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50/50 transition-all duration-200 text-gray-700 hover:text-blue-600"
-                              >
-                                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                                  <Power className="w-4 h-4 text-blue-600" />
-                                </div>
-                                <div className="text-left">
-                                  <p className="font-medium">{master.isActive ? 'Деактивировать' : 'Активировать'}</p>
-                                  <p className="text-xs text-gray-500">
-                                    {master.isActive ? 'Сделать неактивным' : 'Вернуть в работу'}
-                                  </p>
-                                </div>
-                              </motion.button>
-                              
-                              <motion.button
-                                whileHover={{ x: 5 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => handleEditMaster(master)}
-                                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-emerald-50/50 transition-all duration-200 text-gray-700 hover:text-emerald-600 mt-1"
-                              >
-                                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                                  <Edit className="w-4 h-4 text-emerald-600" />
-                                </div>
-                                <div className="text-left">
-                                  <p className="font-medium">Редактировать</p>
-                                  <p className="text-xs text-gray-500">Изменить данные сотрудника</p>
-                                </div>
-                              </motion.button>
-                              
-                              <motion.button
-                                whileHover={{ x: 5 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => handleDeleteMaster(master.id!)}
-                                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50/50 transition-all duration-200 text-gray-700 hover:text-red-600 mt-1"
-                              >
-                                <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
-                                  <Trash2 className="w-4 h-4 text-red-600" />
-                                </div>
-                                <div className="text-left">
-                                  <p className="font-medium">Удалить</p>
-                                  <p className="text-xs text-gray-500">Удалить сотрудника</p>
-                                </div>
-                              </motion.button>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </div>
+                            {master.photo ? (
+                              <img
+                                src={master.photo}
+                                alt={`${master.name} ${master.surname}`}
+                                className="w-full h-full rounded-2xl object-cover"
+                              />
+                            ) : (
+                              getInitials(master)
+                            )}
+                          </div>
+                          <div
+                            className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white ${
+                              isOnTimeOff
+                                ? "bg-amber-500"
+                                : master.isActive
+                                  ? "bg-emerald-500"
+                                  : "bg-rose-500"
+                            }`}
+                          >
+                            <div className="absolute inset-0 rounded-full bg-white/30 animate-ping" />
+                          </div>
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-gray-900 text-lg leading-tight">
+                            {master.surname} {master.name}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {master.specialization}
+                          </p>
+                        </div>
+                      </div>
 
-                  {/* Контактная информация */}
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Phone className="w-3.5 h-3.5" />
-                      <span>{safeFormatPhone(master.phone)}</span>
-                    </div>
-                    
-                  </div>
+                      {/* Действия */}
+                      <div className="relative">
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() =>
+                            setSelectedMaster(
+                              selectedMaster?.id === master.id ? null : master,
+                            )
+                          }
+                          className={`p-1.5 rounded-lg transition-all ${
+                            selectedMaster?.id === master.id
+                              ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          }`}
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </motion.button>
 
-                  {/* Статус и рейтинг */}
-                  <div className="flex items-center justify-between text-sm">
-                    <span className={`px-3 py-1 rounded-full font-medium ${
-                      master.isActive 
-                        ? 'bg-emerald-100 text-emerald-700' 
-                        : 'bg-rose-100 text-rose-700'
-                    }`}>
-                      {master.isActive ? 'Активен' : 'Неактивен'}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                      <span className="font-medium">{stats.averageRating}</span>
+                        {/* Выпадающее меню */}
+                        <AnimatePresence>
+                          {selectedMaster?.id === master.id && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                              className="absolute right-0 top-full mt-2 w-64 bg-white/90 backdrop-blur-lg rounded-2xl shadow-2xl border border-gray-200/50 overflow-hidden z-50"
+                            >
+                              <div className="p-2">
+                                <motion.button
+                                  whileHover={{ x: 5 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => openVacationModal(master)}
+                                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-50/50 transition-all duration-200 text-gray-700 hover:text-purple-600"
+                                >
+                                  <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                                    <Calendar className="w-4 h-4 text-purple-600" />
+                                  </div>
+                                  <div className="text-left">
+                                    <p className="font-medium">
+                                      Отправить в отпуск
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      Добавить период недоступности
+                                    </p>
+                                  </div>
+                                </motion.button>
+
+                                <motion.button
+                                  whileHover={{ x: 5 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => handleToggleStatus(master)}
+                                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50/50 transition-all duration-200 text-gray-700 hover:text-blue-600 mt-1"
+                                >
+                                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                                    <Power className="w-4 h-4 text-blue-600" />
+                                  </div>
+                                  <div className="text-left">
+                                    <p className="font-medium">
+                                      {master.isActive
+                                        ? "Деактивировать"
+                                        : "Активировать"}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      {master.isActive
+                                        ? "Сделать неактивным"
+                                        : "Вернуть в работу"}
+                                    </p>
+                                  </div>
+                                </motion.button>
+
+                                <motion.button
+                                  whileHover={{ x: 5 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => handleEditMaster(master)}
+                                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-emerald-50/50 transition-all duration-200 text-gray-700 hover:text-emerald-600 mt-1"
+                                >
+                                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                                    <Edit className="w-4 h-4 text-emerald-600" />
+                                  </div>
+                                  <div className="text-left">
+                                    <p className="font-medium">Редактировать</p>
+                                    <p className="text-xs text-gray-500">
+                                      Изменить данные сотрудника
+                                    </p>
+                                  </div>
+                                </motion.button>
+
+                                <motion.button
+                                  whileHover={{ x: 5 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => handleDeleteMaster(master.id!)}
+                                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50/50 transition-all duration-200 text-gray-700 hover:text-red-600 mt-1"
+                                >
+                                  <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                  </div>
+                                  <div className="text-left">
+                                    <p className="font-medium">Удалить</p>
+                                    <p className="text-xs text-gray-500">
+                                      Удалить сотрудника
+                                    </p>
+                                  </div>
+                                </motion.button>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))
+
+                    {/* Контактная информация */}
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>{safeFormatPhone(master.phone)}</span>
+                      </div>
+                    </div>
+
+                    {/* Статус и рейтинг */}
+                    <div className="flex items-center justify-between text-sm">
+                      {isOnTimeOff && status?.currentPeriod ? (
+                        <VacationBadge period={status.currentPeriod} />
+                      ) : (
+                        <span
+                          className={`px-3 py-1 rounded-full font-medium ${
+                            master.isActive
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-rose-100 text-rose-700"
+                          }`}
+                        >
+                          {master.isActive ? "Активен" : "Неактивен"}
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                        <span className="font-medium">
+                          {stats.averageRating}
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })
             ) : (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -543,10 +1073,12 @@ export default function Employees() {
                 <div className="w-16 h-16 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Users className="w-8 h-8 text-gray-400" />
                 </div>
-                <p className="text-gray-500 font-medium">Сотрудники не найдены</p>
+                <p className="text-gray-500 font-medium">
+                  Сотрудники не найдены
+                </p>
                 <p className="text-gray-400 text-sm mt-1">
-                  {searchTerm || specializationFilter || statusFilter 
-                    ? "Попробуйте изменить параметры поиска" 
+                  {searchTerm || specializationFilter || statusFilter
+                    ? "Попробуйте изменить параметры поиска"
                     : "Создайте первого сотрудника"}
                 </p>
                 <button
@@ -572,21 +1104,19 @@ export default function Employees() {
               <span>Неактивные</span>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-4">
-            <span>
-              Загружено: {masters.length} сотрудников
-            </span>
+            <span>Загружено: {masters.length} сотрудников</span>
             <span className="text-blue-600 font-medium">
               {stats.activeMasters} сейчас работают
             </span>
           </div>
         </div>
 
-        {/* Модальное окно создания сотрудника */}
+        {/* === Модальные окна === */}
         <AnimatePresence>
           {isCreateModalOpen && (
-            <EmployeesCard 
+            <EmployeesCard
               isOpen={isCreateModalOpen}
               onClose={() => setIsCreateModalOpen(false)}
               onSubmit={handleCreateMaster}
@@ -594,18 +1124,31 @@ export default function Employees() {
           )}
         </AnimatePresence>
 
-        {/* Модальное окно редактирования сотрудника */}
         <AnimatePresence>
           {isEditModalOpen && editingMaster && (
-            <EmployeesCard 
+            <EmployeesCard
               isOpen={isEditModalOpen}
               onClose={() => {
                 setIsEditModalOpen(false);
                 setEditingMaster(null);
               }}
               onSubmit={handleUpdateMaster}
-              master={editingMaster} // Передаем мастера для редактирования
-              isEditMode={true} // Режим редактирования
+              master={editingMaster}
+              isEditMode={true}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isVacationModalOpen && (
+            <MasterVacationModal
+              isOpen={isVacationModalOpen}
+              onClose={() => {
+                setIsVacationModalOpen(false);
+                setVacationMaster(null);
+              }}
+              onSubmit={handleAddVacation}
+              master={vacationMaster}
             />
           )}
         </AnimatePresence>

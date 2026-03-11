@@ -413,7 +413,7 @@ export default function Category() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
                   whileHover={{ scale: 1.01, y: -2 }}
-                  className="bg-gradient-to-br from-white to-gray-50/50 rounded-3xl border border-gray-200/50 p-6 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm overflow-hidden group"
+                  className="bg-gradient-to-br from-white to-gray-50/50 rounded-3xl border border-gray-200/50 p-6 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm group"
                 >
                   {/* Заголовок и статус */}
                   <div className="flex items-start justify-between mb-4">

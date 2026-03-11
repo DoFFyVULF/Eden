@@ -26,6 +26,23 @@ body {
   font-size: 18px;
 }
 
+/* Переопределяем фон body ТОЛЬКО когда он внутри admin-layout */
+.admin-layout body {
+  background-color: #ffffff !important;
+}
+
+/* Альтернативный вариант - если body не внутри admin-layout, 
+   но страница в админке, то можно переопределить напрямую */
+body:has(.admin-layout) {
+  background-color: #ffffff !important;
+}
+
+/* Для мастер-панели */
+.master-layout body,
+body:has(.master-layout) {
+  background-color: #ffffff !important;
+}
+
 a{
   transition: all .2s ease; 
 }

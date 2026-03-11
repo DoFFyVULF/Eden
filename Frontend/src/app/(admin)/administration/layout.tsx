@@ -13,9 +13,18 @@ export default function AdminRootLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-
   const [isAuth, setIsAuth] = useState(false);
   const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    // Добавляем класс на body при загрузке админки
+    document.body.classList.add('admin-layout-body');
+    
+    return () => {
+      // Убираем класс при уходе с админки
+      document.body.classList.remove('admin-layout-body');
+    };
+  }, []);
 
   const checkAuth = async () => {
     const accessToken = getAccessToken();
@@ -38,10 +47,7 @@ export default function AdminRootLayout({
 
   useEffect(() => {
     checkAuth();
-
-    // 🔥 слушаем login / logout
     window.addEventListener("auth-changed", checkAuth);
-
     return () => {
       window.removeEventListener("auth-changed", checkAuth);
     };
@@ -53,20 +59,32 @@ export default function AdminRootLayout({
 
   return (
     <QueryProvider>
-      <div className="bg-white min-h-screen flex ">
+      <div className="admin-layout min-h-screen bg-white">
         {isAuth && (
-          <aside className="w-1/5 flex flex-col border-r border-gray-200">
-            <AsideMenu isAdmin={true} />
-          </aside>
+          <>
+            <div className="hidden lg:flex">
+              <div className="flex-none">
+                <AsideMenu isAdmin={true} />
+              </div>
+              <main className="flex-1 p-6 lg:p-8 overflow-auto bg-white">
+                {children}
+              </main>
+            </div>
+            
+            <div className="lg:hidden bg-white">
+              <AsideMenu isAdmin={true} />
+              <main className="p-4 pt-0 bg-white">
+                {children}
+              </main>
+            </div>
+          </>
         )}
 
-        <div
-          className={`${
-            isAuth ? "w-4/5 p-6 overflow-auto" : "w-full p-6"
-          } transition-all duration-300`}
-        >
-          {children}
-        </div>
+        {!isAuth && (
+          <div className="w-full p-6 bg-white min-h-screen">
+            {children}
+          </div>
+        )}
       </div>
     </QueryProvider>
   );

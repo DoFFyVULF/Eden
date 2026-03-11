@@ -11,6 +11,7 @@ import { AppointmentModule } from './appointment/appointment.module';
 import { StatsModule } from './stats/stats.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppointmentHistoryModule } from './appointment-history/appointment-history.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AppointmentHistoryModule } from './appointment-history/appointment-hist
     StatsModule,
     ScheduleModule.forRoot(),
     AppointmentHistoryModule,
+    AnalyticsModule,
   ]
 })
 export class AppModule {}

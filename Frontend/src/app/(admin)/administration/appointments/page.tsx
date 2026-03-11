@@ -7,13 +7,13 @@ import NewAppointmentsWindow from "./newAppointmentsWindow";
 import { appointmentService } from "@/services/appointment/appointment.service";
 import { IAppointment, AppointmentStatus } from "@/types/appointment.types";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Search, 
-  Filter, 
-  Calendar, 
-  UserCheck, 
-  Clock, 
-  Users, 
+import {
+  Search,
+  Filter,
+  Calendar,
+  UserCheck,
+  Clock,
+  Users,
   CalendarDays,
   CheckCircle,
   XCircle,
@@ -25,10 +25,9 @@ import {
   TrendingUp,
   RefreshCw,
   Download,
-  MoreVertical
 } from "lucide-react";
 
-type SortField = "status" | "time" | "client" | "service" | "date" | "master";
+type SortField = "time" | "client" | "service" | "date" | "master";
 type SortOrder = "asc" | "desc";
 
 export default function AdminAppointments() {
@@ -37,16 +36,17 @@ export default function AdminAppointments() {
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const [isTodayAppointmentsWindow, setTodayAppointmentsWindow] = useState(false);
+  const [isTodayAppointmentsWindow, setTodayAppointmentsWindow] =
+    useState(false);
   const [isConfirmWindowOpen, setIsConfirmWindowOpen] = useState(false);
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  const [editingAppointment, setEditingAppointment] = useState<IAppointment | null>(null);
+  const [editingAppointment, setEditingAppointment] =
+    useState<IAppointment | null>(null);
 
   const [sortField, setSortField] = useState<SortField>("time");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
-  const [statusFilter, setStatusFilter] = useState<string>("");
   const [dateFilter, setDateFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -68,6 +68,31 @@ export default function AdminAppointments() {
   useEffect(() => {
     loadAppointments();
   }, []);
+
+  // Фильтрация записей - ТОЛЬКО подтвержденные записи в основном списке
+  const confirmedAppointments = useMemo(() => {
+    return appointments.filter(app => app.status === AppointmentStatus.Подтвержден);
+  }, [appointments]);
+
+  // Записи на сегодня (только подтвержденные)
+  const todayAppointments = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return confirmedAppointments.filter(
+      (app) => new Date(app.appointmentTime).toISOString().split('T')[0] === today
+    );
+  }, [confirmedAppointments]);
+
+  // Новые записи (только для окна подтверждения)
+  const pendingAppointments = useMemo(
+    () => appointments.filter((a) => a.status === AppointmentStatus.Новый),
+    [appointments],
+  );
+
+  // Завершенные записи
+  const completedAppointments = useMemo(
+    () => appointments.filter((a) => a.status === AppointmentStatus.Завершен),
+    [appointments],
+  );
 
   const sortAppointments = (appointments: IAppointment[]): IAppointment[] => {
     const sorted = [...appointments].sort((a, b) => {
@@ -95,16 +120,6 @@ export default function AdminAppointments() {
           aValue = new Date(a.appointmentTime).setHours(0, 0, 0, 0);
           bValue = new Date(b.appointmentTime).setHours(0, 0, 0, 0);
           break;
-        case "status":
-          const statusOrder = [
-            AppointmentStatus.Новый,
-            AppointmentStatus.Подтвержден,
-            AppointmentStatus.Завершен,
-            AppointmentStatus.Отменен,
-          ];
-          aValue = statusOrder.indexOf(a.status);
-          bValue = statusOrder.indexOf(b.status);
-          break;
         default:
           return 0;
       }
@@ -123,7 +138,7 @@ export default function AdminAppointments() {
   };
 
   const filteredAndSortedAppointments = useMemo(() => {
-    let filtered = appointments;
+    let filtered = confirmedAppointments;
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -138,18 +153,6 @@ export default function AdminAppointments() {
       );
     }
 
-    if (statusFilter) {
-      const statusMap: Record<string, AppointmentStatus> = {
-        new: AppointmentStatus.Новый,
-        confirmed: AppointmentStatus.Подтвержден,
-        completed: AppointmentStatus.Завершен,
-        cancelled: AppointmentStatus.Отменен,
-      };
-      filtered = filtered.filter(
-        (app) => app.status === statusMap[statusFilter],
-      );
-    }
-
     if (dateFilter) {
       filtered = filtered.filter(
         (app) =>
@@ -160,39 +163,12 @@ export default function AdminAppointments() {
 
     return sortAppointments(filtered);
   }, [
-    appointments,
+    confirmedAppointments,
     sortField,
     sortOrder,
-    statusFilter,
     dateFilter,
     searchQuery,
   ]);
-
-  // Статистика
-  const pendingAppointments = useMemo(
-    () => appointments.filter((a) => a.status === AppointmentStatus.Новый),
-    [appointments],
-  );
-
-  const todayConfirmedAppointments = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
-    return appointments.filter(
-      (app) =>
-        new Date(app.appointmentTime).toISOString().split("T")[0] === today &&
-        app.status === AppointmentStatus.Подтвержден
-    );
-  }, [appointments]);
-
-  const allConfirmedAppointments = useMemo(
-    () =>
-      appointments.filter((a) => a.status === AppointmentStatus.Подтвержден),
-    [appointments],
-  );
-
-  const completedAppointments = useMemo(
-    () => appointments.filter((a) => a.status === AppointmentStatus.Завершен),
-    [appointments],
-  );
 
   // Обработчики
   const handleWindowConfirm = () => {
@@ -230,9 +206,19 @@ export default function AdminAppointments() {
     }
   };
 
+  const handleCompleteAppointment = async (appointmentId: string) => {
+    try {
+      await appointmentService.complete(Number(appointmentId));
+      await loadAppointments();
+    } catch (err) {
+      alert("Ошибка завершения записи.");
+      console.error(err);
+    }
+  };
+
   const handleCancelAppointment = async (appointmentId: string) => {
     if (!window.confirm("Вы уверены, что хотите отменить запись?")) return;
-    
+
     try {
       await appointmentService.update(Number(appointmentId), {
         status: AppointmentStatus.Отменен,
@@ -256,6 +242,7 @@ export default function AdminAppointments() {
     status: string;
     date: string;
     duration: number;
+    rawDateTime: string;
   }) => {
     const appointment = appointments.find((a) => a.id.toString() === item.id);
     if (appointment) {
@@ -287,7 +274,6 @@ export default function AdminAppointments() {
   };
 
   const clearFilters = () => {
-    setStatusFilter("");
     setDateFilter("");
     setSearchQuery("");
   };
@@ -309,22 +295,6 @@ export default function AdminAppointments() {
     });
   };
 
-  // Иконки для статусов
-  const getStatusIcon = (status: AppointmentStatus) => {
-    switch (status) {
-      case AppointmentStatus.Новый:
-        return <AlertCircle className="w-4 h-4 text-amber-500" />;
-      case AppointmentStatus.Подтвержден:
-        return <CheckCircle className="w-4 h-4 text-emerald-500" />;
-      case AppointmentStatus.Завершен:
-        return <Clock4 className="w-4 h-4 text-blue-500" />;
-      case AppointmentStatus.Отменен:
-        return <XCircle className="w-4 h-4 text-red-500" />;
-      default:
-        return null;
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
       {/* Заголовок и управление */}
@@ -344,18 +314,24 @@ export default function AdminAppointments() {
               </h1>
             </motion.div>
             <p className="text-gray-600">
-              Всего записей:{" "}
+              Подтвержденные записи:{" "}
               <span className="font-semibold text-gray-800">
-                {appointments.length}
+                {confirmedAppointments.length}
               </span>
-              {filteredAndSortedAppointments.length !== appointments.length && (
+              {filteredAndSortedAppointments.length !== confirmedAppointments.length && (
                 <span className="ml-2">
                   (показано {filteredAndSortedAppointments.length})
                 </span>
               )}
+              <span className="ml-4">
+                Новых записей:{" "}
+                <span className="font-semibold text-gray-800">
+                  {pendingAppointments.length}
+                </span>
+              </span>
             </p>
           </div>
-          
+
           <div className="flex flex-col sm:flex-row gap-3">
             <motion.button
               whileHover={{ scale: 1.02 }}
@@ -365,19 +341,25 @@ export default function AdminAppointments() {
             >
               <Filter className="w-4 h-4" />
               Фильтры
-              {isFilterOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {isFilterOpen ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
             </motion.button>
-            
+
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={loadAppointments}
               className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-all duration-300 shadow-sm"
             >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+              />
               Обновить
             </motion.button>
-            
+
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -400,7 +382,7 @@ export default function AdminAppointments() {
               className="overflow-hidden"
             >
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Поиск */}
                   <div className="relative">
                     <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -412,19 +394,6 @@ export default function AdminAppointments() {
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </div>
-
-                  {/* Фильтр по статусу */}
-                  <select
-                    className="w-full px-4 py-3 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-300"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                  >
-                    <option value="">Все статусы</option>
-                    <option value="new">Новые ⚡</option>
-                    <option value="confirmed">Подтвержденные ✅</option>
-                    <option value="completed">Завершенные 🏁</option>
-                    <option value="cancelled">Отмененные ❌</option>
-                  </select>
 
                   {/* Фильтр по дате */}
                   <div className="relative">
@@ -440,7 +409,9 @@ export default function AdminAppointments() {
 
                 {/* Сортировка */}
                 <div className="mt-6">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Сортировка:</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                    Сортировка:
+                  </h3>
                   <div className="flex flex-wrap gap-2">
                     {(
                       [
@@ -449,7 +420,6 @@ export default function AdminAppointments() {
                         { field: "service", label: "Услуга", icon: TrendingUp },
                         { field: "master", label: "Мастер", icon: UserCheck },
                         { field: "date", label: "Дата", icon: Calendar },
-                        { field: "status", label: "Статус", icon: AlertCircle },
                       ] as const
                     ).map(({ field, label, icon: Icon }) => (
                       <motion.button
@@ -467,7 +437,11 @@ export default function AdminAppointments() {
                         <span className="font-medium">{label}</span>
                         {sortField === field && (
                           <span className="ml-1">
-                            {sortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            {sortOrder === "asc" ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" />
+                            )}
                           </span>
                         )}
                       </motion.button>
@@ -476,7 +450,7 @@ export default function AdminAppointments() {
                 </div>
 
                 {/* Кнопки управления фильтрами */}
-                {(statusFilter || dateFilter || searchQuery) && (
+                {(dateFilter || searchQuery) && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -501,6 +475,7 @@ export default function AdminAppointments() {
 
       {/* Статистика */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {/* Новые записи (требуют подтверждения) */}
         <motion.div
           whileHover={{ scale: 1.02, y: -2 }}
           initial={{ opacity: 0, y: 20 }}
@@ -513,12 +488,22 @@ export default function AdminAppointments() {
             <AlertCircle className="w-16 h-16" />
           </div>
           <div className="relative z-10">
-            <div className="text-4xl font-bold mb-2">{pendingAppointments.length}</div>
+            <div className="text-4xl font-bold mb-2">
+              {pendingAppointments.length}
+            </div>
             <div className="text-amber-100 font-medium">Новые записи</div>
-            <div className="text-sm text-amber-200/80 mt-2">Требуют подтверждения</div>
+            <div className="text-sm text-amber-200/80 mt-2">
+              Требуют подтверждения
+            </div>
+            {pendingAppointments.length > 0 && (
+              <div className="mt-3 text-xs text-amber-300">
+                Нажмите для подтверждения
+              </div>
+            )}
           </div>
         </motion.div>
 
+        {/* Подтвержденные записи на сегодня */}
         <motion.div
           whileHover={{ scale: 1.02, y: -2 }}
           initial={{ opacity: 0, y: 20 }}
@@ -531,12 +516,22 @@ export default function AdminAppointments() {
             <CheckCircle className="w-16 h-16" />
           </div>
           <div className="relative z-10">
-            <div className="text-4xl font-bold mb-2">{todayConfirmedAppointments.length}</div>
+            <div className="text-4xl font-bold mb-2">
+              {todayAppointments.length}
+            </div>
             <div className="text-emerald-100 font-medium">На сегодня</div>
-            <div className="text-sm text-emerald-200/80 mt-2">Подтвержденные записи</div>
+            <div className="text-sm text-emerald-200/80 mt-2">
+              Подтвержденные записи
+            </div>
+            {todayAppointments.length > 0 && (
+              <div className="mt-3 text-xs text-emerald-300">
+                Нажмите для просмотра
+              </div>
+            )}
           </div>
         </motion.div>
 
+        {/* Все подтвержденные записи */}
         <motion.div
           whileHover={{ scale: 1.02, y: -2 }}
           initial={{ opacity: 0, y: 20 }}
@@ -548,12 +543,17 @@ export default function AdminAppointments() {
             <CalendarDays className="w-16 h-16" />
           </div>
           <div className="relative z-10">
-            <div className="text-4xl font-bold mb-2">{allConfirmedAppointments.length}</div>
+            <div className="text-4xl font-bold mb-2">
+              {confirmedAppointments.length}
+            </div>
             <div className="text-blue-100 font-medium">Подтверждено</div>
-            <div className="text-sm text-blue-200/80 mt-2">Все предстоящие записи</div>
+            <div className="text-sm text-blue-200/80 mt-2">
+              Все предстоящие записи
+            </div>
           </div>
         </motion.div>
 
+        {/* Завершенные записи */}
         <motion.div
           whileHover={{ scale: 1.02, y: -2 }}
           initial={{ opacity: 0, y: 20 }}
@@ -565,27 +565,19 @@ export default function AdminAppointments() {
             <Clock4 className="w-16 h-16" />
           </div>
           <div className="relative z-10">
-            <div className="text-4xl font-bold mb-2">{completedAppointments.length}</div>
+            <div className="text-4xl font-bold mb-2">
+              {completedAppointments.length}
+            </div>
             <div className="text-purple-100 font-medium">Завершено</div>
-            <div className="text-sm text-purple-200/80 mt-2">Выполненные записи</div>
+            <div className="text-sm text-purple-200/80 mt-2">
+              Выполненные записи
+            </div>
           </div>
         </motion.div>
       </div>
 
       {/* Список записей */}
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50 overflow-hidden">
-        {/* Заголовок таблицы */}
-        <div className="p-4 border-b border-gray-200/50">
-          <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
-            <div className="col-span-3">Клиент</div>
-            <div className="col-span-2">Услуга</div>
-            <div className="col-span-2">Мастер</div>
-            <div className="col-span-2">Дата и время</div>
-            <div className="col-span-2">Статус</div>
-            <div className="col-span-1 text-center">Действия</div>
-          </div>
-        </div>
-
         {/* Тело таблицы */}
         <div className="divide-y divide-gray-100/50">
           {isLoading ? (
@@ -628,9 +620,12 @@ export default function AdminAppointments() {
                       date: formatDate(appointment.appointmentTime),
                       duration: appointment.service.duration,
                       rawDateTime: appointment.appointmentTime,
+                      clientPhone: appointment.clientPhone,
                     }}
                     onEdit={handleEditAppointment}
                     onDelete={handleDeleteAppointment}
+                    onComplete={handleCompleteAppointment}
+                    onCancel={handleCancelAppointment}
                   />
                 </motion.div>
               ))}
@@ -642,9 +637,11 @@ export default function AdminAppointments() {
               </div>
               <p className="text-gray-500 font-medium">Записи не найдены</p>
               <p className="text-gray-400 text-sm mt-1">
-                Попробуйте изменить параметры поиска или фильтрации
+                {confirmedAppointments.length === 0 
+                  ? "Нет подтвержденных записей" 
+                  : "Попробуйте изменить параметры поиска или фильтрации"}
               </p>
-              {(statusFilter || dateFilter || searchQuery) && (
+              {(dateFilter || searchQuery) && (
                 <button
                   onClick={clearFilters}
                   className="mt-4 px-4 py-2 text-blue-600 hover:text-blue-700 font-medium"
@@ -661,27 +658,21 @@ export default function AdminAppointments() {
       <div className="mt-8 flex flex-col md:flex-row md:items-center justify-between gap-4 text-sm text-gray-500">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-            <span>Новые</span>
-          </div>
-          <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
             <span>Подтвержденные</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+            <span>Новые (требуют подтверждения)</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full bg-blue-500"></div>
             <span>Завершенные</span>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-            <span>Отмененные</span>
-          </div>
         </div>
-        
+
         <div className="flex items-center gap-4">
-          <span>
-            Загружено: {appointments.length} записей
-          </span>
+          <span>Загружено: {appointments.length} записей</span>
           <button className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium">
             <Download className="w-4 h-4" />
             Экспорт в CSV
@@ -707,6 +698,7 @@ export default function AdminAppointments() {
               date: formatDate(a.appointmentTime),
               duration: a.service.duration,
               rawDateTime: a.appointmentTime,
+              clientPhone: a.clientPhone,
             }))}
             onConfirm={handleConfirmAppointment}
             onCancel={handleCancelAppointment}
@@ -719,7 +711,7 @@ export default function AdminAppointments() {
             title="Записи на сегодня"
             isOpen={isTodayAppointmentsWindow}
             onClose={handleCloseTodayWindow}
-            pendingAppointments={todayConfirmedAppointments.map((a) => ({
+            pendingAppointments={todayAppointments.map((a) => ({
               id: a.id.toString(),
               clientName: `${a.clientSurname} ${a.clientName}`,
               service: a.service.title,
@@ -730,6 +722,7 @@ export default function AdminAppointments() {
               date: formatDate(a.appointmentTime),
               duration: a.service.duration,
               rawDateTime: a.appointmentTime,
+              clientPhone: a.clientPhone,
             }))}
             onCancel={handleCancelAppointment}
             windowType="confirmed"

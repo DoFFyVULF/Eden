@@ -46,27 +46,64 @@ export default function AppointmentsHistoryPage() {
   const [masterFilter, setMasterFilter] = useState("");
 
   const loadCompleted = async (showLoading = true) => {
-    if (showLoading) {
-      setIsLoading(true);
-    } else {
-      setIsRefreshing(true);
-    }
-    setError(null);
-    try {
-      const data = await appointmentService.getCompleted();
-      setAppointments(data);
-    } catch (e) {
-      console.error(e);
-      setError("Не удалось загрузить историю записей");
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
+  if (showLoading) {
+    setIsLoading(true);
+  } else {
+    setIsRefreshing(true);
+  }
+  setError(null);
+  try {
+    const data = await appointmentService.getCompleted();
+    
+    // Валидация и очистка данных
+    const validatedData = data.map(item => {
+      // Безопасная обработка цены
+      const priceStr = String(item.price || '0');
+      const priceValue = parseFloat(priceStr.replace(/[^0-9.-]+/g, '')) || 0;
+      
+      return {
+        ...item,
+        price: Math.abs(priceValue) > 10000000 ? 0 : Math.abs(priceValue), // Защита от аномалий
+        clientName: item.clientName || '',
+        clientSurname: item.clientSurname || '',
+        clientPhone: item.clientPhone || '',
+        appointmentTime: item.appointmentTime || new Date().toISOString(),
+        service: {
+          ...item.service,
+          title: item.service?.title || 'Неизвестная услуга',
+          duration: Number(item.service?.duration) || 0,
+        },
+        master: {
+          ...item.master,
+          name: item.master?.name || 'Неизвестный',
+          surname: item.master?.surname || 'мастер',
+          id: Number(item.master?.id) || 0,
+        }
+      };
+    });
+    
+    setAppointments(validatedData);
+  } catch (e) {
+    console.error('Ошибка загрузки записей:', e);
+    setError("Не удалось загрузить историю записей");
+  } finally {
+    setIsLoading(false);
+    setIsRefreshing(false);
+  }
+};
 
   useEffect(() => {
     loadCompleted();
   }, []);
+
+  // Для отладки
+  useEffect(() => {
+    if (appointments.length > 0) {
+      console.log('Загружено записей:', appointments.length);
+      console.log('Пример записи:', appointments[0]);
+      console.log('Цены:', appointments.map(a => a.price).slice(0, 5));
+    }
+  }, [appointments]);
 
   // Собираем уникальных мастеров для фильтра
   const masters = useMemo(() => {
@@ -134,8 +171,9 @@ export default function AppointmentsHistoryPage() {
           bv = `${b.master.surname} ${b.master.name}`.toLowerCase();
           break;
         case "price":
-          av = a.price;
-          bv = b.price;
+          // Убеждаемся, что это числа
+          av = Number(a.price) || 0;
+          bv = Number(b.price) || 0;
           break;
       }
 
@@ -156,26 +194,51 @@ export default function AppointmentsHistoryPage() {
   // Статистика
   const stats = useMemo(() => {
     const total = appointments.length;
-    const totalRevenue = appointments.reduce((sum, a) => sum + a.price, 0);
+    
+    // Безопасное вычисление выручки
+    const totalRevenue = appointments.reduce((sum, a) => {
+      const price = Number(a.price) || 0;
+      // Проверяем на аномальные значения
+      if (price > 10000000) { // Если цена больше 10 млн, вероятно ошибка
+        console.warn('Подозрительно высокая цена:', a);
+        return sum; // Пропускаем эту запись
+      }
+      return sum + price;
+    }, 0);
+    
     const avgRevenue = total > 0 ? Math.round(totalRevenue / total) : 0;
+    
     const today = new Date().toISOString().split("T")[0];
     const todayCount = appointments.filter(
-      (a) => new Date(a.appointmentTime).toISOString().split("T")[0] === today
+      (a) => {
+        try {
+          return new Date(a.appointmentTime).toISOString().split("T")[0] === today;
+        } catch {
+          return false;
+        }
+      }
     ).length;
+    
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
     const weekCount = appointments.filter(
       (a) => {
-        const appointmentDate = new Date(a.appointmentTime);
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        return appointmentDate >= weekAgo;
+        try {
+          const appointmentDate = new Date(a.appointmentTime);
+          return appointmentDate >= weekAgo;
+        } catch {
+          return false;
+        }
       }
     ).length;
 
     // Находим самый популярный сервис
     const serviceCounts: Record<string, number> = {};
     appointments.forEach(a => {
-      serviceCounts[a.service.title] = (serviceCounts[a.service.title] || 0) + 1;
+      const serviceTitle = a.service?.title || 'Неизвестная услуга';
+      serviceCounts[serviceTitle] = (serviceCounts[serviceTitle] || 0) + 1;
     });
+    
     const mostPopularService = Object.entries(serviceCounts)
       .sort(([,a], [,b]) => b - a)[0]?.[0] || "—";
 
@@ -189,18 +252,28 @@ export default function AppointmentsHistoryPage() {
     };
   }, [appointments]);
 
-  const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString("ru-RU", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
+  const formatDate = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleDateString("ru-RU", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
+    } catch {
+      return "Некорректная дата";
+    }
+  };
 
-  const formatTime = (iso: string) =>
-    new Date(iso).toLocaleTimeString("ru-RU", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const formatTime = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleTimeString("ru-RU", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return "Некорректное время";
+    }
+  };
 
   const handleSortChange = (field: SortField) => {
     if (sortField === field) {
@@ -231,7 +304,7 @@ export default function AppointmentsHistoryPage() {
       a.clientPhone,
       a.service.title,
       `${a.master.surname} ${a.master.name}`,
-      `${a.price} ₽`,
+      `${(Number(a.price) || 0).toLocaleString('ru-RU')} ₽`,
       `${a.service.duration} мин.`
     ]);
     
@@ -247,6 +320,20 @@ export default function AppointmentsHistoryPage() {
     link.setAttribute("download", `история_записей_${new Date().toISOString().split("T")[0]}.csv`);
     link.click();
   };
+
+  // Проверяем данные на аномалии
+  const hasDataIssues = useMemo(() => {
+    if (stats.totalRevenue > 1000000000) { // Если выручка больше 1 млрд, вероятно ошибка
+      return true;
+    }
+    
+    // Проверяем отдельные записи на аномальные цены
+    const suspiciousAppointments = appointments.filter(a => 
+      Number(a.price) > 10000000 || Number(a.price) < 0
+    );
+    
+    return suspiciousAppointments.length > 0;
+  }, [appointments, stats.totalRevenue]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
@@ -273,6 +360,11 @@ export default function AppointmentsHistoryPage() {
                 {filteredAndSorted.length !== stats.total && (
                   <span className="ml-2">
                     (показано {filteredAndSorted.length})
+                  </span>
+                )}
+                {hasDataIssues && (
+                  <span className="ml-3 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
+                    Требуется проверка данных
                   </span>
                 )}
               </p>
@@ -443,7 +535,9 @@ export default function AppointmentsHistoryPage() {
               <DollarSign className="w-16 h-16" />
             </div>
             <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">{stats.totalRevenue.toLocaleString()} ₽</div>
+              <div className="text-4xl font-bold mb-2">
+                {hasDataIssues ? "Ошибка в данных" : stats.totalRevenue.toLocaleString('ru-RU')} ₽
+              </div>
               <div className="text-emerald-100 font-medium">Общая выручка</div>
               <div className="text-sm text-emerald-200/80 mt-2">За все время</div>
             </div>
@@ -460,7 +554,9 @@ export default function AppointmentsHistoryPage() {
               <BarChart3 className="w-16 h-16" />
             </div>
             <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">{stats.avgRevenue.toLocaleString()} ₽</div>
+              <div className="text-4xl font-bold mb-2">
+                {hasDataIssues ? "Ошибка" : stats.avgRevenue.toLocaleString('ru-RU')} ₽
+              </div>
               <div className="text-blue-100 font-medium">Средний чек</div>
               <div className="text-sm text-blue-200/80 mt-2">По всем записям</div>
             </div>
@@ -543,75 +639,88 @@ export default function AppointmentsHistoryPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
             <AnimatePresence>
-              {filteredAndSorted.map((appointment, index) => (
-                <motion.div
-                  key={appointment.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  whileHover={{ scale: 1.01, y: -2 }}
-                  className="bg-gradient-to-br from-white to-gray-50/50 rounded-3xl border border-gray-200/50 p-5 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm group"
-                >
-                  {/* Верхняя часть с датой и статусом */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <div className="text-sm text-gray-500 mb-1">Завершено</div>
-                      <div className="text-xl font-bold text-gray-900">
-                        {formatDate(appointment.appointmentTime)}
+              {filteredAndSorted.map((appointment, index) => {
+                const price = Number(appointment.price) || 0;
+                const hasSuspiciousPrice = price > 10000000 || price < 0;
+                
+                return (
+                  <motion.div
+                    key={appointment.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    whileHover={{ scale: 1.01, y: -2 }}
+                    className={`bg-gradient-to-br from-white to-gray-50/50 rounded-3xl border ${hasSuspiciousPrice ? 'border-red-300/50' : 'border-gray-200/50'} p-5 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm group relative`}
+                  >
+                    {hasSuspiciousPrice && (
+                      <div className="absolute top-2 right-2 px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full z-10">
+                        Ошибка в цене
                       </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        {formatTime(appointment.appointmentTime)}
-                      </div>
-                    </div>
-                    <span className="px-3 py-1 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 text-xs font-bold rounded-full">
-                      Завершена
-                    </span>
-                  </div>
-
-                  {/* Разделитель */}
-                  <div className="h-px bg-gradient-to-r from-transparent via-gray-300/50 to-transparent my-4" />
-
-                  {/* Клиент */}
-                  <div className="mb-4">
-                    <div className="text-xs text-gray-600 mb-2">Клиент</div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
-                        {appointment.clientName[0]?.toUpperCase() || "К"}
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-sm font-bold text-gray-900">
-                          {appointment.clientSurname} {appointment.clientName}
+                    )}
+                    
+                    {/* Верхняя часть с датой и статусом */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <div className="text-sm text-gray-500 mb-1">Завершено</div>
+                        <div className="text-xl font-bold text-gray-900">
+                          {formatDate(appointment.appointmentTime)}
                         </div>
-                        <div className="text-xs text-gray-600">{appointment.clientPhone}</div>
+                        <div className="text-sm text-gray-600 mt-1">
+                          {formatTime(appointment.appointmentTime)}
+                        </div>
+                      </div>
+                      <span className="px-3 py-1 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 text-xs font-bold rounded-full">
+                        Завершена
+                      </span>
+                    </div>
+
+                    {/* Разделитель */}
+                    <div className="h-px bg-gradient-to-r from-transparent via-gray-300/50 to-transparent my-4" />
+
+                    {/* Клиент */}
+                    <div className="mb-4">
+                      <div className="text-xs text-gray-600 mb-2">Клиент</div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                          {appointment.clientName[0]?.toUpperCase() || "К"}
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-bold text-gray-900">
+                            {appointment.clientSurname} {appointment.clientName}
+                          </div>
+                          <div className="text-xs text-gray-600">{appointment.clientPhone}</div>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Услуга и мастер */}
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="bg-gradient-to-br from-blue-50/50 to-cyan-50/50 rounded-xl p-3 border border-blue-200/30">
-                      <div className="text-xs text-gray-600 mb-1">Услуга</div>
-                      <div className="text-sm font-bold text-gray-900 truncate">{appointment.service.title}</div>
-                      <div className="text-xs text-gray-500 mt-1">{appointment.service.duration} мин.</div>
+                    {/* Услуга и мастер */}
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="bg-gradient-to-br from-blue-50/50 to-cyan-50/50 rounded-xl p-3 border border-blue-200/30">
+                        <div className="text-xs text-gray-600 mb-1">Услуга</div>
+                        <div className="text-sm font-bold text-gray-900 truncate">{appointment.service.title}</div>
+                        <div className="text-xs text-gray-500 mt-1">{appointment.service.duration} мин.</div>
+                      </div>
+                      <div className="bg-gradient-to-br from-purple-50/50 to-pink-50/50 rounded-xl p-3 border border-purple-200/30">
+                        <div className="text-xs text-gray-600 mb-1">Мастер</div>
+                        <div className="text-sm font-bold text-gray-900">{appointment.master.surname} {appointment.master.name}</div>
+                      </div>
                     </div>
-                    <div className="bg-gradient-to-br from-purple-50/50 to-pink-50/50 rounded-xl p-3 border border-purple-200/30">
-                      <div className="text-xs text-gray-600 mb-1">Мастер</div>
-                      <div className="text-sm font-bold text-gray-900">{appointment.master.surname} {appointment.master.name}</div>
-                    </div>
-                  </div>
 
-                  {/* Цена и информация */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-200/50">
-                    <div className="bg-gradient-to-br from-emerald-50/50 to-green-50/50 rounded-xl p-3 border border-emerald-200/30">
-                      <div className="text-xs text-gray-600">Стоимость</div>
-                      <div className="text-lg font-bold text-emerald-700">{appointment.price.toLocaleString()} ₽</div>
+                    {/* Цена и информация */}
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-200/50">
+                      <div className={`rounded-xl p-3 border ${hasSuspiciousPrice ? 'bg-red-50/50 border-red-200/30' : 'bg-gradient-to-br from-emerald-50/50 to-green-50/50 border-emerald-200/30'}`}>
+                        <div className="text-xs text-gray-600">Стоимость</div>
+                        <div className={`text-lg font-bold ${hasSuspiciousPrice ? 'text-red-700' : 'text-emerald-700'}`}>
+                          {hasSuspiciousPrice ? 'Ошибка' : price.toLocaleString('ru-RU')} ₽
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        ID: {appointment.id}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500">
-                      ID: {appointment.id}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
           </div>
         )}
@@ -625,7 +734,9 @@ export default function AppointmentsHistoryPage() {
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-500 to-green-500"></div>
-              <span>Общая выручка: {stats.totalRevenue.toLocaleString()} ₽</span>
+              <span>
+                Общая выручка: {hasDataIssues ? 'Ошибка в данных' : stats.totalRevenue.toLocaleString('ru-RU')} ₽
+              </span>
             </div>
           </div>
           
@@ -635,7 +746,7 @@ export default function AppointmentsHistoryPage() {
             </span>
             <span className="text-purple-600 font-medium flex items-center gap-2">
               <TrendingUp className="w-4 h-4" />
-              Средний чек: {stats.avgRevenue.toLocaleString()} ₽
+              Средний чек: {hasDataIssues ? 'Ошибка' : stats.avgRevenue.toLocaleString('ru-RU')} ₽
             </span>
           </div>
         </div>

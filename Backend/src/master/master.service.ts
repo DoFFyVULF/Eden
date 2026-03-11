@@ -17,11 +17,15 @@ export class MasterService {
     return this.prisma.master.findUnique({ where: { id } });
   }
 
+  async getActiveMastersCount(): Promise<number> {
+    return this.prisma.master.count({ where: { isActive: true } });
+  }
+
   async create(dto: MasterDto) {
     const master = {
       surname: dto.surname,
       name: dto.name,
-      middlename: dto.middlename,   
+      middlename: dto.middlename,
       specialization: dto.specialization,
       photo: dto.photo || null,
       phone: dto.phone,
@@ -61,6 +65,6 @@ export class MasterService {
   }
 
   async count(): Promise<number> {
-    return this.prisma.master.count()
+    return this.prisma.master.count();
   }
 }

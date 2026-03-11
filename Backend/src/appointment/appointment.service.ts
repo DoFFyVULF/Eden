@@ -39,7 +39,7 @@ export class AppointmentService {
   async findAll() {
     return this.prisma.appointment.findMany({
       include: { master: true, service: true },
-      orderBy: { id: 'asc' }
+      orderBy: { appointmentTime: 'desc' }
     });
   }
 
@@ -63,14 +63,19 @@ export class AppointmentService {
     const end = new Date(date);
     end.setHours(23, 59, 59, 999);
 
+    const where: any = {
+      appointmentTime: {
+        gte: start,
+        lte: end
+      }
+    };
+
+    if (masterId !== undefined) {
+      where.masterID = masterId;
+    }
+
     return this.prisma.appointment.findMany({
-      where: {
-        appointmentTime: {
-          gte: start,
-          lte: end
-        },
-        ...(masterId !== undefined && { masterID: masterId })
-      },
+      where,
       include: {
         master: true,
         service: true
@@ -101,10 +106,21 @@ export class AppointmentService {
     }
 
     if (dto.appointmentTime || dto.masterId) {
-      await this.ensureTimeNotTaken(
-        dto.masterId ?? existing.masterID,
-        dto.appointmentTime ?? existing.appointmentTime.toISOString()
-      );
+      const masterId = dto.masterId ?? existing.masterID;
+      const appointmentTime = dto.appointmentTime ?? existing.appointmentTime.toISOString();
+      
+      // Проверяем, если это не та же самая запись
+      const conflictingAppointment = await this.prisma.appointment.findFirst({
+        where: {
+          masterID: masterId,
+          appointmentTime: new Date(appointmentTime),
+          id: { not: id }
+        }
+      });
+
+      if (conflictingAppointment) {
+        throw new BadRequestException(`На это время мастер уже занят другой записью`);
+      }
     }
 
     return this.prisma.appointment.update({
@@ -125,6 +141,18 @@ export class AppointmentService {
     });
   }
 
+  async complete(id: number) {
+    await this.findOne(id);
+    
+    return this.prisma.appointment.update({
+      where: { id },
+      data: {
+        status: AppointmentStatus.Завершен
+      },
+      include: { master: true, service: true }
+    });
+  }
+
   async remove(id: number) {
     await this.findOne(id);
     return this.prisma.appointment.delete({ where: { id } });
@@ -135,17 +163,17 @@ export class AppointmentService {
   }
 
   private async ensureMasterExists(masterId: number) {
-    const m = await this.prisma.master.findUnique({ where: { id: masterId } });
-    if (!m) {
+    const master = await this.prisma.master.findUnique({ where: { id: masterId } });
+    if (!master) {
       throw new NotFoundException(`Мастер с ID ${masterId} не найден`);
     }
   }
 
   private async ensureServiceExists(serviceId: number) {
-    const s = await this.prisma.service.findUnique({
+    const service = await this.prisma.service.findUnique({
       where: { id: serviceId }
     });
-    if (!s) {
+    if (!service) {
       throw new NotFoundException(`Услуга с ID ${serviceId} не найдена`);
     }
   }
