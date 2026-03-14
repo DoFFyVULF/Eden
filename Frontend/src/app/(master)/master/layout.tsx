@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { QueryProvider } from "@/app/providers/QueryProvider";
-import AsideMenu from "@/app/components/ui/admin/asideMenu/asideMenu";
+import AsideMenu from "@/app/components/ui/admin/Navigation/asideMenu";
 import { getAccessToken } from "@/services/auth/auth-token.service";
 import { axiosWithAuth } from "@/api/interceptors";
 

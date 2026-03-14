@@ -31,7 +31,7 @@ import {
   BarChart3,
   Package,
   TrendingDown,
-  AlertCircle
+  AlertCircle,
 } from "lucide-react";
 
 type SortField = "title" | "duration" | "category" | "status";
@@ -45,13 +45,11 @@ export default function Services() {
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-
   const [sortField, setSortField] = useState<SortField>("title");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [statusFilter, setStatusFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -94,14 +92,14 @@ export default function Services() {
 
   const getCategoryColor = (categoryId: number) => {
     const colors = [
-      'from-blue-500 to-cyan-500',
-      'from-emerald-500 to-green-500',
-      'from-purple-500 to-pink-500',
-      'from-amber-500 to-orange-500',
-      'from-rose-500 to-red-500',
-      'from-indigo-500 to-blue-500',
-      'from-violet-500 to-purple-500',
-      'from-teal-500 to-cyan-500',
+      "from-blue-500 to-cyan-500",
+      "from-emerald-500 to-green-500",
+      "from-purple-500 to-pink-500",
+      "from-amber-500 to-orange-500",
+      "from-rose-500 to-red-500",
+      "from-indigo-500 to-blue-500",
+      "from-violet-500 to-purple-500",
+      "from-teal-500 to-cyan-500",
     ];
     const index = categoryId % colors.length;
     return colors[index];
@@ -111,7 +109,6 @@ export default function Services() {
     return [...list].sort((a, b) => {
       let aVal: string | number = "";
       let bVal: string | number = "";
-
       switch (sortField) {
         case "title":
           aVal = a.title;
@@ -130,13 +127,11 @@ export default function Services() {
           bVal = b.isActive ? 1 : 0;
           break;
       }
-
       if (typeof aVal === "string") {
         return sortOrder === "asc"
           ? aVal.localeCompare(bVal as string)
           : (bVal as string).localeCompare(aVal);
       }
-
       return sortOrder === "asc"
         ? (aVal as number) - (bVal as number)
         : (bVal as number) - (aVal as number);
@@ -145,29 +140,25 @@ export default function Services() {
 
   const filteredAndSortedServices = useMemo(() => {
     let filtered = services;
-
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (s) =>
           s.title.toLowerCase().includes(q) ||
-          s.description.toLowerCase().includes(q) ||
+          s.description?.toLowerCase().includes(q) ||
           getCategoryName(s.categoryId).toLowerCase().includes(q)
       );
     }
-
     if (statusFilter) {
       filtered = filtered.filter((s) =>
         statusFilter === "active" ? s.isActive : !s.isActive
       );
     }
-
     if (categoryFilter) {
       filtered = filtered.filter(
         (s) => s.categoryId === Number(categoryFilter)
       );
     }
-
     return sortServices(filtered);
   }, [
     services,
@@ -195,7 +186,7 @@ export default function Services() {
     setEditingService(service);
     setFormData({
       title: service.title,
-      description: service.description,
+      description: service.description || "",
       duration: service.duration,
       categoryId: service.categoryId,
       isActive: service.isActive,
@@ -214,7 +205,6 @@ export default function Services() {
     >
   ) => {
     const { name, value, type } = e.target;
-
     if (type === "checkbox") {
       const checked = (e.target as HTMLInputElement).checked;
       setFormData((prev) => ({ ...prev, [name]: checked }));
@@ -227,60 +217,44 @@ export default function Services() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (
       !formData.title.trim() ||
       formData.duration <= 0 ||
       formData.categoryId === 0
     ) {
-      alert("Пожалуйста, заполните все обязательные поля");
+      alert("Пожалуйста, заполните название, продолжительность и выберите категорию");
       return;
     }
 
     setIsLoading(true);
-
     try {
+      // Подготовка данных: описание всегда строка (пустая или нет)
+      const payload = {
+        title: formData.title.trim(),
+        description: formData.description?.trim() || "",
+        duration: formData.duration,
+        isActive: formData.isActive,
+        categoryId: formData.categoryId,
+      };
+
       if (editingService) {
-        const updatedService = await serviceService.update(editingService.id, {
-          title: formData.title,
-          description: formData.description,
-          duration: formData.duration,
-          isActive: formData.isActive,
+        await serviceService.update(editingService.id, {
+          title: payload.title,
+          description: payload.description,
+          duration: payload.duration,
+          isActive: payload.isActive,
         });
-
-        setServices((prev) =>
-          prev.map((s) =>
-            s.id === editingService.id
-              ? {
-                  ...updatedService,
-                  categoryName:
-                    categories.find(
-                      (cat) => cat.id === updatedService.categoryId
-                    )?.title || "Не указана",
-                }
-              : s
-          )
-        );
+        
+        // Полная перезагрузка списка после обновления для гарантии актуальности
+        await loadServices(false);
       } else {
-        const newService = await serviceService.create({
-          title: formData.title,
-          description: formData.description,
-          duration: formData.duration,
-          isActive: formData.isActive,
-          categoryId: formData.categoryId,
-        });
-
-        setServices((prev) => [
-          ...prev,
-          {
-            ...newService,
-            categoryName:
-              categories.find((cat) => cat.id === newService.categoryId)
-                ?.title || "Не указана",
-          },
-        ]);
+        await serviceService.create(payload);
+        
+        // Полная перезагрузка списка после создания. 
+        // Это решает проблему с отсутствием categoryId или других полей в ответе сервера.
+        await loadServices(false);
       }
-
+      
       closeModal();
     } catch (error) {
       console.error("Ошибка сохранения:", error);
@@ -292,7 +266,6 @@ export default function Services() {
 
   const deleteService = async (serviceId: number) => {
     if (!confirm("Вы уверены, что хотите удалить эту услугу?")) return;
-
     try {
       await serviceService.delete(serviceId);
       setServices((prev) => prev.filter((s) => s.id !== serviceId));
@@ -321,14 +294,17 @@ export default function Services() {
     () => services.filter((s) => s.isActive).length,
     [services]
   );
+
   const inactiveServicesCount = useMemo(
     () => services.filter((s) => !s.isActive).length,
     [services]
   );
+
   const totalDuration = useMemo(
     () => services.reduce((acc, s) => acc + s.duration, 0),
     [services]
   );
+
   const avgDuration = useMemo(
     () => (services.length > 0 ? Math.round(totalDuration / services.length) : 0),
     [services, totalDuration]
@@ -341,7 +317,7 @@ export default function Services() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
-      <div className="max-w-8xl mx-auto">
+      <div className="max-w-9xl mx-auto">
         {/* Заголовок и управление */}
         <div className="mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
@@ -359,7 +335,8 @@ export default function Services() {
                 </h1>
               </motion.div>
               <p className="text-gray-600">
-                Всего услуг: <span className="font-semibold text-gray-800">{services.length}</span>
+                Всего услуг:{" "}
+                <span className="font-semibold text-gray-800">{services.length}</span>
                 {filteredAndSortedServices.length !== services.length && (
                   <span className="ml-2">
                     (показано {filteredAndSortedServices.length})
@@ -367,7 +344,6 @@ export default function Services() {
                 )}
               </p>
             </div>
-            
             <div className="flex flex-col sm:flex-row gap-3">
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -377,19 +353,23 @@ export default function Services() {
               >
                 <Filter className="w-4 h-4" />
                 Фильтры
-                {isFilterOpen ? <ChevronDown className="w-4 h-4 rotate-180" /> : <ChevronDown className="w-4 h-4" />}
+                {isFilterOpen ? (
+                  <ChevronDown className="w-4 h-4 rotate-180" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
               </motion.button>
-              
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => loadServices(false)}
                 className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-medium hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
               >
-                <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+                />
                 Обновить
               </motion.button>
-              
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -426,7 +406,6 @@ export default function Services() {
                         />
                       </div>
                     </div>
-
                     {/* Фильтр по статусу */}
                     <select
                       className="w-full px-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 text-gray-900 transition-all duration-300"
@@ -437,7 +416,6 @@ export default function Services() {
                       <option value="active">Активные</option>
                       <option value="inactive">Неактивные</option>
                     </select>
-
                     {/* Фильтр по категории */}
                     <select
                       className="w-full px-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 text-gray-900 transition-all duration-300"
@@ -452,35 +430,40 @@ export default function Services() {
                       ))}
                     </select>
                   </div>
-
                   {/* Сортировка */}
                   <div className="mt-4 pt-4 border-t border-gray-200/50">
-                    <div className="text-sm font-medium text-gray-700 mb-2">Сортировка:</div>
+                    <div className="text-sm font-medium text-gray-700 mb-2">
+                      Сортировка:
+                    </div>
                     <div className="flex flex-wrap gap-2">
-                      {(["title", "duration", "category", "status"] as SortField[]).map(
-                        (field) => (
-                          <motion.button
-                            key={field}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => handleSortChange(field)}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-all duration-300 border ${
-                              sortField === field
-                                ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md border-transparent"
-                                : "bg-white/80 text-gray-700 border-gray-300/50 hover:bg-gray-50/80"
-                            }`}
-                          >
-                            {field === "title" && "Название"}
-                            {field === "duration" && "Продолжительность"}
-                            {field === "category" && "Категория"}
-                            {field === "status" && "Статус"}
-                            {getSortIcon(field)}
-                          </motion.button>
-                        )
-                      )}
+                      {(
+                        [
+                          "title",
+                          "duration",
+                          "category",
+                          "status",
+                        ] as SortField[]
+                      ).map((field) => (
+                        <motion.button
+                          key={field}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleSortChange(field)}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-all duration-300 border ${
+                            sortField === field
+                              ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md border-transparent"
+                              : "bg-white/80 text-gray-700 border-gray-300/50 hover:bg-gray-50/80"
+                          }`}
+                        >
+                          {field === "title" && "Название"}
+                          {field === "duration" && "Продолжительность"}
+                          {field === "category" && "Категория"}
+                          {field === "status" && "Статус"}
+                          {getSortIcon(field)}
+                        </motion.button>
+                      ))}
                     </div>
                   </div>
-
                   {(statusFilter || categoryFilter || searchQuery) && (
                     <motion.button
                       initial={{ opacity: 0, y: -10 }}
@@ -513,10 +496,11 @@ export default function Services() {
             <div className="relative z-10">
               <div className="text-4xl font-bold mb-2">{services.length}</div>
               <div className="text-blue-100 font-medium">Всего услуг</div>
-              <div className="text-sm text-blue-200/80 mt-2">Зарегистрировано в системе</div>
+              <div className="text-sm text-blue-200/80 mt-2">
+                Зарегистрировано в системе
+              </div>
             </div>
           </motion.div>
-
           <motion.div
             whileHover={{ scale: 1.02, y: -2 }}
             initial={{ opacity: 0, y: 20 }}
@@ -528,12 +512,15 @@ export default function Services() {
               <Zap className="w-16 h-16" />
             </div>
             <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">{activeServicesCount}</div>
+              <div className="text-4xl font-bold mb-2">
+                {activeServicesCount}
+              </div>
               <div className="text-emerald-100 font-medium">Активные</div>
-              <div className="text-sm text-emerald-200/80 mt-2">Доступны для записи</div>
+              <div className="text-sm text-emerald-200/80 mt-2">
+                Доступны для записи
+              </div>
             </div>
           </motion.div>
-
           <motion.div
             whileHover={{ scale: 1.02, y: -2 }}
             initial={{ opacity: 0, y: 20 }}
@@ -547,10 +534,11 @@ export default function Services() {
             <div className="relative z-10">
               <div className="text-4xl font-bold mb-2">{avgDuration}</div>
               <div className="text-amber-100 font-medium">Среднее время</div>
-              <div className="text-sm text-amber-200/80 mt-2">Минут на услугу</div>
+              <div className="text-sm text-amber-200/80 mt-2">
+                Минут на услугу
+              </div>
             </div>
           </motion.div>
-
           <motion.div
             whileHover={{ scale: 1.02, y: -2 }}
             initial={{ opacity: 0, y: 20 }}
@@ -564,7 +552,9 @@ export default function Services() {
             <div className="relative z-10">
               <div className="text-4xl font-bold mb-2">{categories.length}</div>
               <div className="text-purple-100 font-medium">Категорий</div>
-              <div className="text-sm text-purple-200/80 mt-2">Активных категорий</div>
+              <div className="text-sm text-purple-200/80 mt-2">
+                Активных категорий
+              </div>
             </div>
           </motion.div>
         </div>
@@ -584,10 +574,12 @@ export default function Services() {
             <div className="w-20 h-20 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-6">
               <Package className="w-10 h-10 text-gray-400" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">Услуги не найдены</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+              Услуги не найдены
+            </h3>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              {searchQuery || statusFilter || categoryFilter 
-                ? "Попробуйте изменить параметры поиска" 
+              {searchQuery || statusFilter || categoryFilter
+                ? "Попробуйте изменить параметры поиска"
                 : "Создайте первую услугу для вашего бизнеса"}
             </p>
             <motion.button
@@ -622,36 +614,41 @@ export default function Services() {
                         {service.description || "Описание отсутствует"}
                       </p>
                     </div>
-                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${
-                      service.isActive
-                        ? 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700'
-                        : 'bg-gradient-to-r from-rose-100 to-red-100 text-rose-700'
-                    }`}>
-                      {service.isActive ? 'Активна' : 'Неактивна'}
+                    <span
+                      className={`px-3 py-1 text-xs font-bold rounded-full ${
+                        service.isActive
+                          ? "bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700"
+                          : "bg-gradient-to-r from-rose-100 to-red-100 text-rose-700"
+                      }`}
+                    >
+                      {service.isActive ? "Активна" : "Неактивна"}
                     </span>
                   </div>
-
                   {/* Категория */}
                   <div className="flex items-center gap-2 mb-4">
-                    <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${getCategoryColor(service.categoryId)} flex items-center justify-center`}>
+                    <div
+                      className={`w-8 h-8 rounded-xl bg-gradient-to-br ${getCategoryColor(service.categoryId)} flex items-center justify-center`}
+                    >
                       <Tag className="w-3.5 h-3.5 text-white" />
                     </div>
                     <span className="text-sm font-medium text-gray-900">
                       {getCategoryName(service.categoryId)}
                     </span>
                   </div>
-
                   {/* Длительность */}
                   <div className="flex items-center gap-2 mb-6">
                     <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
                       <Clock className="w-3.5 h-3.5 text-white" />
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-gray-900">{service.duration} мин.</div>
-                      <div className="text-xs text-gray-600">Продолжительность</div>
+                      <div className="text-sm font-bold text-gray-900">
+                        {service.duration} мин.
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        Продолжительность
+                      </div>
                     </div>
                   </div>
-
                   {/* Действия */}
                   <div className="flex items-center justify-between pt-4 border-t border-gray-200/50">
                     <div className="flex gap-2">
@@ -694,11 +691,8 @@ export default function Services() {
               <span>Неактивные</span>
             </div>
           </div>
-          
           <div className="flex items-center gap-4">
-            <span>
-              Загружено: {services.length} услуг
-            </span>
+            <span>Загружено: {services.length} услуг</span>
             <span className="text-purple-600 font-medium flex items-center gap-2">
               <TrendingUp className="w-4 h-4" />
               {activeServicesCount} сейчас доступно
@@ -728,7 +722,6 @@ export default function Services() {
                   <div className="absolute top-0 right-0 p-4 opacity-20">
                     <Sparkles className="w-12 h-12" />
                   </div>
-                  
                   <div className="relative z-10 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
@@ -736,14 +729,17 @@ export default function Services() {
                       </div>
                       <div>
                         <h2 className="text-xl font-bold text-white">
-                          {editingService ? 'Редактирование услуги' : 'Новая услуга'}
+                          {editingService
+                            ? "Редактирование услуги"
+                            : "Новая услуга"}
                         </h2>
                         <p className="text-white/80 text-xs mt-1">
-                          {editingService ? 'Измените параметры услуги' : 'Создайте новую услугу'}
+                          {editingService
+                            ? "Измените параметры услуги"
+                            : "Создайте новую услугу"}
                         </p>
                       </div>
                     </div>
-                    
                     <motion.button
                       whileHover={{ scale: 1.1, rotate: 90 }}
                       whileTap={{ scale: 0.9 }}
@@ -754,7 +750,6 @@ export default function Services() {
                     </motion.button>
                   </div>
                 </div>
-
                 {/* Основной контент */}
                 <div className="flex-1 overflow-y-auto p-6">
                   <form onSubmit={handleSubmit} className="space-y-6">
@@ -774,7 +769,6 @@ export default function Services() {
                         required
                       />
                     </div>
-
                     {/* Описание */}
                     <div className="bg-gradient-to-br from-blue-50/30 to-cyan-50/30 rounded-2xl p-4 border border-blue-200/30">
                       <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -790,7 +784,6 @@ export default function Services() {
                         className="w-full px-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 placeholder-gray-500 transition-all duration-300 resize-none"
                       />
                     </div>
-
                     {/* Продолжительность и категория */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="bg-gradient-to-br from-amber-50/30 to-orange-50/30 rounded-2xl p-4 border border-amber-200/30">
@@ -809,10 +802,11 @@ export default function Services() {
                             className="w-full pl-10 pr-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 text-gray-900 transition-all duration-300"
                             required
                           />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">мин.</span>
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
+                            мин.
+                          </span>
                         </div>
                       </div>
-
                       <div className="bg-gradient-to-br from-emerald-50/30 to-green-50/30 rounded-2xl p-4 border border-emerald-200/30">
                         <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
                           <Tag className="w-4 h-4 text-emerald-500" />
@@ -834,12 +828,13 @@ export default function Services() {
                         </select>
                       </div>
                     </div>
-
                     {/* Статус */}
                     <div className="bg-gradient-to-br from-gray-50/30 to-white/30 rounded-2xl p-4 border border-gray-200/30">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-xl ${formData.isActive ? 'bg-gradient-to-r from-emerald-500 to-green-500' : 'bg-gradient-to-r from-rose-500 to-red-500'}`}>
+                          <div
+                            className={`p-2 rounded-xl ${formData.isActive ? "bg-gradient-to-r from-emerald-500 to-green-500" : "bg-gradient-to-r from-rose-500 to-red-500"}`}
+                          >
                             {formData.isActive ? (
                               <Eye className="w-4 h-4 text-white" />
                             ) : (
@@ -847,9 +842,13 @@ export default function Services() {
                             )}
                           </div>
                           <div>
-                            <div className="text-sm font-semibold text-gray-900">Статус услуги</div>
+                            <div className="text-sm font-semibold text-gray-900">
+                              Статус услуги
+                            </div>
                             <div className="text-xs text-gray-600">
-                              {formData.isActive ? 'Видна клиентам' : 'Скрыта от клиентов'}
+                              {formData.isActive
+                                ? "Видна клиентам"
+                                : "Скрыта от клиентов"}
                             </div>
                           </div>
                         </div>
@@ -865,7 +864,6 @@ export default function Services() {
                         </label>
                       </div>
                     </div>
-
                     {/* Сводная информация */}
                     {formData.title && (
                       <motion.div
@@ -873,11 +871,20 @@ export default function Services() {
                         animate={{ opacity: 1, y: 0 }}
                         className="p-4 bg-gradient-to-r from-gray-50/50 to-white/30 border border-gray-200/30 rounded-2xl backdrop-blur-sm"
                       >
-                        <div className="text-xs text-gray-600 mb-2">Сводная информация</div>
-                        <div className="text-sm font-medium text-gray-900 mb-1">{formData.title}</div>
+                        <div className="text-xs text-gray-600 mb-2">
+                          Сводная информация
+                        </div>
+                        <div className="text-sm font-medium text-gray-900 mb-1">
+                          {formData.title}
+                        </div>
                         {formData.categoryId > 0 && (
                           <div className="text-xs text-gray-600">
-                            Категория: {categories.find(c => c.id === formData.categoryId)?.title}
+                            Категория:{" "}
+                            {
+                              categories.find(
+                                (c) => c.id === formData.categoryId
+                              )?.title
+                            }
                           </div>
                         )}
                         {formData.duration > 0 && (
@@ -887,7 +894,6 @@ export default function Services() {
                         )}
                       </motion.div>
                     )}
-
                     {/* Кнопки */}
                     <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200/50">
                       <motion.button
@@ -899,7 +905,6 @@ export default function Services() {
                       >
                         Отмена
                       </motion.button>
-                      
                       <motion.button
                         type="submit"
                         whileHover={{ scale: 1.02 }}
@@ -914,15 +919,20 @@ export default function Services() {
                           </>
                         ) : (
                           <>
-                            {editingService ? <Edit className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                            {editingService ? 'Сохранить изменения' : 'Создать услугу'}
+                            {editingService ? (
+                              <Edit className="w-4 h-4" />
+                            ) : (
+                              <Plus className="w-4 h-4" />
+                            )}
+                            {editingService
+                              ? "Сохранить изменения"
+                              : "Создать услугу"}
                           </>
                         )}
                       </motion.button>
                     </div>
                   </form>
                 </div>
-
                 {/* Футер */}
                 <div className="px-6 py-3 border-t border-gray-200/50 bg-gradient-to-r from-gray-50/50 to-white/30">
                   <div className="flex items-center justify-between text-xs text-gray-500">
@@ -930,7 +940,9 @@ export default function Services() {
                       <Shield className="w-2.5 h-2.5" />
                       <span>Данные защищены</span>
                     </div>
-                    <span>ID: {editingService ? editingService.id : 'Новый'}</span>
+                    <span>
+                      ID: {editingService ? editingService.id : "Новый"}
+                    </span>
                   </div>
                 </div>
               </motion.div>

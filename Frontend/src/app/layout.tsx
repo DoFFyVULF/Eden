@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import { M_PLUS_Rounded_1c } from "next/font/google";
+import { Pangolin } from "next/font/google";
 import "./globals.css";
 
 
-const mPlusRounded = M_PLUS_Rounded_1c({
-  weight: ["400", "700"],
-  subsets: ["latin", "cyrillic"],
-  variable: "--font-m-plus-rounded",
+const pangolin = Pangolin({
+  subsets: ["latin", "cyrillic"], 
+  weight: "400",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -22,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${mPlusRounded.variable} antialiased flex flex-col min-h-screen`}
+        className={`${pangolin.className} antialiased flex flex-col min-h-screen`}
       >
         <main>
           {children}

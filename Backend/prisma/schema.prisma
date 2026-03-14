@@ -109,7 +109,7 @@ model Category {
 model Service {
   id            Int            @id @default(autoincrement())
   title         String
-  description   String
+  description   String?
   duration      Int
   img           String?
   isActive      Boolean        @default(true) @map("is_active")

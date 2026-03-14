@@ -21,34 +21,34 @@ export const serviceService = {
   },
 
   async create(dto: {
-    title: string;
-    description: string;
-    duration: number;
-    isActive: boolean;
-    categoryId: number;
-  }): Promise<IService> {
-    // ✅ Валидация на фронтенде (защита от 400)
-    if (!dto.title?.trim()) {
-      throw new Error("Название услуги обязательно");
-    }
-    if (!dto.description) dto.description = "";
-    if (dto.duration <= 0) {
-      throw new Error("Продолжительность должна быть положительной");
-    }
-    if (dto.categoryId <= 0) {
-      throw new Error("Выберите категорию");
-    }
+  title: string;
+  description?: string;
+  duration: number;
+  isActive: boolean;
+  categoryId: number;
+}): Promise<IService> {
+  // Валидация
+  if (!dto.title?.trim()) throw new Error("Название обязательно");
+  if (dto.duration <= 0) throw new Error("Продолжительность должна быть > 0");
+  if (dto.categoryId <= 0) throw new Error("Категория обязательна");
 
-    const { data } = await axiosWithAuth.post<IService>("/service", {
-      title: dto.title.trim(),
-      description: dto.description.trim(),
-      duration: dto.duration,
-      isActive: dto.isActive, 
-      categoryId: dto.categoryId, 
-    });
+  // ИЗМЕНЕНИЕ ЗДЕСЬ:
+  // Если описание пустое, лучше вообще не передавать ключ или передать null,
+  // чтобы сработала дефолтная wartość в БД, а не валидатор "не пусто".
+  const descriptionValue = dto.description?.trim();
+  
+  const { data } = await axiosWithAuth.post<IService>("/service", {
+    title: dto.title.trim(),
+    // Если descriptionValue пуст, передаем null. 
+    // Если ваш DTO на бэкенде позволяет undefined/null, это решит проблему.
+    description: descriptionValue || null, 
+    duration: dto.duration,
+    isActive: dto.isActive,
+    categoryId: dto.categoryId,
+  });
 
-    return data;
-  },
+  return data;
+},
 
   async update(
     id: number,

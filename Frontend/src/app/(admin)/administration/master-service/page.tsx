@@ -405,7 +405,7 @@ export default function MasterService() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
-      <div className="max-w-8xl mx-auto">
+      <div className="max-w-9xl mx-auto">
         {/* Заголовок и управление */}
         <div className="mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">

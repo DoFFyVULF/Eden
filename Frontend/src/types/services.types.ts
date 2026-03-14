@@ -13,7 +13,7 @@ export type tServices = {
 export interface IService {
   id: number;
   title: string;
-  description: string;
+  description?: string;
   duration: number;
   isActive: boolean;
   categoryId: number;

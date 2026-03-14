@@ -433,7 +433,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100/50 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-9xl mx-auto">
         {/* Заголовок и фильтры */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}

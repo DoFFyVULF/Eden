@@ -15,9 +15,9 @@ export class ServiceDto {
   title: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @Length(1, 500)
-  description: string;
+  description?: string;
 
   @IsInt()
   @Min(1)
