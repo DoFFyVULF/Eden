@@ -124,11 +124,16 @@ export default function MasterUsersPage() {
       return;
     }
 
+    const selectedMaster = masters.find(m => m.id === Number(form.masterId))
+
+    const fullname = selectedMaster ? `${selectedMaster.surname} ${selectedMaster.name}`.trim() : "";
+
     try {
       await userService.createMasterUser({
         login: form.login,
         password: form.password,
         masterId: Number(form.masterId),
+        name: fullname || '',
       });
 
       setForm({ login: "", password: "", masterId: "" });

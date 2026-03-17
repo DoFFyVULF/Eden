@@ -9,13 +9,11 @@ export const ADMIN_ROUTES = {
 
   APPOINTMENTS: {
     LIST: "/administration/appointments",
-    HISTORY: "/administration/appointments/appointments-history",
+    HISTORY: "/administration/appointments/history",
   },
 
   SERVICES: {
     LIST: "/administration/services",
-    CREATE: "/administration/services/create",
-    EDIT: "/administration/services/:id/edit",
   },
 
   SCHEDULE: {

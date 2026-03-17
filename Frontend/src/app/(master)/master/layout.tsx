@@ -6,6 +6,17 @@ import { QueryProvider } from "@/app/providers/QueryProvider";
 import AsideMenu from "@/app/components/ui/admin/Navigation/asideMenu";
 import { getAccessToken } from "@/services/auth/auth-token.service";
 import { axiosWithAuth } from "@/api/interceptors";
+import { Pangolin } from "next/font/google";
+import TopNavBar from "@/app/components/ui/admin/Navigation/TopNavBar";
+
+const pangolin = Pangolin({
+  subsets: ["latin", "cyrillic"],
+  weight: "400",
+  display: "swap",
+});
+
+
+
 
 export default function MasterRootLayout({
   children,
@@ -22,11 +33,11 @@ export default function MasterRootLayout({
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 1024);
     };
-    
+
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   const checkAuth = async () => {
@@ -63,34 +74,18 @@ export default function MasterRootLayout({
 
   return (
     <QueryProvider>
-      <div className="min-h-screen master-layout bg-gray-50">
-        {isAuth && (
-          <>
-            {/* Для десктопа - aside занимает часть экрана */}
-            <div className="hidden lg:flex">
-              <div className="flex-none">
-                <AsideMenu isAdmin={false} />
-              </div>
-              <main className="flex-1 p-6 lg:p-8 overflow-auto">
-                {children}
-              </main>
-            </div>
-            
-            {/* Для мобилки - контент занимает весь экран */}
-            <div className="lg:hidden">
-              <AsideMenu isAdmin={false} />
-              <main className="p-4 pt-0">
-                {children}
-              </main>
-            </div>
-          </>
-        )}
-
-        {/* Если не авторизован */}
-        {!isAuth && (
-          <div className="w-full p-6">
-            {children}
+      <div
+        className={`${pangolin.className} min-h-screen bg-gradient-to-br from-slate-50 to-blue-50`}
+      >
+        {isAuth ? (
+          <div className="flex flex-col min-h-screen">
+            <TopNavBar isAdmin={false} />
+            <main className="flex-1 p-4 md:p-6 lg:p-8 pt-10 lg:pt-12">
+              {children}
+            </main>
           </div>
+        ) : (
+          <div className="w-full min-h-screen">{children}</div>
         )}
       </div>
     </QueryProvider>

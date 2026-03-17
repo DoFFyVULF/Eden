@@ -6,6 +6,7 @@ export const userService = {
     login: string;
     password: string;
     masterId: number;
+    name: string;
   }) {
     return axiosWithAuth.post<IUser>("/user/master", {
       ...data,
