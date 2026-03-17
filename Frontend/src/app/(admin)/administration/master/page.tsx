@@ -4,31 +4,28 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
-  Filter,
   Plus,
   Users,
   UserPlus,
   Star,
   Phone,
-  Mail,
   Scissors,
   MoreVertical,
   Edit,
   Trash2,
   Power,
   Calendar,
-  TrendingUp,
-  ChevronDown,
-  Sparkles,
-  Shield,
-  Award,
-  Crown,
   RefreshCw,
-  Zap,
   X,
   Clock,
   AlertCircle,
-  Info,
+  ChevronDown,
+  ChevronUp,
+  Activity,
+  SlidersHorizontal,
+  Crown,
+  Flame,
+  TrendingUp,
 } from "lucide-react";
 import EmployeesCard from "@/app/(admin)/administration/master/CreateMasterModal";
 import { masterService } from "@/services/master/master.service";
@@ -37,9 +34,7 @@ import { MasterStatusInfo } from "@/types/schedule.types";
 import { IMaster } from "@/types/masters.type";
 import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber";
 
-// === Типы для модального окна отпуска ===
 type VacationType = "vacation" | "sick_leave" | "day_off" | "other";
-
 type VacationFormData = {
   masterId: number;
   startDate: string;
@@ -48,46 +43,77 @@ type VacationFormData = {
   comment?: string;
 };
 
-// === Компонент: Бейдж отпуска с подсказкой ===
+// ── Vacation type config ─────────────────────────────────────────────────────
+const VTYPE: Record<
+  VacationType,
+  {
+    label: string;
+    emoji: string;
+    gradDark: string;
+    gradLight: string;
+    chipDark: string;
+    chipLight: string;
+  }
+> = {
+  vacation: {
+    label: "Отпуск",
+    emoji: "🌴",
+    gradDark: "from-blue-500 to-cyan-500",
+    gradLight: "from-blue-400 to-cyan-400",
+    chipDark: "bg-blue-500/15 border-blue-400/20 text-blue-300",
+    chipLight: "bg-blue-50 border-blue-200 text-blue-700",
+  },
+  sick_leave: {
+    label: "Больничный",
+    emoji: "🤒",
+    gradDark: "from-rose-500 to-red-500",
+    gradLight: "from-rose-400 to-red-400",
+    chipDark: "bg-rose-500/15 border-rose-400/20 text-rose-300",
+    chipLight: "bg-rose-50 border-rose-200 text-rose-700",
+  },
+  day_off: {
+    label: "Отгул",
+    emoji: "📅",
+    gradDark: "from-amber-500 to-orange-500",
+    gradLight: "from-amber-400 to-orange-400",
+    chipDark: "bg-amber-500/15 border-amber-400/20 text-amber-300",
+    chipLight: "bg-amber-50 border-amber-200 text-amber-700",
+  },
+  other: {
+    label: "Недоступен",
+    emoji: "⚙️",
+    gradDark: "from-slate-500 to-gray-600",
+    gradLight: "from-gray-400 to-gray-500",
+    chipDark: "bg-slate-500/15 border-slate-400/20 text-slate-300",
+    chipLight: "bg-gray-100 border-gray-200 text-gray-600",
+  },
+};
+
+// ── Specialization gradient map ──────────────────────────────────────────────
+const SPEC_GRAD: Record<string, string> = {
+  парикмахер: "from-blue-500 to-cyan-500",
+  массажист: "from-emerald-500 to-green-500",
+  косметолог: "from-purple-500 to-pink-500",
+  маникюр: "from-amber-500 to-orange-500",
+  визажист: "from-rose-500 to-red-500",
+  стилист: "from-indigo-500 to-blue-500",
+};
+const specGrad = (s: string) =>
+  SPEC_GRAD[s.toLowerCase()] ?? "from-slate-500 to-gray-600";
+const getInitials = (m: IMaster) =>
+  `${(m.name[0] ?? "").toUpperCase()}${(m.surname[0] ?? "").toUpperCase()}`;
+
+// ── VacationBadge ─────────────────────────────────────────────────────────────
 function VacationBadge({
   period,
+  isDark,
 }: {
   period: NonNullable<MasterStatusInfo["currentPeriod"]>;
+  isDark: boolean;
 }) {
-  const [showTooltip, setShowTooltip] = useState(false);
-
-  const getTypeConfig = (type: VacationType) => {
-    const configs: Record<
-      VacationType,
-      { label: string; color: string; icon: string }
-    > = {
-      vacation: {
-        label: "Отпуск",
-        color: "bg-blue-100 text-blue-700 border-blue-200",
-        icon: "🌴",
-      },
-      sick_leave: {
-        label: "Больничный",
-        color: "bg-rose-100 text-rose-700 border-rose-200",
-        icon: "🤒",
-      },
-      day_off: {
-        label: "Отгул",
-        color: "bg-amber-100 text-amber-700 border-amber-200",
-        icon: "📅",
-      },
-      other: {
-        label: "Недоступен",
-        color: "bg-gray-100 text-gray-700 border-gray-200",
-        icon: "⚙️",
-      },
-    };
-    return configs[type] || configs.other;
-  };
-
-  const config = getTypeConfig(period.type as VacationType);
-  const endDate = new Date(period.endDate);
-  const formattedEndDate = endDate.toLocaleDateString("ru-RU", {
+  const [tip, setTip] = useState(false);
+  const cfg = VTYPE[period.type as VacationType] ?? VTYPE.other;
+  const end = new Date(period.endDate).toLocaleDateString("ru-RU", {
     day: "numeric",
     month: "short",
   });
@@ -95,40 +121,40 @@ function VacationBadge({
   return (
     <div className="relative inline-block">
       <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
-        className={`px-3 py-1.5 rounded-full text-xs font-medium border ${config.color} flex items-center gap-1.5 cursor-help`}
+        whileHover={{ scale: 1.03 }}
+        onMouseEnter={() => setTip(true)}
+        onMouseLeave={() => setTip(false)}
+        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border cursor-help ${isDark ? cfg.chipDark : cfg.chipLight}`}
       >
-        <span>{config.icon}</span>
-        <span>{config.label}</span>
-        <span className="opacity-70">•</span>
-        <span>до {formattedEndDate}</span>
+        <span>{cfg.emoji}</span>
+        <span>{cfg.label}</span>
+        <span className="opacity-50">·</span>
+        <span>до {end}</span>
       </motion.button>
-
       <AnimatePresence>
-        {showTooltip && (
+        {tip && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            initial={{ opacity: 0, y: 8, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-xl shadow-xl z-50 pointer-events-none"
+            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 w-60 p-3.5 bg-gray-900/95 backdrop-blur-xl text-white text-xs rounded-2xl shadow-2xl border border-white/10 z-50 pointer-events-none"
           >
-            <div className="font-medium mb-1">{config.label}</div>
-            <div className="text-gray-300 space-y-0.5">
+            <div className="font-bold mb-2 text-sm">{cfg.label}</div>
+            <div className="space-y-1 text-white/70">
               <div>
                 📅 Начало:{" "}
                 {new Date(period.startDate).toLocaleDateString("ru-RU")}
               </div>
-              <div>🔚 Окончание: {endDate.toLocaleDateString("ru-RU")}</div>
+              <div>
+                🔚 Конец: {new Date(period.endDate).toLocaleDateString("ru-RU")}
+              </div>
               {period.comment && (
-                <div className="pt-1 border-t border-gray-700 mt-1">
+                <div className="pt-1.5 mt-1.5 border-t border-white/10">
                   💬 {period.comment}
                 </div>
               )}
             </div>
-            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-3 h-3 bg-gray-900 rotate-45" />
+            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px w-2.5 h-2.5 bg-gray-900/95 rotate-45 border-r border-b border-white/10" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -136,1023 +162,1109 @@ function VacationBadge({
   );
 }
 
-// === Компонент модального окна отпуска ===
-function MasterVacationModal({
+// ── VacationModal ─────────────────────────────────────────────────────────────
+function VacationModal({
   isOpen,
   onClose,
   onSubmit,
   master,
+  isDark,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: VacationFormData) => Promise<void>;
+  onSubmit: (d: VacationFormData) => Promise<void>;
   master: IMaster | null;
+  isDark: boolean;
 }) {
-  const [formData, setFormData] = useState<VacationFormData>({
+  const [form, setForm] = useState<VacationFormData>({
     masterId: master?.id || 0,
     startDate: "",
     endDate: "",
     type: "vacation",
     comment: "",
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && master) {
-      setFormData({
+      setForm({
         masterId: master.id,
         startDate: "",
         endDate: "",
         type: "vacation",
         comment: "",
       });
-      setError(null);
+      setErr(null);
     }
   }, [isOpen, master]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!formData.startDate || !formData.endDate) {
-      setError("Пожалуйста, укажите даты начала и окончания");
+    if (!form.startDate || !form.endDate) {
+      setErr("Укажите даты начала и окончания");
       return;
     }
-
-    if (new Date(formData.endDate) < new Date(formData.startDate)) {
-      setError("Дата окончания не может быть раньше даты начала");
+    if (new Date(form.endDate) < new Date(form.startDate)) {
+      setErr("Дата окончания не может быть раньше начала");
       return;
     }
-
-    setIsSubmitting(true);
-    setError(null);
-
+    setSubmitting(true);
+    setErr(null);
     try {
-      await onSubmit(formData);
+      await onSubmit(form);
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Ошибка при добавлении периода");
+    } catch (e: any) {
+      setErr(e.message || "Ошибка");
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
-  const getTypeLabel = (type: VacationType) => {
-    const labels: Record<VacationType, string> = {
-      vacation: "🌴 Отпуск",
-      sick_leave: "🤒 Больничный",
-      day_off: "📅 Отгул",
-      other: "⚙️ Другое",
-    };
-    return labels[type];
-  };
+  const cfg = VTYPE[form.type];
+  const modalCls = isDark
+    ? "bg-slate-900/90 backdrop-blur-3xl border border-white/[0.1] shadow-[0_32px_80px_rgba(0,0,0,0.7)]"
+    : "bg-white/95 backdrop-blur-xl border border-gray-200/70 shadow-2xl";
 
-  const getTypeColor = (type: VacationType) => {
-    const colors: Record<VacationType, string> = {
-      vacation: "from-blue-500 to-cyan-500",
-      sick_leave: "from-rose-500 to-red-500",
-      day_off: "from-amber-500 to-orange-500",
-      other: "from-gray-500 to-gray-600",
-    };
-    return colors[type];
-  };
+  const inputCls = isDark
+    ? "bg-white/[0.07] border-white/[0.1] text-white/90 focus:border-indigo-400/50 placeholder-white/25"
+    : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-400";
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={(e) => e.target === e.currentTarget && onClose()}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{
+            background: isDark ? "rgba(0,0,0,0.75)" : "rgba(15,23,42,0.4)",
+            backdropFilter: "blur(12px)",
+          }}
+        >
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
-          />
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.96, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg z-50 p-4"
+            exit={{ opacity: 0, scale: 0.96, y: 20 }}
+            transition={{ type: "spring", damping: 28, stiffness: 340 }}
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-md rounded-3xl overflow-hidden ${modalCls}`}
           >
-            <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-200/50 overflow-hidden">
-              <div
-                className={`bg-gradient-to-r ${master ? getTypeColor(formData.type) : "from-blue-500 to-purple-500"} p-6 text-white`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white/20 rounded-xl">
-                      <Calendar className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold">
-                        Период недоступности
-                      </h3>
-                      <p className="text-white/80 text-sm">
-                        {master
-                          ? `${master.surname} ${master.name}`
-                          : "Выберите мастера"}
-                      </p>
-                    </div>
+            {/* Header */}
+            <div
+              className={`relative px-6 py-5 bg-gradient-to-r ${isDark ? cfg.gradDark : cfg.gradLight} overflow-hidden`}
+            >
+              <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full" />
+              <div className="relative flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl">
+                    {cfg.emoji}
                   </div>
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={onClose}
-                    className="p-2 hover:bg-white/20 rounded-xl transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </motion.button>
+                  <div>
+                    <h3 className="text-lg font-black text-white">
+                      Период недоступности
+                    </h3>
+                    <p className="text-white/70 text-xs mt-0.5">
+                      {master ? `${master.surname} ${master.name}` : ""}
+                    </p>
+                  </div>
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.1, rotate: 90 }}
+                  whileTap={{ scale: 0.9 }}
+                  transition={{ duration: 0.18 }}
+                  onClick={onClose}
+                  className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center text-white hover:bg-white/25 transition-colors"
+                >
+                  <X size={16} />
+                </motion.button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+              {/* Type selector */}
+              <div>
+                <label
+                  className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${isDark ? "text-white/35" : "text-gray-400"}`}
+                >
+                  Тип периода
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(Object.keys(VTYPE) as VacationType[]).map((t) => {
+                    const tc = VTYPE[t];
+                    const active = form.type === t;
+                    return (
+                      <motion.button
+                        key={t}
+                        type="button"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => setForm((p) => ({ ...p, type: t }))}
+                        className={`p-3 rounded-2xl border-2 text-left transition-all text-sm font-semibold ${
+                          active
+                            ? `border-transparent bg-gradient-to-r ${isDark ? tc.gradDark : tc.gradLight} text-white shadow-lg`
+                            : isDark
+                              ? "border-white/[0.08] bg-white/[0.04] text-white/60 hover:bg-white/[0.07]"
+                              : "border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100"
+                        }`}
+                      >
+                        <span className="mr-2">{tc.emoji}</span>
+                        {tc.label}
+                      </motion.button>
+                    );
+                  })}
                 </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Тип периода
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(
-                      [
-                        "vacation",
-                        "sick_leave",
-                        "day_off",
-                        "other",
-                      ] as VacationType[]
-                    ).map((type) => (
-                      <motion.button
-                        key={type}
-                        type="button"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() =>
-                          setFormData((prev) => ({ ...prev, type }))
-                        }
-                        className={`p-3 rounded-xl border-2 text-left transition-all ${
-                          formData.type === type
-                            ? `border-transparent bg-gradient-to-r ${getTypeColor(type)} text-white shadow-lg`
-                            : "border-gray-200 hover:border-gray-300 bg-gray-50 text-gray-700"
-                        }`}
-                      >
-                        <span className="text-sm font-medium">
-                          {getTypeLabel(type)}
-                        </span>
-                      </motion.button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Начало
-                    </label>
-                    <input
-                      type="datetime-local"
-                      className="w-full px-4 py-3 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all"
-                      value={formData.startDate}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          startDate: e.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Окончание
-                    </label>
-                    <input
-                      type="datetime-local"
-                      className="w-full px-4 py-3 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all"
-                      value={formData.endDate}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          endDate: e.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Комментарий{" "}
-                    <span className="text-gray-400">(необязательно)</span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    className="w-full px-4 py-3 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 placeholder-gray-400 transition-all resize-none"
-                    placeholder="Например: ежегодный отпуск, больничный лист №..."
-                    value={formData.comment}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        comment: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-
-                <AnimatePresence>
-                  {error && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm"
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "Начало", key: "startDate" },
+                  { label: "Окончание", key: "endDate" },
+                ].map((f) => (
+                  <div key={f.key}>
+                    <label
+                      className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? "text-white/35" : "text-gray-400"}`}
                     >
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      <span>{error}</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      {f.label}
+                    </label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={form[f.key as "startDate" | "endDate"]}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, [f.key]: e.target.value }))
+                      }
+                      className={`w-full h-11 px-3 rounded-xl text-sm border outline-none transition-all focus:ring-2 focus:ring-indigo-400/20 ${inputCls}`}
+                    />
+                  </div>
+                ))}
+              </div>
 
-                <div className="flex gap-3 pt-2">
-                  <motion.button
-                    type="button"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={onClose}
-                    className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
-                    disabled={isSubmitting}
+              {/* Comment */}
+              <div>
+                <label
+                  className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? "text-white/35" : "text-gray-400"}`}
+                >
+                  Комментарий{" "}
+                  <span
+                    className={`normal-case font-normal ${isDark ? "text-white/20" : "text-gray-300"}`}
                   >
-                    Отмена
-                  </motion.button>
-                  <motion.button
-                    type="submit"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    disabled={isSubmitting}
-                    className={`flex-1 px-4 py-3 bg-gradient-to-r ${getTypeColor(formData.type)} text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+                    (необязательно)
+                  </span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={form.comment}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, comment: e.target.value }))
+                  }
+                  placeholder="Ежегодный отпуск, больничный лист..."
+                  className={`w-full px-3 py-2.5 rounded-xl text-sm border outline-none resize-none transition-all focus:ring-2 focus:ring-indigo-400/20 ${inputCls}`}
+                />
+              </div>
+
+              <AnimatePresence>
+                {err && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className={`flex items-center gap-2.5 p-3 rounded-xl border text-sm ${
+                      isDark
+                        ? "bg-rose-500/10 border-rose-400/20 text-rose-400"
+                        : "bg-rose-50 border-rose-200 text-rose-600"
+                    }`}
                   >
-                    {isSubmitting ? (
-                      <>
-                        <Clock className="w-4 h-4 animate-spin" />
-                        Сохранение...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4" />
-                        Добавить период
-                      </>
-                    )}
-                  </motion.button>
-                </div>
-              </form>
-            </div>
+                    <AlertCircle size={14} />
+                    {err}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="flex gap-3 pt-1">
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={onClose}
+                  className={`flex-1 h-12 rounded-2xl text-sm font-semibold border transition-all ${
+                    isDark
+                      ? "bg-white/[0.06] border-white/[0.1] text-white/60 hover:bg-white/[0.09]"
+                      : "bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200"
+                  }`}
+                  disabled={submitting}
+                >
+                  Отмена
+                </motion.button>
+                <motion.button
+                  type="submit"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.97 }}
+                  disabled={submitting}
+                  className={`flex-1 h-12 rounded-2xl text-sm font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 bg-gradient-to-r ${isDark ? cfg.gradDark : cfg.gradLight}`}
+                >
+                  {submitting ? (
+                    <>
+                      <Clock size={15} className="animate-spin" />
+                      Сохранение...
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={15} />
+                      Добавить
+                    </>
+                  )}
+                </motion.button>
+              </div>
+            </form>
           </motion.div>
-        </>
+        </motion.div>
       )}
     </AnimatePresence>
   );
 }
 
-// === Основной компонент страницы ===
+// ── Master card ────────────────────────────────────────────────────────────────
+function MasterCard({
+  master,
+  status,
+  isDark,
+  onEdit,
+  onDelete,
+  onToggle,
+  onVacation,
+}: {
+  master: IMaster;
+  status?: MasterStatusInfo;
+  isDark: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  onToggle: () => void;
+  onVacation: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const isTimeOff = status?.isOnTimeOff && status.currentPeriod;
+  const grad = specGrad(master.specialization);
+
+  const cardCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1] hover:bg-white/[0.1] hover:border-white/[0.15] shadow-lg hover:shadow-xl"
+    : "bg-white border border-gray-200/80 hover:border-gray-300/80 shadow-sm hover:shadow-lg";
+
+  const menuCls = isDark
+    ? "bg-slate-900/95 backdrop-blur-2xl border border-white/[0.1] shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
+    : "bg-white border border-gray-200/70 shadow-2xl";
+
+  const MENU_ITEMS = [
+    {
+      label: "Отправить в отпуск",
+      sub: "Добавить период недоступности",
+      icon: <Calendar size={14} />,
+      color: isDark ? "text-purple-400" : "text-purple-600",
+      hover: isDark ? "hover:bg-purple-500/10" : "hover:bg-purple-50",
+      onClick: onVacation,
+    },
+    {
+      label: master.isActive ? "Деактивировать" : "Активировать",
+      sub: master.isActive ? "Сделать недоступным" : "Вернуть в работу",
+      icon: <Power size={14} />,
+      color: isDark ? "text-blue-400" : "text-blue-600",
+      hover: isDark ? "hover:bg-blue-500/10" : "hover:bg-blue-50",
+      onClick: onToggle,
+    },
+    {
+      label: "Редактировать",
+      sub: "Изменить данные",
+      icon: <Edit size={14} />,
+      color: isDark ? "text-emerald-400" : "text-emerald-600",
+      hover: isDark ? "hover:bg-emerald-500/10" : "hover:bg-emerald-50",
+      onClick: onEdit,
+    },
+    {
+      label: "Удалить",
+      sub: "Удалить сотрудника",
+      icon: <Trash2 size={14} />,
+      color: isDark ? "text-rose-400" : "text-rose-500",
+      hover: isDark ? "hover:bg-rose-500/10" : "hover:bg-rose-50",
+      onClick: onDelete,
+    },
+  ];
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 16, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      whileHover={{ y: -3 }}
+      transition={{ duration: 0.25 }}
+      className={`relative rounded-2xl p-5 transition-all duration-300 overflow-hidden ${cardCls}`}
+    >
+      {/* Gradient accent top line */}
+      <div
+        className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r ${grad} opacity-50`}
+      />
+
+      {/* Top row */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start gap-3">
+          {/* Avatar */}
+          <div className="relative flex-shrink-0">
+            <div
+              className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-lg shadow-lg overflow-hidden`}
+            >
+              {master.photo ? (
+                <img
+                  src={master.photo}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                getInitials(master)
+              )}
+            </div>
+            {/* Status dot */}
+            <div
+              className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 ${
+                isTimeOff
+                  ? "bg-amber-400"
+                  : master.isActive
+                    ? "bg-emerald-400"
+                    : "bg-rose-400"
+              } ${isDark ? "border-slate-900" : "border-white"}`}
+            >
+              {master.isActive && !isTimeOff && (
+                <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-60" />
+              )}
+            </div>
+          </div>
+
+          <div className="min-w-0">
+            <h3
+              className={`font-bold text-base leading-tight ${isDark ? "text-white/95" : "text-gray-900"}`}
+            >
+              {master.surname} {master.name}
+            </h3>
+            {master.middlename && (
+              <p
+                className={`text-xs mt-0.5 ${isDark ? "text-white/35" : "text-gray-400"}`}
+              >
+                {master.middlename}
+              </p>
+            )}
+            {/* Specialization pill */}
+            <span
+              className={`inline-flex items-center gap-1 mt-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gradient-to-r ${grad} text-white shadow-sm`}
+            >
+              <Scissors size={10} />
+              {master.specialization}
+            </span>
+          </div>
+        </div>
+
+        {/* Context menu */}
+        <div className="relative flex-shrink-0">
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setMenuOpen(!menuOpen)}
+            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+              menuOpen
+                ? isDark
+                  ? "bg-white/[0.12] text-white/90"
+                  : "bg-gray-100 text-gray-700"
+                : isDark
+                  ? "bg-white/[0.06] text-white/40 hover:bg-white/[0.1] hover:text-white/70"
+                  : "text-gray-400 hover:bg-gray-100"
+            }`}
+          >
+            <MoreVertical size={15} />
+          </motion.button>
+
+          <AnimatePresence>
+            {menuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setMenuOpen(false)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.93, y: -6 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.93, y: -6 }}
+                  transition={{ duration: 0.12 }}
+                  className={`absolute right-0 top-full mt-1.5 w-56 rounded-2xl overflow-hidden z-50 ${menuCls}`}
+                >
+                  <div className="p-1.5 space-y-0.5">
+                    {MENU_ITEMS.map((item) => (
+                      <motion.button
+                        key={item.label}
+                        whileHover={{ x: 3 }}
+                        onClick={() => {
+                          item.onClick();
+                          setMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-left ${item.color} ${item.hover}`}
+                      >
+                        <div className="flex-shrink-0">{item.icon}</div>
+                        <div>
+                          <div className="text-sm font-semibold">
+                            {item.label}
+                          </div>
+                          <div
+                            className={`text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}
+                          >
+                            {item.sub}
+                          </div>
+                        </div>
+                      </motion.button>
+                    ))}
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+
+      {/* Phone */}
+      {master.phone && (
+        <div
+          className={`flex items-center gap-2 text-xs mb-4 ${isDark ? "text-white/40" : "text-gray-400"}`}
+        >
+          <Phone size={12} />
+          <span>{formatPhoneNumber(master.phone)}</span>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div
+        className={`flex items-center justify-between pt-4 border-t ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}
+      >
+        {isTimeOff && status?.currentPeriod ? (
+          <VacationBadge period={status.currentPeriod} isDark={isDark} />
+        ) : (
+          <span
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+              master.isActive
+                ? isDark
+                  ? "bg-emerald-500/10 border-emerald-400/15 text-emerald-400"
+                  : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                : isDark
+                  ? "bg-rose-500/10 border-rose-400/15 text-rose-400"
+                  : "bg-rose-50 border-rose-200 text-rose-600"
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${master.isActive ? "bg-emerald-400" : "bg-rose-400"}`}
+            />
+            {master.isActive ? "Активен" : "Неактивен"}
+          </span>
+        )}
+
+        <div
+          className={`flex items-center gap-1 text-xs font-bold ${isDark ? "text-amber-400" : "text-amber-500"}`}
+        >
+          <Star size={13} className="fill-current" />
+          4.8
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function Employees() {
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isVacationModalOpen, setIsVacationModalOpen] = useState(false);
-  const [editingMaster, setEditingMaster] = useState<IMaster | null>(null);
-  const [vacationMaster, setVacationMaster] = useState<IMaster | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isVacOpen, setIsVacOpen] = useState(false);
+  const [editMaster, setEditMaster] = useState<IMaster | null>(null);
+  const [vacMaster, setVacMaster] = useState<IMaster | null>(null);
   const [masters, setMasters] = useState<IMaster[]>([]);
-  const [masterStatuses, setMasterStatuses] = useState<
-    Record<number, MasterStatusInfo>
-  >({});
+  const [statuses, setStatuses] = useState<Record<number, MasterStatusInfo>>(
+    {},
+  );
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [specializationFilter, setSpecializationFilter] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [isDark, setIsDark] = useState(false);
+  const [search, setSearch] = useState("");
+  const [specFilter, setSpecFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [selectedMaster, setSelectedMaster] = useState<IMaster | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
 
-  const loadMasters = async (showLoading = true) => {
-    if (showLoading) setLoading(true);
-    else setIsRefreshing(true);
+  useEffect(() => {
+    const check = () =>
+      setIsDark(document.documentElement.classList.contains("dark"));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => obs.disconnect();
+  }, []);
 
+  const loadMasters = async (showLoader = true) => {
+    showLoader ? setLoading(true) : setRefreshing(true);
     try {
       const data = await masterService.getAll();
       setMasters(data);
-
-      // Загружаем статусы отпусков для каждого мастера
-      const statuses: Record<number, MasterStatusInfo> = {};
+      const st: Record<number, MasterStatusInfo> = {};
       await Promise.all(
-        data.map(async (master) => {
-          try {
-            if (master.id) {
-              statuses[master.id] = await masterScheduleService.getMasterStatus(
-                master.id,
-              );
+        data.map(async (m) => {
+          if (m.id)
+            try {
+              st[m.id] = await masterScheduleService.getMasterStatus(m.id);
+            } catch {
+              st[m.id] = { isOnTimeOff: false, currentPeriod: null };
             }
-          } catch {
-            if (master.id) {
-              statuses[master.id] = { isOnTimeOff: false, currentPeriod: null };
-            }
-          }
         }),
       );
-      setMasterStatuses(statuses);
-    } catch (error) {
-      console.error("Ошибка загрузки мастеров:", error);
+      setStatuses(st);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
-      setIsRefreshing(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
     loadMasters();
-
-    // Проверка статусов каждые 5 минут (автоматическое обновление при окончании отпуска)
-    const interval = setInterval(
-      () => {
-        loadMasters(false);
-      },
-      5 * 60 * 1000,
-    );
-
-    return () => clearInterval(interval);
+    const id = setInterval(() => loadMasters(false), 5 * 60 * 1000);
+    return () => clearInterval(id);
   }, []);
 
-  const filteredMasters = useMemo(() => {
-    return masters.filter((master) => {
-      const matchesSearch =
-        master.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        master.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        master.middlename?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        master.specialization
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        (master.phone && master.phone.includes(searchTerm));
+  const filtered = useMemo(
+    () =>
+      masters.filter((m) => {
+        const q = search.toLowerCase();
+        const matchQ =
+          !q ||
+          `${m.name} ${m.surname} ${m.middlename ?? ""} ${m.specialization} ${m.phone ?? ""}`
+            .toLowerCase()
+            .includes(q);
+        const matchS =
+          !specFilter ||
+          m.specialization.toLowerCase().includes(specFilter.toLowerCase());
+        const matchSt =
+          !statusFilter ||
+          (statusFilter === "active" && m.isActive) ||
+          (statusFilter === "inactive" && !m.isActive);
+        return matchQ && matchS && matchSt;
+      }),
+    [masters, search, specFilter, statusFilter],
+  );
 
-      const matchesSpecialization =
-        !specializationFilter ||
-        master.specialization
-          .toLowerCase()
-          .includes(specializationFilter.toLowerCase());
+  const stats = useMemo(
+    () => ({
+      total: masters.length,
+      active: masters.filter((m) => m.isActive && !statuses[m.id!]?.isOnTimeOff)
+        .length,
+      inactive: masters.filter((m) => !m.isActive).length,
+      onLeave: Object.values(statuses).filter((s) => s.isOnTimeOff).length,
+    }),
+    [masters, statuses],
+  );
 
-      const matchesStatus =
-        !statusFilter ||
-        (statusFilter === "active" && master.isActive) ||
-        (statusFilter === "inactive" && !master.isActive);
-
-      return matchesSearch && matchesSpecialization && matchesStatus;
+  const handleCreate = async (data: any) => {
+    await masterService.create({
+      ...data,
+      phone: data.phone?.replace(/\D/g, "") || "",
     });
-  }, [masters, searchTerm, specializationFilter, statusFilter]);
+    await loadMasters(false);
+    setIsCreateOpen(false);
+  };
+  const handleUpdate = async (data: any) => {
+    await masterService.update(editMaster!.id!, {
+      ...data,
+      phone: data.phone?.replace(/\D/g, "") || "",
+    });
+    await loadMasters(false);
+    setIsEditOpen(false);
+    setEditMaster(null);
+  };
+  const handleVacation = async (d: VacationFormData) => {
+    await masterScheduleService.createTimeOff({
+      masterId: d.masterId,
+      startDate: new Date(d.startDate).toISOString(),
+      endDate: new Date(d.endDate).toISOString(),
+      type: d.type,
+      comment: d.comment || undefined,
+    });
+    await loadMasters(false);
+  };
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("Удалить сотрудника?")) return;
+    await masterService.delete(id);
+    await loadMasters(false);
+  };
+  const handleToggle = async (m: IMaster) => {
+    await masterService.update(m.id!, { isActive: !m.isActive });
+    await loadMasters(false);
+  };
 
-  const stats = useMemo(() => {
-    const totalMasters = masters.length;
-    const mastersOnTimeOff = Object.values(masterStatuses).filter(
-      (s) => s.isOnTimeOff,
-    ).length;
-    const activeMasters = masters.filter(
-      (m) => m.isActive && !masterStatuses[m.id!]?.isOnTimeOff,
-    ).length;
-    const inactiveMasters = masters.filter((m) => !m.isActive).length;
-    const averageRating =
-      masters.length > 0
-        ? Number(
-            (
-              masters.reduce((acc, master) => acc + 4.8, 0) / masters.length
-            ).toFixed(1),
-          )
-        : 0;
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1] shadow-lg"
+    : "bg-white border border-gray-200/70 shadow-sm";
 
-    return {
-      totalMasters,
-      activeMasters,
-      inactiveMasters,
-      averageRating,
-      mastersOnTimeOff,
-    };
-  }, [masters, masterStatuses]);
-
-  const specializations = [
-    "парикмахер",
-    "массажист",
-    "косметолог",
-    "маникюр",
-    "визажист",
-    "стилист",
+  const SPECIALIZATIONS = [
+    "Парикмахер",
+    "Массажист",
+    "Косметолог",
+    "Маникюр",
+    "Визажист",
+    "Стилист",
   ];
 
-  const handleCreateMaster = async (masterData: any) => {
-    try {
-      const cleanedPhone = masterData.phone?.replace(/\D/g, "") || "";
-      await masterService.create({ ...masterData, phone: cleanedPhone });
-      await loadMasters(false);
-      setIsCreateModalOpen(false);
-    } catch (error) {
-      console.error("Ошибка создания мастера:", error);
-      throw error;
-    }
-  };
-
-  const handleEditMaster = (master: IMaster) => {
-    setEditingMaster(master);
-    setIsEditModalOpen(true);
-    setSelectedMaster(null);
-  };
-
-  const handleUpdateMaster = async (masterData: any) => {
-    try {
-      const cleanedPhone = masterData.phone?.replace(/\D/g, "") || "";
-      await masterService.update(editingMaster!.id!, {
-        ...masterData,
-        phone: cleanedPhone,
-      });
-      await loadMasters(false);
-      setIsEditModalOpen(false);
-      setEditingMaster(null);
-    } catch (error) {
-      console.error("Ошибка обновления мастера:", error);
-      throw error;
-    }
-  };
-
-  const handleAddVacation = async (formData: VacationFormData) => {
-    try {
-      await masterScheduleService.createTimeOff({
-        masterId: formData.masterId,
-        startDate: new Date(formData.startDate).toISOString(),
-        endDate: new Date(formData.endDate).toISOString(),
-        type: formData.type,
-        comment: formData.comment || undefined,
-      });
-      await loadMasters(false);
-    } catch (error: any) {
-      console.error("Ошибка добавления периода:", error);
-      throw error;
-    }
-  };
-
-  const handleDeleteMaster = async (id: number) => {
-    if (!window.confirm("Вы уверены, что хотите удалить этого мастера?"))
-      return;
-    try {
-      await masterService.delete(id);
-      await loadMasters(false);
-      setSelectedMaster(null);
-    } catch (error) {
-      console.error("Ошибка удаления мастера:", error);
-      alert("Ошибка при удалении мастера");
-    }
-  };
-
-  const handleToggleStatus = async (master: IMaster) => {
-    try {
-      await masterService.update(master.id!, { isActive: !master.isActive });
-      await loadMasters(false);
-    } catch (error) {
-      console.error("Ошибка изменения статуса:", error);
-      alert("Ошибка при изменении статуса мастера");
-    }
-  };
-
-  const openVacationModal = (master: IMaster) => {
-    setVacationMaster(master);
-    setIsVacationModalOpen(true);
-    setSelectedMaster(null);
-  };
-
-  const safeFormatPhone = (phone: string | undefined): string => {
-    if (!phone) return "Не указан";
-    return formatPhoneNumber(phone);
-  };
-
-  const getInitials = (master: IMaster) => {
-    return `${master.name[0]}${master.surname[0]}`.toUpperCase();
-  };
-
-  const getSpecializationColor = (specialization: string) => {
-    const colors: Record<string, string> = {
-      парикмахер: "from-blue-500 to-cyan-500",
-      массажист: "from-emerald-500 to-green-500",
-      косметолог: "from-purple-500 to-pink-500",
-      маникюр: "from-amber-500 to-orange-500",
-      визажист: "from-rose-500 to-red-500",
-      стилист: "from-indigo-500 to-blue-500",
-    };
-    return colors[specialization.toLowerCase()] || "from-gray-500 to-gray-600";
-  };
+  const STAT_CARDS = [
+    {
+      num: stats.total,
+      label: "Всего",
+      sub: "сотрудников",
+      grad: "from-blue-500 to-indigo-600",
+      glow: "shadow-blue-500/20",
+    },
+    {
+      num: stats.active,
+      label: "Активных",
+      sub: "сейчас работают",
+      grad: "from-emerald-500 to-teal-600",
+      glow: "shadow-emerald-500/20",
+    },
+    {
+      num: stats.onLeave,
+      label: "В отпуске",
+      sub: "недоступны",
+      grad: "from-amber-500 to-orange-500",
+      glow: "shadow-amber-500/20",
+    },
+    {
+      num: stats.inactive,
+      label: "Неактивных",
+      sub: "недоступны",
+      grad: "from-rose-500 to-pink-600",
+      glow: "shadow-rose-500/20",
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
-      <div className="max-w-9xl mx-auto">
-        {/* Заголовок и управление */}
-        <div className="mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+    <div className="min-h-screen p-4 md:p-6 lg:p-8">
+      <div className="max-w-9xl mx-auto space-y-6">
+        {/* ── HEADER ── */}
+        <motion.div
+          initial={{ opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-3 mb-2"
-              >
-                <div className="p-2.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl">
-                  <Users className="w-6 h-6 text-white" />
+              <div className={`flex items-center gap-2 mb-2.5`}>
+                <div
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border ${
+                    isDark
+                      ? "bg-white/[0.06] border-white/[0.09] text-white/40"
+                      : "bg-gray-100 border-gray-200 text-gray-400"
+                  }`}
+                >
+                  <Activity size={11} />
+                  Команда
                 </div>
-                <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-                  Управление сотрудниками
-                </h1>
-              </motion.div>
-              <p className="text-gray-600">
-                Всего сотрудников:{" "}
-                <span className="font-semibold text-gray-800">
-                  {stats.totalMasters}
-                </span>
-                {stats.mastersOnTimeOff > 0 && (
-                  <span className="ml-2 text-amber-600">
-                    • {stats.mastersOnTimeOff} в отпуске
-                  </span>
-                )}
-                {filteredMasters.length !== stats.totalMasters && (
-                  <span className="ml-2">
-                    (показано {filteredMasters.length})
-                  </span>
-                )}
+              </div>
+              <h1
+                className={`text-4xl md:text-5xl font-black leading-none tracking-tight ${isDark ? "text-white" : "text-gray-900"}`}
+              >
+                Сотрудники
+              </h1>
+              <p
+                className={`mt-2 text-sm ${isDark ? "text-white/35" : "text-gray-400"}`}
+              >
+                {stats.total} человек · {stats.active} активны
+                {stats.onLeave > 0 && ` · ${stats.onLeave} в отпуске`}
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex gap-2.5 flex-wrap">
               <motion.button
                 whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-medium hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
-              >
-                <Filter className="w-4 h-4" />
-                Фильтры
-                {isFilterOpen ? (
-                  <ChevronDown className="w-4 h-4 rotate-180" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
-              </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => loadMasters(false)}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-medium hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.1] text-white/60 hover:text-white/80 hover:bg-white/[0.1]"
+                    : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
+                }`}
               >
                 <RefreshCw
-                  className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+                  size={14}
+                  className={refreshing ? "animate-spin" : ""}
                 />
                 Обновить
               </motion.button>
 
               <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setIsCreateModalOpen(true)}
-                className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-purple-700"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setIsCreateOpen(true)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all ${
+                  isDark
+                    ? "bg-gradient-to-r from-indigo-500 to-purple-600 shadow-purple-500/25 hover:shadow-purple-500/40"
+                    : "bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/20 hover:shadow-blue-500/35"
+                }`}
               >
-                <UserPlus className="w-5 h-5" />
+                <UserPlus size={16} />
                 Новый сотрудник
               </motion.button>
             </div>
           </div>
+        </motion.div>
 
-          {/* Расширенные фильтры */}
+        {/* ── STAT CARDS ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {STAT_CARDS.map((s, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.06 }}
+              whileHover={{ y: -3, scale: 1.02 }}
+              className={`relative rounded-2xl p-5 overflow-hidden transition-all duration-300 ${
+                isDark
+                  ? `bg-white/[0.07] backdrop-blur-xl border border-white/[0.1] shadow-lg hover:shadow-xl ${s.glow}`
+                  : `bg-white border border-gray-200/70 shadow-sm hover:shadow-md ${s.glow}`
+              }`}
+            >
+              <div
+                className={`absolute -top-5 -right-5 w-16 h-16 bg-gradient-to-br ${s.grad} opacity-[0.12] rounded-xl rotate-12 blur-sm`}
+              />
+              <div className="relative">
+                <div
+                  className={`w-9 h-9 rounded-xl bg-gradient-to-br ${s.grad} flex items-center justify-center shadow-md mb-3`}
+                >
+                  <Users size={17} className="text-white" />
+                </div>
+                <div
+                  className={`text-3xl font-black leading-none mb-1 ${isDark ? "text-white" : "text-gray-900"}`}
+                >
+                  {s.num}
+                </div>
+                <div
+                  className={`text-sm font-semibold ${isDark ? "text-white/70" : "text-gray-700"}`}
+                >
+                  {s.label}
+                </div>
+                <div
+                  className={`text-xs mt-0.5 ${isDark ? "text-white/30" : "text-gray-400"}`}
+                >
+                  {s.sub}
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* ── SEARCH + FILTER ── */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className={`rounded-2xl p-4 ${glassCls}`}
+        >
+          <div className="flex gap-3 flex-wrap">
+            <div className="flex-1 min-w-[180px] relative">
+              <Search
+                size={15}
+                className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`}
+              />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Поиск по имени, специализации..."
+                className={`w-full h-11 pl-10 pr-4 rounded-xl text-sm border outline-none transition-all ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.08] text-white/90 placeholder-white/25 focus:border-indigo-400/40"
+                    : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-300 focus:bg-white"
+                }`}
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDark ? "text-white/30 hover:text-white/60" : "text-gray-400"}`}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setFilterOpen(!filterOpen)}
+              className={`h-11 flex items-center gap-2 px-4 rounded-xl text-sm font-semibold border transition-all ${
+                filterOpen
+                  ? isDark
+                    ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300"
+                    : "bg-blue-50 border-blue-300 text-blue-600"
+                  : isDark
+                    ? "bg-white/[0.07] border-white/[0.09] text-white/55 hover:bg-white/[0.1]"
+                    : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-white shadow-sm"
+              }`}
+            >
+              <SlidersHorizontal size={15} />
+              Фильтры
+              {filterOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </motion.button>
+
+            {(search || specFilter || statusFilter) && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  setSearch("");
+                  setSpecFilter("");
+                  setStatusFilter("");
+                }}
+                className={`h-11 px-4 rounded-xl text-sm font-semibold border transition-all ${
+                  isDark
+                    ? "bg-rose-500/10 border-rose-400/20 text-rose-400"
+                    : "bg-rose-50 border-rose-200 text-rose-500"
+                }`}
+              >
+                <X size={15} />
+              </motion.button>
+            )}
+          </div>
+
           <AnimatePresence>
-            {isFilterOpen && (
+            {filterOpen && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: "auto", marginTop: 12 }}
+                exit={{ opacity: 0, height: 0, marginTop: 0 }}
                 className="overflow-hidden"
               >
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 mb-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="relative">
-                      <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        placeholder="Поиск по имени, фамилии, специализации..."
-                        className="w-full pl-10 pr-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 placeholder-gray-500 transition-all duration-300"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                    </div>
-
-                    <select
-                      className="w-full px-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-300"
-                      value={specializationFilter}
-                      onChange={(e) => setSpecializationFilter(e.target.value)}
+                <div
+                  className={`pt-3 border-t grid grid-cols-1 sm:grid-cols-2 gap-3 ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}
+                >
+                  <div>
+                    <p
+                      className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? "text-white/25" : "text-gray-400"}`}
                     >
-                      <option value="">Все специализации</option>
-                      {specializations.map((spec) => (
-                        <option key={spec} value={spec} className="capitalize">
-                          {spec.charAt(0).toUpperCase() + spec.slice(1)}
-                        </option>
+                      Специализация
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {SPECIALIZATIONS.map((sp) => (
+                        <motion.button
+                          key={sp}
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
+                          onClick={() =>
+                            setSpecFilter(specFilter === sp ? "" : sp)
+                          }
+                          className={`h-7 px-3 rounded-full text-xs font-semibold border transition-all ${
+                            specFilter === sp
+                              ? isDark
+                                ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300"
+                                : "bg-blue-100 border-blue-300 text-blue-700"
+                              : isDark
+                                ? "bg-white/[0.05] border-white/[0.07] text-white/45 hover:border-white/[0.12]"
+                                : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-white"
+                          }`}
+                        >
+                          {sp}
+                        </motion.button>
                       ))}
-                    </select>
-
-                    <select
-                      className="w-full px-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-300"
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
+                    </div>
+                  </div>
+                  <div>
+                    <p
+                      className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? "text-white/25" : "text-gray-400"}`}
                     >
-                      <option value="">Все статусы</option>
-                      <option value="active">Активные ✅</option>
-                      <option value="inactive">Неактивные ❌</option>
-                    </select>
+                      Статус
+                    </p>
+                    <div className="flex gap-2">
+                      {[
+                        { v: "", l: "Все" },
+                        { v: "active", l: "Активные" },
+                        { v: "inactive", l: "Неактивные" },
+                      ].map((o) => (
+                        <motion.button
+                          key={o.v}
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
+                          onClick={() => setStatusFilter(o.v)}
+                          className={`h-7 px-3 rounded-full text-xs font-semibold border transition-all ${
+                            statusFilter === o.v
+                              ? isDark
+                                ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300"
+                                : "bg-blue-100 border-blue-300 text-blue-700"
+                              : isDark
+                                ? "bg-white/[0.05] border-white/[0.07] text-white/45"
+                                : "bg-gray-50 border-gray-200 text-gray-500"
+                          }`}
+                        >
+                          {o.l}
+                        </motion.button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </motion.div>
 
-        {/* Статистика */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
+        {/* ── RESULTS LABEL ── */}
+        {!loading && (
+          <div
+            className={`px-1 text-xs ${isDark ? "text-white/25" : "text-gray-400"}`}
           >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <Users className="w-16 h-16" />
+            {filtered.length === masters.length
+              ? `${filtered.length} сотрудников`
+              : `${filtered.length} из ${masters.length}`}
+          </div>
+        )}
+
+        {/* ── GRID ── */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-24">
+            <div
+              className={`w-10 h-10 rounded-full border-t-transparent animate-spin mb-4 ${isDark ? "border-purple-400" : "border-blue-400"}`}
+              style={{ borderWidth: 3, borderStyle: "solid" }}
+            />
+            <p
+              className={`text-sm ${isDark ? "text-white/35" : "text-gray-400"}`}
+            >
+              Загрузка сотрудников...
+            </p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className={`rounded-2xl p-16 text-center ${glassCls}`}>
+            <div
+              className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center ${isDark ? "bg-white/[0.06]" : "bg-gray-100"}`}
+            >
+              <Users
+                size={26}
+                className={isDark ? "text-white/20" : "text-gray-300"}
+              />
             </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">
-                {stats.totalMasters}
-              </div>
-              <div className="text-blue-100 font-medium">Всего сотрудников</div>
-              <div className="text-sm text-blue-200/80 mt-2">
-                Зарегистрировано в системе
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-gradient-to-br from-emerald-500 to-green-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <Zap className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">
-                {stats.activeMasters}
-              </div>
-              <div className="text-emerald-100 font-medium">Активные</div>
-              <div className="text-sm text-emerald-200/80 mt-2">
-                Сейчас работают
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <Star className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">
-                {stats.averageRating}
-              </div>
-              <div className="text-amber-100 font-medium">Средний рейтинг</div>
-              <div className="text-sm text-amber-200/80 mt-2">
-                По отзывам клиентов
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="bg-gradient-to-br from-rose-500 to-red-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <Shield className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">
-                {stats.inactiveMasters}
-              </div>
-              <div className="text-rose-100 font-medium">Неактивные</div>
-              <div className="text-sm text-rose-200/80 mt-2">
-                Недоступны для записи
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Карточки сотрудников */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-          <AnimatePresence>
-            {loading ? (
-              <div className="col-span-full py-12 text-center">
-                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-                <p className="mt-4 text-gray-500 font-medium">
-                  Загрузка сотрудников...
-                </p>
-              </div>
-            ) : filteredMasters.length > 0 ? (
-              filteredMasters.map((master, index) => {
-                const status = masterStatuses[master.id!];
-                const isOnTimeOff = status?.isOnTimeOff && status.currentPeriod;
-
-                return (
-                  <motion.div
-                    key={master.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    whileHover={{ scale: 1.01, y: -2 }}
-                    className="bg-gradient-to-br from-white to-gray-50/50 rounded-3xl border border-gray-200/50 p-5 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm group"
-                  >
-                    {/* Верхняя часть с аватаром и статусом */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <div
-                            className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${getSpecializationColor(master.specialization)} flex items-center justify-center text-white font-bold text-xl shadow-lg`}
-                          >
-                            {master.photo ? (
-                              <img
-                                src={master.photo}
-                                alt={`${master.name} ${master.surname}`}
-                                className="w-full h-full rounded-2xl object-cover"
-                              />
-                            ) : (
-                              getInitials(master)
-                            )}
-                          </div>
-                          <div
-                            className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white ${
-                              isOnTimeOff
-                                ? "bg-amber-500"
-                                : master.isActive
-                                  ? "bg-emerald-500"
-                                  : "bg-rose-500"
-                            }`}
-                          >
-                            <div className="absolute inset-0 rounded-full bg-white/30 animate-ping" />
-                          </div>
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-gray-900 text-lg leading-tight">
-                            {master.surname} {master.name}
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            {master.specialization}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Действия */}
-                      <div className="relative">
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={() =>
-                            setSelectedMaster(
-                              selectedMaster?.id === master.id ? null : master,
-                            )
-                          }
-                          className={`p-1.5 rounded-lg transition-all ${
-                            selectedMaster?.id === master.id
-                              ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white"
-                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                          }`}
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </motion.button>
-
-                        {/* Выпадающее меню */}
-                        <AnimatePresence>
-                          {selectedMaster?.id === master.id && (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0.9, y: -10 }}
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                              className="absolute right-0 top-full mt-2 w-64 bg-white/90 backdrop-blur-lg rounded-2xl shadow-2xl border border-gray-200/50 overflow-hidden z-50"
-                            >
-                              <div className="p-2">
-                                <motion.button
-                                  whileHover={{ x: 5 }}
-                                  whileTap={{ scale: 0.95 }}
-                                  onClick={() => openVacationModal(master)}
-                                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-50/50 transition-all duration-200 text-gray-700 hover:text-purple-600"
-                                >
-                                  <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                                    <Calendar className="w-4 h-4 text-purple-600" />
-                                  </div>
-                                  <div className="text-left">
-                                    <p className="font-medium">
-                                      Отправить в отпуск
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                      Добавить период недоступности
-                                    </p>
-                                  </div>
-                                </motion.button>
-
-                                <motion.button
-                                  whileHover={{ x: 5 }}
-                                  whileTap={{ scale: 0.95 }}
-                                  onClick={() => handleToggleStatus(master)}
-                                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-blue-50/50 transition-all duration-200 text-gray-700 hover:text-blue-600 mt-1"
-                                >
-                                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                                    <Power className="w-4 h-4 text-blue-600" />
-                                  </div>
-                                  <div className="text-left">
-                                    <p className="font-medium">
-                                      {master.isActive
-                                        ? "Деактивировать"
-                                        : "Активировать"}
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                      {master.isActive
-                                        ? "Сделать неактивным"
-                                        : "Вернуть в работу"}
-                                    </p>
-                                  </div>
-                                </motion.button>
-
-                                <motion.button
-                                  whileHover={{ x: 5 }}
-                                  whileTap={{ scale: 0.95 }}
-                                  onClick={() => handleEditMaster(master)}
-                                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-emerald-50/50 transition-all duration-200 text-gray-700 hover:text-emerald-600 mt-1"
-                                >
-                                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                                    <Edit className="w-4 h-4 text-emerald-600" />
-                                  </div>
-                                  <div className="text-left">
-                                    <p className="font-medium">Редактировать</p>
-                                    <p className="text-xs text-gray-500">
-                                      Изменить данные сотрудника
-                                    </p>
-                                  </div>
-                                </motion.button>
-
-                                <motion.button
-                                  whileHover={{ x: 5 }}
-                                  whileTap={{ scale: 0.95 }}
-                                  onClick={() => handleDeleteMaster(master.id!)}
-                                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50/50 transition-all duration-200 text-gray-700 hover:text-red-600 mt-1"
-                                >
-                                  <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
-                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                  </div>
-                                  <div className="text-left">
-                                    <p className="font-medium">Удалить</p>
-                                    <p className="text-xs text-gray-500">
-                                      Удалить сотрудника
-                                    </p>
-                                  </div>
-                                </motion.button>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </div>
-
-                    {/* Контактная информация */}
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Phone className="w-3.5 h-3.5" />
-                        <span>{safeFormatPhone(master.phone)}</span>
-                      </div>
-                    </div>
-
-                    {/* Статус и рейтинг */}
-                    <div className="flex items-center justify-between text-sm">
-                      {isOnTimeOff && status?.currentPeriod ? (
-                        <VacationBadge period={status.currentPeriod} />
-                      ) : (
-                        <span
-                          className={`px-3 py-1 rounded-full font-medium ${
-                            master.isActive
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-rose-100 text-rose-700"
-                          }`}
-                        >
-                          {master.isActive ? "Активен" : "Неактивен"}
-                        </span>
-                      )}
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                        <span className="font-medium">
-                          {stats.averageRating}
-                        </span>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })
-            ) : (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="col-span-full bg-white/80 backdrop-blur-sm rounded-2xl p-8 text-center border border-gray-200/50"
+            <p
+              className={`text-lg font-bold mb-1 ${isDark ? "text-white/50" : "text-gray-500"}`}
+            >
+              Сотрудники не найдены
+            </p>
+            <p
+              className={`text-sm ${isDark ? "text-white/25" : "text-gray-400"}`}
+            >
+              {search || specFilter || statusFilter
+                ? "Попробуйте изменить параметры поиска"
+                : "Создайте первого сотрудника"}
+            </p>
+            {!search && !specFilter && !statusFilter && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                onClick={() => setIsCreateOpen(true)}
+                className={`mt-5 px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg ${
+                  isDark
+                    ? "bg-gradient-to-r from-indigo-500 to-purple-600"
+                    : "bg-gradient-to-r from-blue-500 to-purple-600"
+                }`}
               >
-                <div className="w-16 h-16 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-8 h-8 text-gray-400" />
-                </div>
-                <p className="text-gray-500 font-medium">
-                  Сотрудники не найдены
-                </p>
-                <p className="text-gray-400 text-sm mt-1">
-                  {searchTerm || specializationFilter || statusFilter
-                    ? "Попробуйте изменить параметры поиска"
-                    : "Создайте первого сотрудника"}
-                </p>
-                <button
-                  onClick={() => setIsCreateModalOpen(true)}
-                  className="mt-4 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:opacity-90 transition-opacity"
-                >
-                  Создать сотрудника
-                </button>
-              </motion.div>
+                + Создать сотрудника
+              </motion.button>
             )}
-          </AnimatePresence>
-        </div>
-
-        {/* Информация внизу */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 text-sm text-gray-500">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-              <span>Активные</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-rose-500"></div>
-              <span>Неактивные</span>
-            </div>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <AnimatePresence mode="popLayout">
+              {filtered.map((m) => (
+                <MasterCard
+                  key={m.id}
+                  master={m}
+                  status={statuses[m.id!]}
+                  isDark={isDark}
+                  onEdit={() => {
+                    setEditMaster(m);
+                    setIsEditOpen(true);
+                  }}
+                  onDelete={() => handleDelete(m.id!)}
+                  onToggle={() => handleToggle(m)}
+                  onVacation={() => {
+                    setVacMaster(m);
+                    setIsVacOpen(true);
+                  }}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
 
-          <div className="flex items-center gap-4">
+        {/* ── FOOTER ── */}
+        {!loading && filtered.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className={`flex flex-wrap items-center justify-between gap-3 pt-5 border-t text-xs ${
+              isDark
+                ? "border-white/[0.06] text-white/20"
+                : "border-gray-100 text-gray-400"
+            }`}
+          >
+            <div className="flex flex-wrap gap-4">
+              {[
+                { c: "bg-emerald-400", l: "Активные" },
+                { c: "bg-amber-400", l: "В отпуске" },
+                { c: "bg-rose-400", l: "Неактивные" },
+              ].map((x) => (
+                <div key={x.l} className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${x.c}`} />
+                  {x.l}
+                </div>
+              ))}
+            </div>
             <span>Загружено: {masters.length} сотрудников</span>
-            <span className="text-blue-600 font-medium">
-              {stats.activeMasters} сейчас работают
-            </span>
-          </div>
-        </div>
-
-        {/* === Модальные окна === */}
-        <AnimatePresence>
-          {isCreateModalOpen && (
-            <EmployeesCard
-              isOpen={isCreateModalOpen}
-              onClose={() => setIsCreateModalOpen(false)}
-              onSubmit={handleCreateMaster}
-            />
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {isEditModalOpen && editingMaster && (
-            <EmployeesCard
-              isOpen={isEditModalOpen}
-              onClose={() => {
-                setIsEditModalOpen(false);
-                setEditingMaster(null);
-              }}
-              onSubmit={handleUpdateMaster}
-              master={editingMaster}
-              isEditMode={true}
-            />
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {isVacationModalOpen && (
-            <MasterVacationModal
-              isOpen={isVacationModalOpen}
-              onClose={() => {
-                setIsVacationModalOpen(false);
-                setVacationMaster(null);
-              }}
-              onSubmit={handleAddVacation}
-              master={vacationMaster}
-            />
-          )}
-        </AnimatePresence>
+          </motion.div>
+        )}
       </div>
+
+      {/* ── MODALS ── */}
+      <AnimatePresence>
+        {isCreateOpen && (
+          <EmployeesCard
+            isOpen={isCreateOpen}
+            onClose={() => setIsCreateOpen(false)}
+            onSubmit={handleCreate}
+          />
+        )}
+        {isEditOpen && editMaster && (
+          <EmployeesCard
+            isOpen={isEditOpen}
+            onClose={() => {
+              setIsEditOpen(false);
+              setEditMaster(null);
+            }}
+            onSubmit={handleUpdate}
+            master={editMaster}
+            isEditMode
+          />
+        )}
+        {isVacOpen && (
+          <VacationModal
+            isOpen={isVacOpen}
+            onClose={() => {
+              setIsVacOpen(false);
+              setVacMaster(null);
+            }}
+            onSubmit={handleVacation}
+            master={vacMaster}
+            isDark={isDark}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

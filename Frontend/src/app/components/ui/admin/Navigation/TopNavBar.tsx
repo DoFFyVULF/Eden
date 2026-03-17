@@ -4,23 +4,9 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  CalendarDays,
-  Users,
-  Calendar,
-  FolderTree,
-  Settings,
-  Clock,
-  UserCog,
-  BarChart3,
-  DollarSign,
-  LogOut,
-  ChevronDown,
-  Menu,
-  X,
-  Shield,
-  HomeIcon,
-  Scissors,
-  Sparkles,
+  CalendarDays, Users, Calendar, FolderTree, Settings, Clock,
+  UserCog, BarChart3, DollarSign, LogOut, ChevronDown, Menu, X,
+  HomeIcon, Scissors, Sparkles, Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { adminService } from "@/services/admin/admin.service";
@@ -32,12 +18,8 @@ import { authService } from "@/services/auth/auth.service";
 import Cookies from "js-cookie";
 
 type MenuItem = {
-  id: number;
-  label: string;
-  href: string;
-  icon: React.ReactNode;
-  description: string;
-  count?: string | number;
+  id: number; label: string; href: string;
+  icon: React.ReactNode; description: string; count?: string | number;
 };
 
 export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
@@ -46,143 +28,53 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
+  const [isDark, setIsDark] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
-  // Загрузка данных
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [countsData, userData] = await Promise.all([
-          adminService.getCounts(),
-          userService.getMe().then((res) => res.data),
-        ]);
-        setCounts(countsData);
-        setUser(userData);
-      } catch (error) {
-        console.error("Ошибка загрузки данных:", error);
-      }
-    };
-    loadData();
+    const check = () => setIsDark(document.documentElement.classList.contains("dark"));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
   }, []);
 
-  // Иконки
-  const iconComponents = useMemo(
-    () => ({
-      appointments: <CalendarDays size={18} />,
-      masters: <Users size={18} />,
-      schedule: <Calendar size={18} />,
-      category: <FolderTree size={18} />,
-      services: <Settings size={18} />,
-      history: <Clock size={18} />,
-      users: <UserCog size={18} />,
-      analytics: <BarChart3 size={18} />,
-      prices: <DollarSign size={18} />,
-    }),
-    [],
-  );
+  useEffect(() => {
+    (async () => {
+      try {
+        const [c, u] = await Promise.all([adminService.getCounts(), userService.getMe().then(r => r.data)]);
+        setCounts(c); setUser(u);
+      } catch {}
+    })();
+  }, []);
 
-  // Меню
+  const icons = useMemo(() => ({
+    appointments: <CalendarDays size={16} />, masters: <Users size={16} />, schedule: <Calendar size={16} />,
+    category: <FolderTree size={16} />, services: <Settings size={16} />, history: <Clock size={16} />,
+    users: <UserCog size={16} />, analytics: <BarChart3 size={16} />, prices: <DollarSign size={16} />,
+  }), []);
+
   const menuItems = useMemo((): MenuItem[] => {
-    const baseItems: MenuItem[] = [
-      {
-        id: 1,
-        label: "Записи",
-        count: counts?.appointments ?? "-",
-        href: ADMIN_ROUTES.APPOINTMENTS.LIST,
-        icon: iconComponents.appointments,
-        description: "Управление записями",
-      },
-      {
-        id: 2,
-        label: "Сотрудники",
-        count: counts?.masters ?? "-",
-        href: ADMIN_ROUTES.MASTERS.LIST,
-        icon: iconComponents.masters,
-        description: "Управление персоналом",
-      },
-      {
-        id: 3,
-        label: "Расписание",
-        count: counts?.schedule ?? "-",
-        href: ADMIN_ROUTES.SCHEDULE.OVERVIEW,
-        icon: iconComponents.schedule,
-        description: "График работы",
-      },
-      {
-        id: 4,
-        label: "Категории",
-        count: counts?.category ?? "-",
-        href: ADMIN_ROUTES.CATEGORY.LIST,
-        icon: iconComponents.category,
-        description: "Категории услуг",
-      },
-      {
-        id: 5,
-        label: "Услуги",
-        count: counts?.services ?? "-",
-        href: ADMIN_ROUTES.SERVICES.LIST,
-        icon: iconComponents.services,
-        description: "Список услуг",
-      },
-      {
-        id: 6,
-        label: "Цены",
-        count: counts?.services ?? "-",
-        href: ADMIN_ROUTES.PRICES.MASTER,
-        icon: iconComponents.prices,
-        description: "Прайс-лист",
-      },
-      {
-        id: 7,
-        label: "История",
-        count: counts?.history ?? "-",
-        href: ADMIN_ROUTES.APPOINTMENTS.HISTORY,
-        icon: iconComponents.history,
-        description: "Архив записей",
-      },
-      {
-        id: 8,
-        label: "Пользователи",
-        count: counts?.users ?? "-",
-        href: ADMIN_ROUTES.USERS,
-        icon: iconComponents.users,
-        description: "Управление аккаунтами",
-      },
-      {
-        id: 9,
-        label: "Аналитика",
-        href: ADMIN_ROUTES.ANALYTICS.DASHBOARD,
-        icon: iconComponents.analytics,
-        description: "Отчёты и статистика",
-      },
+    const base: MenuItem[] = [
+      { id: 1, label: "Записи",       count: counts?.appointments ?? "-", href: ADMIN_ROUTES.APPOINTMENTS.LIST,    icon: icons.appointments, description: "Управление записями"   },
+      { id: 2, label: "Сотрудники",   count: counts?.masters ?? "-",      href: ADMIN_ROUTES.MASTERS.LIST,         icon: icons.masters,      description: "Управление персоналом" },
+      { id: 3, label: "Расписание",   count: counts?.schedule ?? "-",     href: ADMIN_ROUTES.SCHEDULE.OVERVIEW,    icon: icons.schedule,     description: "График работы"          },
+      { id: 4, label: "Категории",    count: counts?.category ?? "-",     href: ADMIN_ROUTES.CATEGORY.LIST,        icon: icons.category,     description: "Категории услуг"         },
+      { id: 5, label: "Услуги",       count: counts?.services ?? "-",     href: ADMIN_ROUTES.SERVICES.LIST,        icon: icons.services,     description: "Список услуг"            },
+      { id: 6, label: "Цены",         count: counts?.services ?? "-",     href: ADMIN_ROUTES.PRICES.MASTER,        icon: icons.prices,       description: "Прайс-лист"             },
+      { id: 7, label: "История",      count: counts?.history ?? "-",      href: ADMIN_ROUTES.APPOINTMENTS.HISTORY, icon: icons.history,      description: "Архив записей"           },
+      { id: 8, label: "Пользователи", count: counts?.users ?? "-",        href: ADMIN_ROUTES.USERS,                icon: icons.users,        description: "Управление аккаунтами"   },
+      { id: 9, label: "Аналитика",                                        href: ADMIN_ROUTES.ANALYTICS.DASHBOARD,  icon: icons.analytics,    description: "Отчёты и статистика"     },
     ];
-    const masterItems: MenuItem[] = [
-      {
-        id: 1,
-        label: "Записи",
-        count: counts?.appointments ?? "-",
-        href: MASTER_ROUTES.APPOINTMENTS,
-        icon: iconComponents.appointments,
-        description: "Мои записи",
-      },
-      {
-        id: 2,
-        label: "Расписание",
-        count: counts?.schedule ?? "-",
-        href: MASTER_ROUTES.SCHEDULE,
-        icon: iconComponents.schedule,
-        description: "Мой график",
-      },
+    const master: MenuItem[] = [
+      { id: 1, label: "Записи",     count: counts?.appointments ?? "-", href: MASTER_ROUTES.APPOINTMENTS, icon: icons.appointments, description: "Мои записи"  },
+      { id: 2, label: "Расписание", count: counts?.schedule ?? "-",     href: MASTER_ROUTES.SCHEDULE,     icon: icons.schedule,     description: "Мой график"  },
     ];
-    return isAdmin ? baseItems : masterItems;
-  }, [isAdmin, counts, iconComponents]);
+    return isAdmin ? base : master;
+  }, [isAdmin, counts, icons]);
 
-  const isActive = useCallback(
-    (href: string) => pathname === href,
-    [pathname, menuItems],
-  );
+  const isActive = useCallback((href: string) => pathname === href, [pathname]);
 
   const handleLogout = async () => {
     await authService.logout();
@@ -191,166 +83,150 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
     router.push("/auth");
   };
 
-  // Закрытие меню при клике вне
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (
-        !target.closest(".profile-dropdown") &&
-        !target.closest(".profile-trigger")
-      ) {
-        setIsProfileOpen(false);
-      }
-      if (
-        !target.closest(".mobile-menu") &&
-        !target.closest(".mobile-trigger")
-      ) {
-        setIsMobileMenuOpen(false);
-      }
+    const h = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (!t.closest(".pd") && !t.closest(".pt")) setIsProfileOpen(false);
+      if (!t.closest(".md") && !t.closest(".mt")) setIsMobileMenuOpen(false);
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  if (!user) {
-    return (
-      <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl animate-pulse" />
-            <div className="h-5 w-32 bg-gray-200 rounded-lg animate-pulse" />
-          </div>
-          <div className="flex items-center gap-2">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-9 w-24 bg-gray-200 rounded-xl animate-pulse"
-              />
-            ))}
-          </div>
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border-white/[0.12] shadow-[0_1px_0_rgba(255,255,255,0.08),0_8px_32px_rgba(0,0,0,0.3)]"
+    : "bg-white/90 backdrop-blur-xl border-gray-200/60 shadow-sm";
+
+  const dropGlass = isDark
+    ? "bg-white/[0.08] backdrop-blur-3xl border border-white/[0.12] shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
+    : "bg-white border border-gray-200/70 shadow-xl";
+
+  const CountPill = ({ count }: { count?: string | number }) =>
+    count && count !== "-" ? (
+      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none tabular-nums ${
+        isDark ? "bg-purple-400/20 text-purple-300" : "bg-blue-100 text-blue-600"
+      }`}>{count}</span>
+    ) : null;
+
+  if (!user) return (
+    <header className={`fixed top-0 left-0 right-0 z-50 h-16 border-b ${glassCls}`}>
+      <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
+        <div className={`w-32 h-5 rounded-lg animate-pulse ${isDark ? "bg-white/10" : "bg-gray-200"}`} />
+        <div className="flex gap-2">
+          {[1,2,3,4].map(i => <div key={i} className={`h-8 w-20 rounded-xl animate-pulse ${isDark ? "bg-white/10" : "bg-gray-200"}`} />)}
         </div>
-      </header>
-    );
-  }
+        <div className={`w-9 h-9 rounded-full animate-pulse ${isDark ? "bg-white/10" : "bg-gray-200"}`} />
+      </div>
+    </header>
+  );
 
   return (
     <>
-      {/* === DESKTOP TOP BAR === */}
-      <header className="hidden lg:flex fixed top-0 left-0 right-0 z-50 h-16 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between w-full">
-          {/* Логотип */}
-          <Link
-            href={ADMIN_ROUTES.DASHBOARD}
-            className="flex items-center gap-3 group"
-          >
+      {/* ── DESKTOP ─────────────────────────────────────────── */}
+      <header className={`hidden lg:flex fixed top-0 left-0 right-0 z-50 h-16 border-b transition-all duration-300 ${glassCls}`}>
+        <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between w-full gap-6">
+
+          {/* Logo */}
+          <Link href={ADMIN_ROUTES.DASHBOARD} className="flex items-center gap-3 shrink-0 group">
             <motion.div
-              whileHover={{ rotate: 10, scale: 1.05 }}
-              className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center shadow-lg shadow-blue-500/20"
+              whileHover={{ scale: 1.08, rotate: 8 }}
+              transition={{ type: "spring", stiffness: 400, damping: 12 }}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-lg ${
+                isDark
+                  ? "bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 shadow-purple-500/30"
+                  : "bg-gradient-to-br from-blue-500 to-purple-600 shadow-blue-500/20"
+              }`}
             >
-              <HomeIcon className="w-5 h-5 text-white" />
+              <Zap className="w-5 h-5 text-white fill-white" />
             </motion.div>
-            <div>
-              <h1 className="text-lg tracking-[2.5] font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                ЭДЭН
-              </h1>
-            </div>
+            <span className={`text-lg font-black tracking-[3px] uppercase ${
+              isDark
+                ? "bg-gradient-to-r from-white via-purple-200 to-indigo-300 bg-clip-text text-transparent"
+                : "bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent"
+            }`}>ЭДЭН</span>
           </Link>
 
-          {/* Навигация */}
-          <nav className="flex items-center gap-1">
-            {menuItems.slice(0, 6).map((item) => {
+          {/* Nav links */}
+          <nav className="flex items-center gap-0.5 flex-1 justify-center">
+            {menuItems.slice(0, 6).map(item => {
               const active = isActive(item.href);
               return (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  className={`relative px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 group
-                    ${
-                      active
-                        ? "text-blue-600 bg-blue-50"
-                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100/50"
-                    }`}
+                <Link key={item.id} href={item.href}
+                  className={`relative px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                    active
+                      ? isDark
+                        ? "text-white bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]"
+                        : "text-blue-700 bg-blue-50/80"
+                      : isDark
+                        ? "text-white/50 hover:text-white/80 hover:bg-white/[0.06]"
+                        : "text-gray-500 hover:text-gray-800 hover:bg-gray-100/70"
+                  }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`transition-colors ${active ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600"}`}
-                    >
-                      {item.icon}
-                    </span>
-                    {item.label}
-                  </div>
+                  <span className={active ? (isDark ? "text-purple-300" : "text-blue-500") : ""}>{item.icon}</span>
+                  {item.label}
+                  <CountPill count={item.count} />
                   {active && (
                     <motion.div
-                      layoutId="activeTab"
-                      className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
+                      layoutId="navIndicator"
+                      className={`absolute bottom-1.5 left-1/2 -translate-x-1/2 h-0.5 w-6 rounded-full ${
+                        isDark ? "bg-gradient-to-r from-indigo-400 to-purple-400" : "bg-blue-500"
+                      }`}
                     />
                   )}
                 </Link>
               );
             })}
 
-            {/* Dropdown "Ещё" */}
-            {user.role == "admin" && (
-              <div
-                className="relative"
+            {/* More */}
+            {user.role === "admin" && (
+              <div className="relative"
                 onMouseEnter={() => setIsMenuOpen(true)}
                 onMouseLeave={() => setIsMenuOpen(false)}
               >
-                <button
-                  className={`px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 transition-all
-                ${isMenuOpen ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:text-gray-900 hover:bg-gray-100/50"}`}
-                >
-                  Ещё{" "}
-                  <ChevronDown
-                    size={14}
-                    className={`transition-transform ${isMenuOpen ? "rotate-180" : ""}`}
-                  />
+                <button className={`px-3.5 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 transition-all duration-200 ${
+                  isMenuOpen
+                    ? isDark ? "text-white bg-white/10" : "text-blue-700 bg-blue-50/80"
+                    : isDark ? "text-white/50 hover:text-white/80 hover:bg-white/[0.06]" : "text-gray-500 hover:text-gray-800 hover:bg-gray-100/70"
+                }`}>
+                  Ещё
+                  <motion.span animate={{ rotate: isMenuOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                    <ChevronDown size={13} />
+                  </motion.span>
                 </button>
 
                 <AnimatePresence>
                   {isMenuOpen && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute top-full right-0 mt-2 w-72 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/50 overflow-hidden z-50"
+                      exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                      transition={{ duration: 0.15, ease: "easeOut" }}
+                      className={`absolute top-full left-0 mt-2 w-72 rounded-2xl overflow-hidden z-50 ${dropGlass}`}
                     >
                       <div className="p-2">
-                        {menuItems.slice(6).map((item) => {
+                        {menuItems.slice(6).map(item => {
                           const active = isActive(item.href);
                           return (
-                            <Link
-                              key={item.id}
-                              href={item.href}
-                              className={`flex items-center gap-3 p-3 rounded-xl transition-all
-                              ${
+                            <Link key={item.id} href={item.href}
+                              className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-150 ${
                                 active
-                                  ? "bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50"
-                                  : "hover:bg-gray-50"
+                                  ? isDark ? "bg-white/10" : "bg-blue-50"
+                                  : isDark ? "hover:bg-white/[0.07]" : "hover:bg-gray-50"
                               }`}
                             >
-                              <div
-                                className={`w-9 h-9 rounded-xl flex items-center justify-center
-                              ${active ? "bg-gradient-to-br from-blue-500 to-purple-500 text-white" : "bg-gray-100 text-gray-600"}`}
-                              >
-                                {item.icon}
-                              </div>
+                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                                active
+                                  ? isDark ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white" : "bg-blue-500 text-white"
+                                  : isDark ? "bg-white/10 text-white/60" : "bg-gray-100 text-gray-500"
+                              }`}>{item.icon}</div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between">
-                                  <span
-                                    className={`font-medium text-sm ${active ? "text-gray-900" : "text-gray-700"}`}
-                                  >
-                                    {item.label}
-                                  </span>
-                                  {item.count && item.count !== "-" && (
-                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                                      {item.count}
-                                    </span>
-                                  )}
+                                  <span className={`font-semibold text-sm ${
+                                    active ? (isDark ? "text-white" : "text-blue-700") : (isDark ? "text-white/80" : "text-gray-700")
+                                  }`}>{item.label}</span>
+                                  <CountPill count={item.count} />
                                 </div>
-                                <p className="text-xs text-gray-500 truncate">
-                                  {item.description}
-                                </p>
+                                <p className={`text-xs mt-0.5 ${isDark ? "text-white/40" : "text-gray-400"}`}>{item.description}</p>
                               </div>
                             </Link>
                           );
@@ -363,60 +239,76 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
             )}
           </nav>
 
-          {/* Профиль */}
-          <div className="relative profile-dropdown">
+          {/* Profile */}
+          <div className="relative pd shrink-0">
             <button
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className="profile-trigger flex items-center gap-3 p-1.5 pr-3 rounded-xl hover:bg-gray-100/50 transition-all"
+              className={`pt flex items-center gap-2.5 px-2 py-1.5 rounded-xl transition-all duration-200 ${
+                isDark ? "hover:bg-white/[0.07]" : "hover:bg-gray-100/70"
+              }`}
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-lg shadow-blue-500/30">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-md ${
+                isDark
+                  ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-purple-500/30"
+                  : "bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-blue-500/20"
+              }`}>
                 {(user.name || "?").charAt(0).toUpperCase()}
               </div>
-              <div className="text-left hidden xl:block">
-                <p className="text-sm font-medium text-gray-900">
-                  {user.name ? user.name.split(" ")[0] : "Пользователь"}
+              <div className="hidden xl:block text-left">
+                <p className={`text-sm font-semibold leading-tight ${isDark ? "text-white/90" : "text-gray-800"}`}>
+                  {user.name?.split(" ")[0] || "Пользователь"}
                 </p>
-                <p className="text-xs text-gray-500">
-                  {user.role === "admin" ? "Админ" : "Мастер"}
+                <p className={`text-xs leading-tight ${isDark ? "text-white/40" : "text-gray-400"}`}>
+                  {user.role === "admin" ? "Администратор" : "Мастер"}
                 </p>
               </div>
-              <ChevronDown
-                size={14}
-                className={`text-gray-400 transition-transform ${isProfileOpen ? "rotate-180" : ""}`}
-              />
+              <motion.span animate={{ rotate: isProfileOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                <ChevronDown size={13} className={isDark ? "text-white/30" : "text-gray-400"} />
+              </motion.span>
             </button>
 
             <AnimatePresence>
               {isProfileOpen && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute top-full right-0 mt-2 w-64 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/50 overflow-hidden z-50"
+                  exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                  transition={{ duration: 0.15 }}
+                  className={`absolute top-full right-0 mt-2 w-64 rounded-2xl overflow-hidden z-50 ${dropGlass}`}
                 >
-                  <div className="p-4 border-b border-gray-100">
-                    <p className="font-semibold text-gray-900">{user.name}</p>
-                    <p className="text-sm text-gray-500">
-                      {user.role === "admin"
-                        ? "Администратор системы"
-                        : "Мастер"}
-                    </p>
+                  {/* Header */}
+                  <div className={`px-4 py-4 border-b ${isDark ? "border-white/10" : "border-gray-100"}`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-base font-bold ${
+                        isDark
+                          ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white"
+                          : "bg-gradient-to-br from-blue-500 to-purple-600 text-white"
+                      }`}>
+                        {(user.name || "?").charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className={`font-bold text-sm ${isDark ? "text-white/90" : "text-gray-900"}`}>{user.name}</p>
+                        <p className={`text-xs mt-0.5 ${isDark ? "text-white/40" : "text-gray-400"}`}>
+                          {user.role === "admin" ? "Администратор" : "Мастер"}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                   <div className="p-2">
-                    <Link
-                      href="/profile"
-                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors"
+                    <Link href="/profile"
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+                        isDark ? "hover:bg-white/[0.07] text-white/70" : "hover:bg-gray-50 text-gray-600"
+                      }`}
                     >
-                      <UserCog size={18} className="text-gray-500" />
-                      <span className="text-sm text-gray-700">
-                        Настройки профиля
-                      </span>
+                      <UserCog size={16} />
+                      <span className="text-sm font-medium">Настройки профиля</span>
                     </Link>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 transition-colors text-red-600"
+                    <button onClick={handleLogout}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-left ${
+                        isDark ? "hover:bg-red-500/10 text-red-400" : "hover:bg-red-50 text-red-500"
+                      }`}
                     >
-                      <LogOut size={18} />
+                      <LogOut size={16} />
                       <span className="text-sm font-medium">Выйти</span>
                     </button>
                   </div>
@@ -427,142 +319,135 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
         </div>
       </header>
 
-      {/* === MOBILE HEADER === */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 h-16 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-sm">
+      {/* ── MOBILE HEADER ───────────────────────────────────── */}
+      <header className={`lg:hidden fixed top-0 left-0 right-0 z-50 h-16 border-b transition-all duration-300 ${glassCls}`}>
         <div className="px-4 h-full flex items-center justify-between">
-          {/* Кнопка меню */}
-          <button
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="mobile-trigger p-2 -ml-2 rounded-xl hover:bg-gray-100/50 transition-colors"
+          <button onClick={() => setIsMobileMenuOpen(true)}
+            className={`mt p-2 -ml-1 rounded-xl transition-colors ${
+              isDark ? "text-white/60 hover:bg-white/[0.07]" : "text-gray-600 hover:bg-gray-100"
+            }`}
           >
-            <Menu size={22} className="text-gray-700" />
+            <Menu size={20} />
           </button>
 
-          {/* Логотип */}
-          <Link
-            href={ADMIN_ROUTES.DASHBOARD}
-            className="flex items-center gap-2"
-          >
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
-              <Scissors className="w-4 h-4 text-white" />
+          <Link href={ADMIN_ROUTES.DASHBOARD} className="flex items-center gap-2.5">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+              isDark ? "bg-gradient-to-br from-indigo-500 to-purple-600" : "bg-gradient-to-br from-blue-500 to-purple-600"
+            }`}>
+              <Zap className="w-4 h-4 text-white fill-white" />
             </div>
-            <span className="font-bold tracking-[2.5] bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              ЭДЭН
-            </span>
+            <span className={`font-black tracking-[3px] text-sm uppercase ${
+              isDark
+                ? "bg-gradient-to-r from-white to-purple-300 bg-clip-text text-transparent"
+                : "text-gray-900"
+            }`}>ЭДЭН</span>
           </Link>
 
-          {/* Аватар */}
-          <button className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-lg">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+            isDark ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white" : "bg-gradient-to-br from-blue-500 to-purple-600 text-white"
+          }`}>
             {(user.name || "?").charAt(0).toUpperCase()}
-          </button>
+          </div>
         </div>
       </header>
 
-      {/* === MOBILE DRAWER === */}
+      {/* ── MOBILE DRAWER ───────────────────────────────────── */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <>
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="lg:hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
+              className="lg:hidden fixed inset-0 z-50"
+              style={{ background: isDark ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.3)", backdropFilter: "blur(4px)" }}
             />
             <motion.div
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="lg:hidden fixed top-0 left-0 bottom-0 w-80 max-w-full bg-white/95 backdrop-blur-xl z-50 mobile-menu overflow-y-auto"
+              initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className={`md lg:hidden fixed top-0 left-0 bottom-0 w-80 z-50 overflow-y-auto ${
+                isDark
+                  ? "bg-slate-900/95 backdrop-blur-2xl border-r border-white/10"
+                  : "bg-white border-r border-gray-200/70"
+              }`}
             >
-              {/* Header drawer */}
-              <div className="p-5 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white">
-                <div className="flex items-center justify-between mb-4">
+              {/* Drawer top */}
+              <div className={`relative px-5 pt-6 pb-5 ${
+                isDark
+                  ? "bg-gradient-to-br from-indigo-900/60 via-purple-900/60 to-slate-900/60 border-b border-white/10"
+                  : "bg-gradient-to-br from-blue-50 to-purple-50/50 border-b border-gray-100"
+              }`}>
+                <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                      <Sparkles className="w-5 h-5" />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      isDark ? "bg-gradient-to-br from-indigo-500 to-purple-600" : "bg-gradient-to-br from-blue-500 to-purple-600"
+                    }`}>
+                      <Zap className="w-5 h-5 text-white fill-white" />
                     </div>
                     <div>
-                      <h2 className="font-bold text-lg">Меню</h2>
-                      <p className="text-blue-100/80 text-sm">
-                        {isAdmin ? "Администратор" : "Мастер"}
-                      </p>
+                      <h2 className={`font-black tracking-widest text-sm uppercase ${isDark ? "text-white" : "text-gray-900"}`}>ЭДЭН</h2>
+                      <p className={`text-xs ${isDark ? "text-white/40" : "text-gray-400"}`}>{isAdmin ? "Администратор" : "Мастер"}</p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                  >
-                    <X size={20} />
+                  <button onClick={() => setIsMobileMenuOpen(false)}
+                    className={`p-1.5 rounded-lg transition-colors ${isDark ? "text-white/50 hover:bg-white/10" : "text-gray-500 hover:bg-gray-100"}`}>
+                    <X size={18} />
                   </button>
                 </div>
 
-                {/* Профиль в мобильном меню */}
-                <div className="flex items-center gap-3 p-3 bg-white/10 rounded-xl">
-                  <div className="w-10 h-10 rounded-full bg-white/30 flex items-center justify-center text-white font-semibold">
-                    {(user.name || '?').charAt(0).toUpperCase()}
+                <div className={`flex items-center gap-3 p-3 rounded-2xl ${
+                  isDark ? "bg-white/[0.07] border border-white/[0.1]" : "bg-white/80 border border-gray-200/60 shadow-sm"
+                }`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0 ${
+                    isDark ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white" : "bg-gradient-to-br from-blue-500 to-purple-600 text-white"
+                  }`}>
+                    {(user.name || "?").charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <p className="font-medium">{user.name || 'Пользователь'}</p>
-                    <p className="text-sm text-blue-100/80">
-                      {user.role === "admin" ? "Админ" : "Мастер"}
-                    </p>
+                    <p className={`font-semibold text-sm ${isDark ? "text-white/90" : "text-gray-800"}`}>{user.name || "Пользователь"}</p>
+                    <p className={`text-xs ${isDark ? "text-white/40" : "text-gray-400"}`}>{user.role === "admin" ? "Администратор" : "Мастер"}</p>
                   </div>
                 </div>
               </div>
 
-              {/* Навигация */}
-              <nav className="p-4 space-y-1">
-                {menuItems.map((item) => {
+              <nav className="p-3 space-y-0.5">
+                {menuItems.map(item => {
                   const active = isActive(item.href);
                   return (
-                    <Link
-                      key={item.id}
-                      href={item.href}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={`flex items-center gap-3 p-3.5 rounded-xl transition-all
-                        ${
-                          active
-                            ? "bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50"
-                            : "hover:bg-gray-50"
-                        }`}
+                    <Link key={item.id} href={item.href} onClick={() => setIsMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-150 ${
+                        active
+                          ? isDark
+                            ? "bg-white/[0.1] border border-white/[0.1] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
+                            : "bg-blue-50 border border-blue-100"
+                          : isDark ? "hover:bg-white/[0.06]" : "hover:bg-gray-50"
+                      }`}
                     >
-                      <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center
-                        ${active ? "bg-gradient-to-br from-blue-500 to-purple-500 text-white" : "bg-gray-100 text-gray-600"}`}
-                      >
-                        {item.icon}
-                      </div>
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                        active
+                          ? isDark ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white" : "bg-blue-500 text-white"
+                          : isDark ? "bg-white/[0.08] text-white/50" : "bg-gray-100 text-gray-500"
+                      }`}>{item.icon}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <span
-                            className={`font-medium text-sm ${active ? "text-gray-900" : "text-gray-700"}`}
-                          >
-                            {item.label}
-                          </span>
-                          {item.count && item.count !== "-" && (
-                            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                              {item.count}
-                            </span>
-                          )}
+                          <span className={`font-semibold text-sm ${
+                            active ? (isDark ? "text-white" : "text-blue-700") : (isDark ? "text-white/75" : "text-gray-700")
+                          }`}>{item.label}</span>
+                          <CountPill count={item.count} />
                         </div>
-                        <p className="text-xs text-gray-500 truncate">
-                          {item.description}
-                        </p>
+                        <p className={`text-xs truncate mt-0.5 ${isDark ? "text-white/35" : "text-gray-400"}`}>{item.description}</p>
                       </div>
                     </Link>
                   );
                 })}
               </nav>
 
-              {/* Кнопка выхода */}
-              <div className="p-4 mt-2 border-t border-gray-100">
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-red-50 text-red-600 font-medium hover:bg-red-100 transition-colors"
+              <div className={`p-3 border-t mt-2 ${isDark ? "border-white/10" : "border-gray-100"}`}>
+                <button onClick={handleLogout}
+                  className={`w-full flex items-center justify-center gap-2 p-3 rounded-xl text-sm font-semibold transition-colors ${
+                    isDark ? "bg-red-500/10 text-red-400 hover:bg-red-500/15" : "bg-red-50 text-red-500 hover:bg-red-100"
+                  }`}
                 >
-                  <LogOut size={18} />
+                  <LogOut size={16} />
                   Выйти из аккаунта
                 </button>
               </div>
@@ -571,8 +456,7 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
         )}
       </AnimatePresence>
 
-      {/* Отступ для фиксированного хедера */}
-      <div className="h-16 lg:h-16" />
+      <div className="h-16" />
     </>
   );
 }

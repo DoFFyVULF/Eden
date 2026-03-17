@@ -1,22 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence, Variants } from "framer-motion";
-import { 
-  X, 
-  Calendar, 
-  Clock, 
-  User, 
-  Phone, 
-  Scissors, 
-  Users, 
-  CheckCircle,
-  Loader2,
-  ChevronDown,
-  Sparkles,
-  Shield,
-  BadgeCheck,
-  Zap
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  X, Calendar, Clock, User, Phone, Scissors, Users,
+  CheckCircle, Loader2, ChevronDown, BadgeCheck, Shield, Zap, Sparkles,
 } from "lucide-react";
 import { masterService } from "@/services/master/master.service";
 import { serviceService } from "@/services/service/service.service";
@@ -24,638 +12,344 @@ import { servicePriceService } from "@/services/service-price/service-price.serv
 import { appointmentService } from "@/services/appointment/appointment.service";
 import { masterScheduleService } from "@/services/schedule/schedule.service";
 import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber";
-
 import { IMaster } from "@/types/masters.type";
 import { IService } from "@/types/services.types";
 import { IServicePrice } from "@/types/service-price.types";
 import { ICreateAppointmentDto, AppointmentStatus, IUpdateAppointmentDto } from "@/types/appointment.types";
 import type { IMasterSchedule } from "@/types/schedule.types";
 
-interface NewAppointmentsWindowProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess?: () => void;
+interface Props {
+  isOpen: boolean; onClose: () => void; onSuccess?: () => void;
   mode?: "create" | "edit";
-  initialData?: {
-    id: number;
-    clientSurname: string;
-    clientName: string;
-    clientPhone: string;
-    masterId: number;
-    serviceId: number;
-    appointmentTime: string;
-  };
+  initialData?: { id: number; clientSurname: string; clientName: string; clientPhone: string; masterId: number; serviceId: number; appointmentTime: string; };
 }
 
-const getWeekdayIndex = (dateStr: string): number => {
-  const date = new Date(dateStr);
-  return (date.getDay() + 6) % 7;
-};
+const getWeekdayIndex = (ds: string) => (new Date(ds).getDay() + 6) % 7;
+const fmtPrice = (p: number) => new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", minimumFractionDigits: 0 }).format(p);
 
-const slideIn: Variants = {
-  hidden: { opacity: 0, y: 50, scale: 0.95 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    scale: 1,
-    transition: {
-      type: "spring",
-      damping: 25,
-      stiffness: 300
-    }
-  },
-  exit: { opacity: 0, y: 50, scale: 0.95 }
-};
-
-const overlayAnimation: Variants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1 },
-  exit: { opacity: 0 }
-};
-
-export default function NewAppointmentsWindow({
-  isOpen,
-  onClose,
-  onSuccess,
-  mode = "create",
-  initialData,
-}: NewAppointmentsWindowProps) {
+export default function NewAppointmentsWindow({ isOpen, onClose, onSuccess, mode = "create", initialData }: Props) {
   const [masters, setMasters] = useState<IMaster[]>([]);
-  const [services, setServices] = useState<IService[]>([]);
   const [servicePrices, setServicePrices] = useState<IServicePrice[]>([]);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [loadingTimes, setLoadingTimes] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedServicePrice, setSelectedServicePrice] = useState<IServicePrice | null>(null);
+  const [selectedSP, setSelectedSP] = useState<IServicePrice | null>(null);
+  const [isDark, setIsDark] = useState(false);
+  const [form, setForm] = useState({ clientSurname: "", clientName: "", clientPhone: "", service: "", time: "", master: "", date: "" });
 
-  const [formData, setFormData] = useState({
-    clientSurname: "",
-    clientName: "",
-    clientPhone: "",
-    service: "",
-    time: "",
-    master: "",
-    date: "",
-  });
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains("dark"));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
 
-  // Заполнение формы при редактировании
   useEffect(() => {
     if (mode !== "edit" || !initialData || !isOpen) return;
-
     try {
-      const dateObj = new Date(initialData.appointmentTime);
-      if (isNaN(dateObj.getTime())) {
-        setError("Ошибка: некорректная дата записи");
-        return;
-      }
-
-      const dateStr = dateObj.toISOString().split("T")[0];
-      const timeStr = dateObj.toTimeString().slice(0, 5);
-
-      setFormData({
-        clientSurname: initialData.clientSurname || "",
-        clientName: initialData.clientName || "",
-        clientPhone: formatPhoneNumber(initialData.clientPhone || ""),
-        master: String(initialData.masterId || ""),
-        service: String(initialData.serviceId || ""),
-        date: dateStr,
-        time: timeStr,
-      });
-    } catch (err) {
-      console.error("Ошибка при заполнении формы для редактирования:", err);
-      setError("Не удалось загрузить данные для редактирования");
-    }
+      const d = new Date(initialData.appointmentTime);
+      if (isNaN(d.getTime())) { setError("Некорректная дата"); return; }
+      setForm({ clientSurname: initialData.clientSurname || "", clientName: initialData.clientName || "", clientPhone: formatPhoneNumber(initialData.clientPhone || ""), master: String(initialData.masterId || ""), service: String(initialData.serviceId || ""), date: d.toISOString().split("T")[0], time: d.toTimeString().slice(0, 5) });
+    } catch { setError("Не удалось загрузить данные"); }
   }, [mode, initialData, isOpen]);
 
-  // Загрузка мастеров и услуг
   useEffect(() => {
     if (!isOpen) return;
-
     setError(null);
-    Promise.all([masterService.getAll(), serviceService.getAll()])
-      .then(([mastersData, servicesData]) => {
-        setMasters(mastersData);
-        setServices(servicesData);
-      })
-      .catch((err) => {
-        console.error("Ошибка загрузки базовых данных:", err);
-        setError("Не удалось загрузить мастеров и услуги");
-      });
+    Promise.all([masterService.getAll(), serviceService.getAll()]).then(([m]) => setMasters(m)).catch(() => setError("Не удалось загрузить мастеров"));
   }, [isOpen]);
 
-  // Загрузка цен по мастеру
   useEffect(() => {
-    if (!formData.master) {
-      setServicePrices([]);
-      setSelectedServicePrice(null);
-      return;
-    }
+    if (!form.master) { setServicePrices([]); setSelectedSP(null); return; }
+    servicePriceService.getByMaster(Number(form.master)).then(prices => {
+      setServicePrices(prices);
+      setSelectedSP(prices.find(sp => sp.service?.id === Number(form.service)) || null);
+    }).catch(() => setError("Не удалось загрузить услуги"));
+  }, [form.master, form.service]);
 
-    servicePriceService
-      .getByMaster(Number(formData.master))
-      .then(prices => {
-        setServicePrices(prices);
-        const selected = prices.find(sp => sp.service?.id === Number(formData.service));
-        setSelectedServicePrice(selected || null);
-      })
-      .catch((err) => {
-        console.error("Ошибка загрузки цен:", err);
-        setError("Не удалось загрузить услуги мастера");
-      });
-  }, [formData.master, formData.service]);
-
-  // Загрузка свободного времени
   useEffect(() => {
-    const loadAvailableTimes = async () => {
-      if (!formData.master || !formData.date) {
-        setAvailableTimes([]);
-        return;
-      }
-
+    const load = async () => {
+      if (!form.master || !form.date) { setAvailableTimes([]); return; }
       setLoadingTimes(true);
-      setError(null);
-
       try {
-        const masterId = Number(formData.master);
-        const weekdayIndex = getWeekdayIndex(formData.date);
-
-        const schedules: IMasterSchedule[] = await masterScheduleService.getByMaster(masterId);
-        const schedule = schedules.find((s) => s.dayOfWeek === weekdayIndex);
-
-        if (!schedule) {
-          setAvailableTimes([]);
-          return;
-        }
-
-        const appointments = await appointmentService.getByDate(formData.date, masterId);
-
-        const start = new Date(schedule.startTime);
-        const end = new Date(schedule.endTime);
-        const startMins = start.getHours() * 60 + start.getMinutes();
-        const endMins = end.getHours() * 60 + end.getMinutes();
-
+        const mid = Number(form.master);
+        const schedules: IMasterSchedule[] = await masterScheduleService.getByMaster(mid);
+        const sch = schedules.find(s => s.dayOfWeek === getWeekdayIndex(form.date));
+        if (!sch) { setAvailableTimes([]); return; }
+        const appts = await appointmentService.getByDate(form.date, mid);
+        const s = new Date(sch.startTime), e = new Date(sch.endTime);
+        const sm = s.getHours() * 60 + s.getMinutes(), em = e.getHours() * 60 + e.getMinutes();
         const slots: string[] = [];
-        for (let m = startMins; m + 30 <= endMins; m += 30) {
-          const h = Math.floor(m / 60);
-          const min = m % 60;
-          slots.push(`${h.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`);
-        }
-
-        const booked = appointments
-          .filter((a) => a.status !== AppointmentStatus.Отменен)
-          .map((a) => {
-            const d = new Date(a.appointmentTime);
-            return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-          });
-
-        setAvailableTimes(slots.filter((t) => !booked.includes(t)));
-      } catch (err) {
-        console.error("Ошибка загрузки времени:", err);
-        setError("Не удалось загрузить доступное время");
-        setAvailableTimes([]);
-      } finally {
-        setLoadingTimes(false);
-      }
+        for (let m = sm; m + 30 <= em; m += 30) slots.push(`${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`);
+        const booked = appts.filter(a => a.status !== AppointmentStatus.Отменен).map(a => { const d = new Date(a.appointmentTime); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; });
+        setAvailableTimes(slots.filter(t => !booked.includes(t)));
+      } catch { setError("Не удалось загрузить время"); setAvailableTimes([]); }
+      finally { setLoadingTimes(false); }
     };
+    load();
+  }, [form.master, form.date]);
 
-    loadAvailableTimes();
-  }, [formData.master, formData.date]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-
-    setFormData((prev) => ({
-      ...prev,
-      [name]: name === "clientPhone" ? formatPhoneNumber(value) : value,
-      ...(name === "master" ? { service: "", time: "" } : {}),
-    }));
-
-    if (name === "service") {
-      const selected = servicePrices.find(sp => sp.service?.id === Number(value));
-      setSelectedServicePrice(selected || null);
-    }
+    setForm(p => ({ ...p, [name]: name === "clientPhone" ? formatPhoneNumber(value) : value, ...(name === "master" ? { service: "", time: "" } : {}) }));
+    if (name === "service") setSelectedSP(servicePrices.find(sp => sp.service?.id === Number(value)) || null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-
+    e.preventDefault(); setIsSubmitting(true); setError(null);
     try {
-      if (!formData.clientSurname.trim()) throw new Error("Укажите фамилию");
-      if (!formData.clientName.trim()) throw new Error("Укажите имя");
-      if (formData.clientPhone.replace(/\D/g, "").length < 10)
-        throw new Error("Некорректный телефон");
-      if (!formData.master) throw new Error("Выберите мастера");
-      if (!formData.service) throw new Error("Выберите услугу");
-      if (!formData.date) throw new Error("Укажите дату");
-      if (!formData.time) throw new Error("Укажите время");
-
-      const priceItem = servicePrices.find((sp) => sp.service?.id === Number(formData.service));
+      if (!form.clientSurname.trim()) throw new Error("Укажите фамилию");
+      if (!form.clientName.trim()) throw new Error("Укажите имя");
+      if (form.clientPhone.replace(/\D/g, "").length < 10) throw new Error("Некорректный телефон");
+      if (!form.master) throw new Error("Выберите мастера");
+      if (!form.service) throw new Error("Выберите услугу");
+      if (!form.date) throw new Error("Укажите дату");
+      if (!form.time) throw new Error("Укажите время");
+      const priceItem = servicePrices.find(sp => sp.service?.id === Number(form.service));
       if (!priceItem) throw new Error("Не найдена цена услуги");
-
-      const appointmentTime = `${formData.date}T${formData.time}:00`;
-
+      const appointmentTime = `${form.date}T${form.time}:00`;
       if (mode === "edit" && initialData?.id) {
-        const updateDto: Partial<IUpdateAppointmentDto> = {
-          clientSurname: formData.clientSurname.trim(),
-          clientName: formData.clientName.trim(),
-          clientPhone: formData.clientPhone.replace(/\D/g, ""),
-          masterId: Number(formData.master),
-          serviceId: Number(formData.service),
-          appointmentTime,
-          price: priceItem.price,
-        };
-
-        await appointmentService.update(initialData.id, updateDto);
+        await appointmentService.update(initialData.id, { clientSurname: form.clientSurname.trim(), clientName: form.clientName.trim(), clientPhone: form.clientPhone.replace(/\D/g,""), masterId: Number(form.master), serviceId: Number(form.service), appointmentTime, price: priceItem.price } as Partial<IUpdateAppointmentDto>);
       } else {
-        const createDto: ICreateAppointmentDto = {
-          clientSurname: formData.clientSurname.trim(),
-          clientName: formData.clientName.trim(),
-          clientPhone: formData.clientPhone.replace(/\D/g, ""),
-          masterId: Number(formData.master),
-          serviceId: Number(formData.service),
-          appointmentTime,
-          price: priceItem.price.toString(),
-          status: AppointmentStatus.Подтвержден,
-        };
-
-        await appointmentService.create(createDto);
+        await appointmentService.create({ clientSurname: form.clientSurname.trim(), clientName: form.clientName.trim(), clientPhone: form.clientPhone.replace(/\D/g,""), masterId: Number(form.master), serviceId: Number(form.service), appointmentTime, price: priceItem.price.toString(), status: AppointmentStatus.Подтвержден } as ICreateAppointmentDto);
       }
-
-      onSuccess?.();
-      onClose();
-    } catch (err: any) {
-      setError(err.message || "Ошибка сохранения записи");
-      console.error(err);
-    } finally {
-      setIsSubmitting(false);
-    }
+      onSuccess?.(); onClose();
+    } catch (err: any) { setError(err.message || "Ошибка сохранения"); }
+    finally { setIsSubmitting(false); }
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('ru-RU', {
-      style: 'currency',
-      currency: 'RUB',
-      minimumFractionDigits: 0,
-    }).format(price);
-  };
+  const modalCls = isDark
+    ? "bg-slate-900/85 backdrop-blur-3xl border border-white/[0.12] shadow-[0_32px_80px_rgba(0,0,0,0.7)]"
+    : "bg-white/95 backdrop-blur-xl border border-gray-200/70 shadow-2xl";
 
-  // Функция для получения текста placeholder для времени
-  const getTimePlaceholder = () => {
-    if (loadingTimes) return "Загрузка...";
-    if (!formData.date) return "Выберите дату";
-    if (availableTimes.length === 0) return "Нет свободных слотов";
-    return "Выберите время";
-  };
+  const inputCls = (disabled = false) => `w-full h-11 px-4 rounded-xl text-sm border outline-none transition-all ${
+    disabled
+      ? isDark ? "bg-white/[0.03] border-white/[0.06] text-white/25 cursor-not-allowed" : "bg-gray-100 border-gray-200 text-gray-300 cursor-not-allowed"
+      : isDark
+        ? "bg-white/[0.07] border-white/[0.1] text-white/90 placeholder-white/25 focus:border-indigo-400/50 focus:bg-white/[0.09] focus:ring-1 focus:ring-indigo-400/20"
+        : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
+  }`;
+
+  const selectCls = (disabled = false) => `w-full h-11 pl-4 pr-10 rounded-xl text-sm border outline-none appearance-none transition-all ${
+    disabled
+      ? isDark ? "bg-white/[0.03] border-white/[0.06] text-white/25 cursor-not-allowed" : "bg-gray-100 border-gray-200 text-gray-300 cursor-not-allowed"
+      : isDark
+        ? "bg-white/[0.07] border-white/[0.1] text-white/90 focus:border-indigo-400/50 focus:bg-white/[0.09]"
+        : "bg-gray-50 border-gray-200 text-gray-800 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
+  }`;
+
+  const isComplete = !!(form.master && form.service && form.date && form.time);
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          onClick={e => e.target === e.currentTarget && onClose()}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: isDark ? "rgba(0,0,0,0.75)" : "rgba(15,23,42,0.4)", backdropFilter: "blur(16px)" }}
+        >
           <motion.div
-            variants={overlayAnimation}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4"
-            onClick={onClose}
+            initial={{ opacity: 0, scale: 0.96, y: 24 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 24 }}
+            transition={{ type: "spring", damping: 28, stiffness: 340 }}
+            onClick={e => e.stopPropagation()}
+            className={`w-full max-w-lg rounded-3xl overflow-hidden ${modalCls}`}
           >
-            <motion.div
-              variants={slideIn}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-2xl bg-gradient-to-br from-white to-gray-50/50 rounded-3xl shadow-2xl border border-gray-200/50 backdrop-blur-xl overflow-hidden"
-            >
-              {/* Градиентный заголовок */}
-              <div className="relative px-8 py-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
-                <div className="absolute top-0 right-0 p-4 opacity-20">
-                  <Sparkles className="w-16 h-16" />
-                </div>
-                
-                <div className="relative z-10 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">
-                      {mode === "edit" ? "✏️ Редактирование записи" : "✨ Новая запись"}
-                    </h2>
-                    <p className="text-blue-100/80 mt-1 flex items-center gap-2">
-                      {mode === "create" ? (
-                        <>
-                          <BadgeCheck className="w-4 h-4" />
-                          Созданные записи сразу подтверждаются
-                        </>
-                      ) : (
-                        <>
-                          <Shield className="w-4 h-4" />
-                          Редактирование существующей записи
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  
-                  <motion.button
-                    whileHover={{ scale: 1.1, rotate: 90 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={onClose}
-                    className="p-2 text-white/80 hover:text-white rounded-full hover:bg-white/10 transition-all duration-300"
-                  >
-                    <X className="w-6 h-6" />
-                  </motion.button>
-                </div>
+            {/* Header gradient */}
+            <div className={`relative px-7 py-6 overflow-hidden ${
+              isDark
+                ? "bg-gradient-to-br from-indigo-900/60 via-purple-900/40 to-slate-900/60 border-b border-white/[0.08]"
+                : "bg-gradient-to-br from-blue-50 via-purple-50/50 to-white border-b border-gray-100"
+            }`}>
+              <div className="absolute top-0 right-0 w-32 h-32 opacity-30">
+                <div className={`w-full h-full rounded-full bg-gradient-to-br ${isDark ? "from-indigo-500 to-purple-600" : "from-blue-400 to-purple-500"} blur-2xl`} />
               </div>
-
-              {/* Блок с ошибкой */}
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mx-8 mt-6 p-4 bg-gradient-to-r from-red-500/10 to-rose-500/10 border border-red-200/50 text-red-700 rounded-2xl backdrop-blur-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <X className="w-5 h-5" />
-                    {error}
+              <div className="relative flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                      isDark ? "bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-purple-500/30" : "bg-gradient-to-br from-blue-500 to-purple-600 shadow-md shadow-blue-500/20"
+                    }`}>
+                      <Sparkles className="w-5 h-5 text-white" />
+                    </div>
+                    <h2 className={`text-xl font-black ${isDark ? "text-white" : "text-gray-900"}`}>
+                      {mode === "edit" ? "Редактировать запись" : "Новая запись"}
+                    </h2>
                   </div>
-                </motion.div>
-              )}
-
-              {/* Информация о выбранной услуге */}
-              {selectedServicePrice && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="mx-8 mt-6 p-4 bg-gradient-to-r from-emerald-500/10 to-green-500/10 border border-emerald-200/50 rounded-2xl backdrop-blur-sm"
+                  <p className={`text-sm flex items-center gap-1.5 ${isDark ? "text-white/40" : "text-gray-400"}`}>
+                    {mode === "create" ? <><BadgeCheck size={14} />Запись сразу подтверждается</> : <><Shield size={14} />Редактирование существующей</>}
+                  </p>
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.1, rotate: 90 }} whileTap={{ scale: 0.9 }}
+                  transition={{ duration: 0.2 }} onClick={onClose}
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors mt-0.5 ${
+                    isDark ? "text-white/40 hover:bg-white/[0.08] hover:text-white/70" : "text-gray-400 hover:bg-gray-100"
+                  }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <X size={18} />
+                </motion.button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto max-h-[68vh]">
+              {/* Error */}
+              <AnimatePresence>
+                {error && (
+                  <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                    className={`mx-6 mt-5 px-4 py-3 rounded-xl border flex items-center gap-3 text-sm font-medium ${
+                      isDark ? "bg-rose-500/10 border-rose-400/20 text-rose-400" : "bg-rose-50 border-rose-200 text-rose-600"
+                    }`}>
+                    <X size={15} className="flex-shrink-0" />{error}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Service price preview */}
+              <AnimatePresence>
+                {selectedSP && (
+                  <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                    className={`mx-6 mt-5 px-5 py-4 rounded-2xl border flex items-center justify-between ${
+                      isDark ? "bg-indigo-500/10 border-indigo-400/20" : "bg-blue-50/80 border-blue-200/70"
+                    }`}>
                     <div>
-                      <p className="text-sm text-emerald-600 font-medium">Выбранная услуга</p>
-                      <p className="font-bold text-gray-900 text-lg">{selectedServicePrice.service?.title}</p>
+                      <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${isDark ? "text-indigo-400" : "text-blue-500"}`}>Выбранная услуга</p>
+                      <p className={`font-bold text-base ${isDark ? "text-white/90" : "text-gray-900"}`}>{selectedSP.service?.title}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-500">Стоимость</p>
-                      <p className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">
-                        {formatPrice(selectedServicePrice.price)}
+                      <p className={`text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}>Стоимость</p>
+                      <p className={`text-2xl font-black ${isDark ? "bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent" : "text-blue-600"}`}>
+                        {fmtPrice(selectedSP.price)}
                       </p>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              <form onSubmit={handleSubmit} className="p-8 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Фамилия */}
-                  <div>
-                    <div className="text-sm font-semibold text-gray-700 mb-2.5 flex items-center gap-2">
-                      <User className="w-4 h-4 text-blue-500" />
-                      Фамилия *
-                    </div>
-                    <div className="relative">
-                      <input
-                        name="clientSurname"
-                        value={formData.clientSurname}
-                        onChange={handleInputChange}
-                        className="w-full pl-11 pr-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 placeholder-gray-500 transition-all duration-300"
-                        placeholder="Введите фамилию"
-                        required
-                      />
-                      <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    </div>
-                  </div>
-
-                  {/* Имя */}
-                  <div>
-                    <div className="text-sm font-semibold text-gray-700 mb-2.5 flex items-center gap-2">
-                      <User className="w-4 h-4 text-blue-500" />
-                      Имя *
-                    </div>
-                    <div className="relative">
-                      <input
-                        name="clientName"
-                        value={formData.clientName}
-                        onChange={handleInputChange}
-                        className="w-full pl-11 pr-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 placeholder-gray-500 transition-all duration-300"
-                        placeholder="Введите имя"
-                        required
-                      />
-                      <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    </div>
-                  </div>
-
-                  {/* Телефон */}
-                  <div>
-                    <div className="text-sm font-semibold text-gray-700 mb-2.5 flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-blue-500" />
-                      Телефон *
-                    </div>
-                    <div className="relative">
-                      <input
-                        name="clientPhone"
-                        value={formData.clientPhone}
-                        onChange={handleInputChange}
-                        placeholder="+7 (___) ___-__-__"
-                        className="w-full pl-11 pr-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 placeholder-gray-500 transition-all duration-300"
-                        required
-                      />
-                      <Phone className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    </div>
-                  </div>
-
-                  {/* Мастер */}
-                  <div>
-                    <div className="text-sm font-semibold text-gray-700 mb-2.5 flex items-center gap-2">
-                      <Users className="w-4 h-4 text-blue-500" />
-                      Мастер *
-                    </div>
-                    <div className="relative">
-                      <select
-                        name="master"
-                        value={formData.master}
-                        onChange={handleInputChange}
-                        className="w-full pl-11 pr-10 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 appearance-none transition-all duration-300"
-                        required
-                      >
-                        <option value="">Выберите мастера</option>
-                        {masters.filter(m => m.isActive).map(m => (
-                          <option key={m.id} value={m.id}>
-                            {m.surname} {m.name}
-                          </option>
-                        ))}
-                      </select>
-                      <Users className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    </div>
-                  </div>
-
-                  {/* Услуга */}
-                  <div>
-                    <div className="text-sm font-semibold text-gray-700 mb-2.5 flex items-center gap-2">
-                      <Scissors className="w-4 h-4 text-blue-500" />
-                      Услуга *
-                    </div>
-                    <div className="relative">
-                      <select
-                        name="service"
-                        value={formData.service}
-                        onChange={handleInputChange}
-                        disabled={!formData.master}
-                        className="w-full pl-11 pr-10 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 disabled:bg-gray-100/50 disabled:text-gray-500 appearance-none transition-all duration-300"
-                        required
-                      >
-                        <option value="">
-                          {formData.master ? "Выберите услугу" : "Сначала выберите мастера"}
-                        </option>
-                        {servicePrices
-                          .filter(sp => sp.isActive && sp.service)
-                          .map(sp => (
-                            <option key={sp.id} value={sp.service!.id}>
-                              {sp.service!.title} • {formatPrice(sp.price)}
-                            </option>
-                          ))}
-                      </select>
-                      <Scissors className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    </div>
-                  </div>
-
-                  {/* Дата */}
-                  <div>
-                    <div className="text-sm font-semibold text-gray-700 mb-2.5 flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-blue-500" />
-                      Дата *
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        name="date"
-                        value={formData.date}
-                        onChange={handleInputChange}
-                        min={new Date().toISOString().split("T")[0]}
-                        className="w-full pl-11 pr-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-300"
-                        required
-                      />
-                      <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    </div>
-                  </div>
-
-                  {/* Время */}
-                  <div>
-                    <div className="text-sm font-semibold text-gray-700 mb-2.5 flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-blue-500" />
-                      Время *
-                    </div>
-                    <div className="relative">
-                      <div className="relative">
-                        <select
-                          name="time"
-                          value={formData.time}
-                          onChange={handleInputChange}
-                          disabled={loadingTimes || !formData.date}
-                          className="w-full pl-11 pr-10 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 disabled:bg-gray-100/50 disabled:text-gray-500 appearance-none transition-all duration-300"
-                          required
-                        >
-                          <option value="">
-                            {getTimePlaceholder()}
-                          </option>
-                          {availableTimes.map(t => (
-                            <option key={t} value={t} className="text-gray-900">
-                              {t}
-                            </option>
-                          ))}
-                        </select>
-                        <Clock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      </div>
-                      {/* Индикатор загрузки рядом с селектом */}
-                      {loadingTimes && (
-                        <div className="absolute right-12 top-1/2 transform -translate-y-1/2">
-                          <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Сводная информация */}
-                {formData.master && formData.service && formData.date && formData.time && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-4 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 border border-blue-200/30 rounded-2xl backdrop-blur-sm"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600">Сводная информация</p>
-                        <p className="font-medium text-gray-900">
-                          {formData.clientSurname} {formData.clientName} • {formData.date} в {formData.time}
-                        </p>
-                      </div>
-                      {selectedServicePrice && (
-                        <div className="text-right">
-                          <p className="text-sm text-gray-600">Общая стоимость</p>
-                          <p className="text-xl font-bold text-blue-600">
-                            {formatPrice(selectedServicePrice.price)}
-                          </p>
-                        </div>
-                      )}
                     </div>
                   </motion.div>
                 )}
+              </AnimatePresence>
 
-                {/* Кнопки */}
-                <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-200/50">
-                  <motion.button
-                    type="button"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={onClose}
-                    className="flex-1 px-6 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-2xl font-semibold hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
-                  >
+              <form onSubmit={handleSubmit} className="px-6 pt-5 pb-6">
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Surname */}
+                  <FormField label="Фамилия" icon={<User size={14} />} isDark={isDark}>
+                    <input name="clientSurname" value={form.clientSurname} onChange={handleChange} placeholder="Иванов" required className={inputCls()} />
+                  </FormField>
+
+                  {/* Name */}
+                  <FormField label="Имя" icon={<User size={14} />} isDark={isDark}>
+                    <input name="clientName" value={form.clientName} onChange={handleChange} placeholder="Иван" required className={inputCls()} />
+                  </FormField>
+
+                  {/* Phone */}
+                  <FormField label="Телефон" icon={<Phone size={14} />} isDark={isDark}>
+                    <input name="clientPhone" value={form.clientPhone} onChange={handleChange} placeholder="+7 (___) ___-__-__" required className={inputCls()} />
+                  </FormField>
+
+                  {/* Master */}
+                  <FormField label="Мастер" icon={<Users size={14} />} isDark={isDark} select>
+                    <select name="master" value={form.master} onChange={handleChange} required className={selectCls()}>
+                      <option value="">Выберите мастера</option>
+                      {masters.filter(m => m.isActive).map(m => <option key={m.id} value={m.id}>{m.surname} {m.name}</option>)}
+                    </select>
+                    <ChevronDown size={14} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/30" : "text-gray-400"}`} />
+                  </FormField>
+
+                  {/* Service */}
+                  <FormField label="Услуга" icon={<Scissors size={14} />} isDark={isDark} select>
+                    <select name="service" value={form.service} onChange={handleChange} disabled={!form.master} required className={selectCls(!form.master)}>
+                      <option value="">{form.master ? "Выберите услугу" : "Сначала мастера"}</option>
+                      {servicePrices.filter(sp => sp.isActive && sp.service).map(sp => (
+                        <option key={sp.id} value={sp.service!.id}>{sp.service!.title} · {fmtPrice(sp.price)}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/30" : "text-gray-400"}`} />
+                  </FormField>
+
+                  {/* Date */}
+                  <FormField label="Дата" icon={<Calendar size={14} />} isDark={isDark}>
+                    <input type="date" name="date" value={form.date} onChange={handleChange} min={new Date().toISOString().split("T")[0]} required className={inputCls()} />
+                  </FormField>
+
+                  {/* Time */}
+                  <FormField label="Время" icon={<Clock size={14} />} isDark={isDark} select extra={loadingTimes && <Loader2 size={13} className={`animate-spin ${isDark ? "text-indigo-400" : "text-blue-400"}`} />}>
+                    <select name="time" value={form.time} onChange={handleChange} disabled={loadingTimes || !form.date} required className={selectCls(loadingTimes || !form.date)}>
+                      <option value="">{loadingTimes ? "Загрузка..." : !form.date ? "Сначала дату" : availableTimes.length === 0 ? "Нет слотов" : "Выберите время"}</option>
+                      {availableTimes.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    {!loadingTimes && <ChevronDown size={14} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/30" : "text-gray-400"}`} />}
+                  </FormField>
+                </div>
+
+                {/* Summary */}
+                <AnimatePresence>
+                  {isComplete && (
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                      className={`mt-4 px-4 py-3.5 rounded-2xl border flex items-center justify-between ${
+                        isDark ? "bg-white/[0.05] border-white/[0.07]" : "bg-gray-50/80 border-gray-200/70"
+                      }`}>
+                      <p className={`text-sm ${isDark ? "text-white/50" : "text-gray-500"}`}>
+                        {form.clientSurname} {form.clientName} · {form.date} в {form.time}
+                      </p>
+                      {selectedSP && <span className={`text-base font-black ${isDark ? "text-white/80" : "text-gray-900"}`}>{fmtPrice(selectedSP.price)}</span>}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Buttons */}
+                <div className={`flex gap-3 mt-6 pt-5 border-t ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}>
+                  <motion.button type="button" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={onClose}
+                    className={`flex-1 h-12 rounded-2xl text-sm font-semibold border transition-all ${
+                      isDark
+                        ? "bg-white/[0.06] border-white/[0.1] text-white/60 hover:bg-white/[0.09]"
+                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm"
+                    }`}>
                     Отмена
                   </motion.button>
-                  
-                  <motion.button
-                    type="submit"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+
+                  <motion.button type="submit" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
                     disabled={isSubmitting || loadingTimes}
-                    className="flex-1 px-6 py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-2xl font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Сохранение...
-                      </>
-                    ) : mode === "edit" ? (
-                      <>
-                        <CheckCircle className="w-5 h-5" />
-                        Сохранить изменения
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="w-5 h-5" />
-                        Создать запись
-                      </>
-                    )}
+                    className={`flex-1 h-12 rounded-2xl text-sm font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isDark
+                        ? "bg-gradient-to-r from-indigo-500 to-purple-600 shadow-purple-500/25 hover:shadow-purple-500/40"
+                        : "bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/20 hover:shadow-blue-500/35"
+                    }`}>
+                    {isSubmitting ? <><Loader2 size={16} className="animate-spin" />Сохранение...</>
+                     : mode === "edit" ? <><CheckCircle size={16} />Сохранить изменения</>
+                     : <><Zap size={16} />Создать запись</>}
                   </motion.button>
                 </div>
               </form>
+            </div>
 
-              {/* Футер */}
-              <div className="px-8 py-4 border-t border-gray-200/50 bg-gradient-to-r from-gray-50/50 to-white/30">
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-3 h-3" />
-                    <span>Защищенное соединение</span>
-                  </div>
-                  <span>ID: {initialData?.id || "Новая"}</span>
-                </div>
-              </div>
-            </motion.div>
+            <div className={`px-7 py-3 border-t flex items-center justify-between text-xs ${
+              isDark ? "border-white/[0.06] text-white/20" : "border-gray-100 text-gray-400"
+            }`}>
+              <span className="flex items-center gap-1.5"><Shield size={11} />Защищённое соединение</span>
+              <span>ID: {initialData?.id || "—"}</span>
+            </div>
           </motion.div>
-        </>
+        </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function FormField({ label, icon, isDark, children, select, extra }: {
+  label: string; icon: React.ReactNode; isDark: boolean;
+  children: React.ReactNode; select?: boolean; extra?: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className={`flex items-center gap-1.5 text-xs font-semibold mb-2 uppercase tracking-wide ${isDark ? "text-white/35" : "text-gray-400"}`}>
+        <span className={isDark ? "text-indigo-400" : "text-blue-500"}>{icon}</span>
+        {label}
+      </label>
+      <div className={select ? "relative" : undefined}>
+        {children}
+        {extra && <span className="absolute right-9 top-1/2 -translate-y-1/2">{extra}</span>}
+      </div>
+    </div>
   );
 }
