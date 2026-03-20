@@ -1,18 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { servicePriceService } from "@/services/service-price/service-price.service";
-import { categoryService } from "@/services/category/category.service";
-import { masterService } from "@/services/master/master.service";
-import { serviceService } from "@/services/service/service.service";
-import { IServicePrice, UIServicePrice } from "@/types/service-price.types";
-import { ICategory } from "@/types/category.types";
-import { IMaster } from "@/types/masters.type";
-import { IService } from "@/types/services.types";
 import {
   Search,
-  Filter,
   Plus,
   Tag,
   Clock,
@@ -20,81 +11,113 @@ import {
   Trash2,
   RefreshCw,
   ChevronDown,
+  ChevronUp,
   Shield,
-  Zap,
-  Sparkles,
-  TrendingUp,
-  Users,
   DollarSign,
-  Award,
-  Package,
-  TrendingDown,
-  CheckCircle,
-  X,
-  Loader2,
-  Star,
-  BarChart3,
+  Users,
+  TrendingUp,
   Eye,
   EyeOff,
-  Calendar,
-  Target,
-  Percent,
-  Crown,
+  X,
+  Loader2,
+  Package,
+  SlidersHorizontal,
 } from "lucide-react";
 
-type SortField = "service" | "master" | "price" | "status";
+import { servicePriceService } from "@/services/service-price/service-price.service";
+import { categoryService } from "@/services/category/category.service";
+import { masterService } from "@/services/master/master.service";
+import { serviceService } from "@/services/service/service.service";
 
-export default function MasterService() {
-  const [rawPrices, setRawPrices] = useState<IServicePrice[]>([]);
+import { IServicePrice, UIServicePrice } from "@/types/service-price.types";
+import { ICategory } from "@/types/category.types";
+import { IMaster } from "@/types/masters.type";
+import { IService } from "@/types/services.types";
+
+type SortField = "service" | "master" | "price" | "status";
+type SortOrder = "asc" | "desc";
+
+const CAT_GRADS = [
+  "from-blue-500 to-indigo-600",
+  "from-emerald-500 to-teal-600",
+  "from-purple-500 to-pink-600",
+  "from-amber-500 to-orange-500",
+  "from-rose-500 to-red-600",
+  "from-indigo-500 to-blue-600",
+  "from-violet-500 to-purple-600",
+  "from-cyan-500 to-blue-500",
+];
+
+export default function MasterServicePrices() {
   const [prices, setPrices] = useState<UIServicePrice[]>([]);
   const [categories, setCategories] = useState<ICategory[]>([]);
   const [masters, setMasters] = useState<IMaster[]>([]);
   const [services, setServices] = useState<IService[]>([]);
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPrice, setEditingPrice] = useState<UIServicePrice | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [isDark, setIsDark] = useState(false);
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [sortField, setSortField] = useState<SortField>("service");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [statusFilter, setStatusFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [masterFilter, setMasterFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [sortField, setSortField] = useState<SortField>("service");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [search, setSearch] = useState("");
 
-  const [formData, setFormData] = useState({
+  const [form, setForm] = useState({
     serviceId: 0,
     masterId: 0,
     price: 0,
     isActive: true,
     durationOverride: null as number | null,
-    _baseDuration: 30,
   });
 
-  const loadData = async (showLoading = true) => {
-    if (showLoading) {
-      setIsLoading(true);
-    } else {
-      setIsRefreshing(true);
-    }
-    try {
-      const [priceData, categoryData, masterData, serviceData] =
-        await Promise.all([
-          servicePriceService.getAll(),
-          categoryService.getAll(),
-          masterService.getAll(),
-          serviceService.getAll(),
-        ]);
+  // ================== ТЕМА ==================
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains("dark"));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
 
-      setRawPrices(priceData);
-      setCategories(categoryData);
-      setMasters(masterData);
-      setServices(serviceData);
-    } catch (error) {
-      console.error("Ошибка загрузки:", error);
-      alert("Не удалось загрузить данные. Проверьте соединение.");
+  // ================== ЗАГРУЗКА ДАННЫХ ==================
+  const loadData = async (showLoader = true) => {
+    showLoader ? setIsLoading(true) : setIsRefreshing(true);
+    try {
+      const [p, c, m, s] = await Promise.all([
+        servicePriceService.getAll(),
+        categoryService.getAll(),
+        masterService.getAll(),
+        serviceService.getAll(),
+      ]);
+
+      const mapped: UIServicePrice[] = p
+        .filter((pr): pr is IServicePrice & { service: IService; master: IMaster } => !!pr.service && !!pr.master)
+        .map((pr) => ({
+          id: pr.id,
+          price: pr.price,
+          isActive: pr.isActive,
+          durationOverride: pr.durationOverride ?? null,
+          serviceId: pr.service.id,
+          serviceTitle: pr.service.title,
+          categoryId: pr.service.categoryId,
+          categoryName: c.find((cat) => cat.id === pr.service.categoryId)?.title ?? "Не указана",
+          masterId: pr.master.id,
+          masterFullName: `${pr.master.surname} ${pr.master.name}`,
+          masterSpecialization: pr.master.specialization || "",
+        }));
+
+      setPrices(mapped);
+      setCategories(c);
+      setMasters(m);
+      setServices(s);
+    } catch {
+      alert("Ошибка загрузки данных");
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -105,163 +128,76 @@ export default function MasterService() {
     loadData();
   }, []);
 
-  const categoryMap = useMemo(
-    () => new Map(categories.map((c) => [c.id, c.title])),
-    [categories],
-  );
+  const catGrad = (id: number) => CAT_GRADS[id % CAT_GRADS.length];
 
-  useEffect(() => {
-    const mapped: UIServicePrice[] = rawPrices
-      .filter((p) => p.service != null && p.master != null)
-      .map((p) => {
-        const service = p.service!;
-        const master = p.master!;
-        return {
-          id: p.id,
-          price: p.price,
-          isActive: p.isActive,
-          serviceId: service.id,
-          serviceTitle: service.title,
-          categoryId: service.categoryId,
-          categoryName: categoryMap.get(service.categoryId) ?? "Не указана",
-          masterId: master.id,
-          masterFullName: `${master.surname} ${master.name}`,
-          masterSpecialization: master.specialization || "",
-          durationOverride: p.durationOverride ?? null,
-        };
-      });
-
-    setPrices(mapped);
-  }, [rawPrices, categoryMap]);
-
-  const filteredAndSortedPrices = useMemo(() => {
-    let list = [...prices];
-
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+  // ================== ФИЛЬТР + СОРТИРОВКА ==================
+  const filtered = useMemo(() => {
+    let list = prices;
+    if (search) {
+      const q = search.toLowerCase();
       list = list.filter(
         (p) =>
           p.serviceTitle.toLowerCase().includes(q) ||
           p.categoryName.toLowerCase().includes(q) ||
           p.masterFullName.toLowerCase().includes(q) ||
-          p.masterSpecialization.toLowerCase().includes(q) ||
-          p.price.toString().includes(q),
+          p.price.toString().includes(q)
       );
     }
+    if (statusFilter) list = list.filter((p) => p.isActive === (statusFilter === "active"));
+    if (categoryFilter) list = list.filter((p) => p.categoryId === Number(categoryFilter));
+    if (masterFilter) list = list.filter((p) => p.masterId === Number(masterFilter));
 
-    if (categoryFilter) {
-      list = list.filter((p) => p.categoryId === Number(categoryFilter));
-    }
-    if (masterFilter) {
-      list = list.filter((p) => p.masterId === Number(masterFilter));
-    }
-    if (statusFilter) {
-      const isActive = statusFilter === "active";
-      list = list.filter((p) => p.isActive === isActive);
-    }
-
-    list.sort((a, b) => {
-      let aVal: string | number = "";
-      let bVal: string | number = "";
-
+    return [...list].sort((a, b) => {
+      let av: string | number = "";
+      let bv: string | number = "";
       switch (sortField) {
         case "service":
-          aVal = a.serviceTitle;
-          bVal = b.serviceTitle;
+          av = a.serviceTitle;
+          bv = b.serviceTitle;
           break;
         case "master":
-          aVal = a.masterFullName;
-          bVal = b.masterFullName;
+          av = a.masterFullName;
+          bv = b.masterFullName;
           break;
         case "price":
-          aVal = a.price;
-          bVal = b.price;
+          av = a.price;
+          bv = b.price;
           break;
         case "status":
-          aVal = a.isActive ? 1 : 0;
-          bVal = b.isActive ? 1 : 0;
+          av = a.isActive ? 1 : 0;
+          bv = b.isActive ? 1 : 0;
           break;
       }
-
-      if (typeof aVal === "string") {
-        return sortOrder === "asc"
-          ? aVal.localeCompare(bVal as string)
-          : (bVal as string).localeCompare(aVal);
-      }
-      return sortOrder === "asc"
-        ? (aVal as number) - (bVal as number)
-        : (bVal as number) - (aVal as number);
+      if (typeof av === "string")
+        return sortOrder === "asc" ? av.localeCompare(bv as string) : (bv as string).localeCompare(av);
+      return sortOrder === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number);
     });
-
-    return list;
-  }, [
-    prices,
-    searchQuery,
-    categoryFilter,
-    masterFilter,
-    statusFilter,
-    sortField,
-    sortOrder,
-  ]);
+  }, [prices, search, statusFilter, categoryFilter, masterFilter, sortField, sortOrder]);
 
   const stats = useMemo(() => {
     const total = prices.length;
     const active = prices.filter((p) => p.isActive).length;
-    const inactive = total - active;
-    
-    // Исправленный расчет средней цены
-    const totalSum = prices.reduce((sum, p) => {
-      // Убедимся, что price это число
-      const price = Number(p.price);
-      return sum + (isNaN(price) ? 0 : price);
-    }, 0);
-    
-    const avgPrice = total > 0 ? Math.round(totalSum / total) : 0;
-    
-    // Исправленный расчет мин/макс цен
-    const validPrices = prices
-      .map(p => Number(p.price))
-      .filter(price => !isNaN(price) && price > 0);
-    
-    const maxPrice = validPrices.length > 0 ? Math.max(...validPrices) : 0;
-    const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
-
-    return { 
-      total, 
-      active, 
-      inactive, 
-      avgPrice, 
-      maxPrice, 
-      minPrice,
-      totalSum // Для отладки, можно убрать
-    };
+    const valid = prices.map((p) => p.price).filter((p) => !isNaN(p) && p > 0);
+    const avg = valid.length ? Math.round(valid.reduce((a, b) => a + b, 0) / valid.length) : 0;
+    const max = valid.length ? Math.max(...valid) : 0;
+    return { total, active, avg, max };
   }, [prices]);
 
-  const openModalForAdd = () => {
+  // ================== МОДАЛКА ==================
+  const openAdd = () => {
     setEditingPrice(null);
-    setFormData({
-      serviceId: 0,
-      masterId: 0,
-      price: 0,
-      isActive: true,
-      durationOverride: null,
-      _baseDuration: 30,
-    });
+    setForm({ serviceId: 0, masterId: 0, price: 0, isActive: true, durationOverride: null });
     setIsModalOpen(true);
   };
 
-  const openModalForEdit = (price: UIServicePrice) => {
-    const service = services.find((s) => s.id === price.serviceId);
-    const baseDuration = service?.duration || 30;
-
-    setEditingPrice(price);
-    setFormData({
-      serviceId: price.serviceId,
-      masterId: price.masterId,
-      price: price.price,
-      isActive: price.isActive,
-      durationOverride: price.durationOverride ?? null,
-      _baseDuration: baseDuration,
+  const openEdit = (p: UIServicePrice) => {
+    setEditingPrice(p);
+    setForm({
+      serviceId: p.serviceId,
+      masterId: p.masterId,
+      price: p.price,
+      isActive: p.isActive,
+      durationOverride: p.durationOverride ?? null,
     });
     setIsModalOpen(true);
   };
@@ -271,547 +207,548 @@ export default function MasterService() {
     setEditingPrice(null);
   };
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>,
-  ) => {
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-
-    if (name === "durationOverride") {
-      const numValue =
-        value === "" || value === "null" ? null : parseInt(value) || 0;
-      setFormData((prev) => ({ ...prev, [name]: numValue }));
-      return;
+    if (type === "checkbox") {
+      setForm((prev) => ({ ...prev, [name]: (e.target as HTMLInputElement).checked }));
+    } else if (name === "durationOverride") {
+      setForm((prev) => ({ ...prev, durationOverride: value ? parseInt(value) : null }));
+    } else if (type === "number") {
+      setForm((prev) => ({ ...prev, [name]: parseInt(value) || 0 }));
+    } else {
+      setForm((prev) => ({ ...prev, [name]: value }));
     }
-
-    const val =
-      type === "checkbox"
-        ? (e.target as HTMLInputElement).checked
-        : type === "number"
-          ? Math.max(0, parseInt(value) || 0)
-          : value;
-
-    setFormData((prev) => ({ ...prev, [name]: val }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    const { serviceId, masterId, price, durationOverride } = formData;
-    if (serviceId === 0 || masterId === 0 || price <= 0) {
-      alert("Пожалуйста, выберите услугу, мастера и укажите цену > 0 ₽");
+    if (!form.serviceId || !form.masterId || form.price <= 0) {
+      alert("Выберите услугу, мастера и цену > 0");
       return;
     }
-
     setIsLoading(true);
     try {
       const payload = {
-        serviceId,
-        masterId,
-        price,
-        isActive: formData.isActive,
-        durationOverride,
+        serviceId: form.serviceId,
+        masterId: form.masterId,
+        price: form.price,
+        isActive: form.isActive,
+        durationOverride: form.durationOverride,
       };
 
       if (editingPrice) {
-        const updated = await servicePriceService.update(
-          editingPrice.id,
-          payload,
-        );
-        setRawPrices((prev) =>
-          prev.map((p) => (p.id === updated.id ? updated : p)),
+        const updated = await servicePriceService.update(editingPrice.id, payload);
+        setPrices((prev) =>
+          prev.map((p) =>
+            p.id === updated.id
+              ? {
+                  ...p,
+                  price: updated.price,
+                  isActive: updated.isActive,
+                  durationOverride: updated.durationOverride ?? null,
+                }
+              : p
+          )
         );
       } else {
         const created = await servicePriceService.create(payload);
-        setRawPrices((prev) => [created, ...prev]);
+        const service = services.find((s) => s.id === created.serviceId);
+        const master = masters.find((m) => m.id === created.masterId);
+        if (service && master) {
+          const newPrice: UIServicePrice = {
+            id: created.id,
+            price: created.price,
+            isActive: created.isActive,
+            durationOverride: created.durationOverride ?? null,
+            serviceId: created.serviceId,
+            serviceTitle: service.title,
+            categoryId: service.categoryId,
+            categoryName: categories.find((c) => c.id === service.categoryId)?.title ?? "Не указана",
+            masterId: created.masterId,
+            masterFullName: `${master.surname} ${master.name}`,
+            masterSpecialization: master.specialization || "",
+          };
+          setPrices((prev) => [newPrice, ...prev]);
+        }
       }
-
       closeModal();
-    } catch (error) {
-      console.error("Ошибка сохранения цены:", error);
-      alert("Не удалось сохранить запись. Повторите попытку.");
+    } catch {
+      alert("Ошибка сохранения");
     } finally {
       setIsLoading(false);
     }
   };
 
   const deletePrice = async (id: number) => {
-    if (!confirm("Вы уверены? Эта цена будет удалена безвозвратно.")) return;
-
+    if (!confirm("Удалить цену?")) return;
     try {
       await servicePriceService.delete(id);
-      setRawPrices((prev) => prev.filter((p) => p.id !== id));
-    } catch (error) {
-      console.error("Ошибка удаления:", error);
-      alert("Не удалось удалить запись");
+      setPrices((prev) => prev.filter((p) => p.id !== id));
+    } catch {
+      alert("Ошибка удаления");
     }
   };
 
-  const handleSortChange = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
+  const handleSort = (field: SortField) => {
+    if (sortField === field) setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
+    else {
       setSortField(field);
       setSortOrder("asc");
     }
   };
 
-  const clearFilters = () => {
-    setSearchQuery("");
-    setCategoryFilter("");
-    setMasterFilter("");
-    setStatusFilter("");
-  };
+  // ================== DESIGN TOKENS ==================
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1] shadow-lg"
+    : "bg-white border border-gray-200/70 shadow-sm";
 
-  const getCategoryOptions = () => {
-    const usedCategories = new Set(
-      services.filter((s) => s.isActive).map((s) => s.categoryId),
-    );
-    return categories.filter((c) => usedCategories.has(c.id));
-  };
+  const cardCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1] hover:bg-white/[0.1] hover:border-white/[0.15] shadow-lg hover:shadow-xl"
+    : "bg-white border border-gray-200/70 hover:border-gray-300/80 shadow-sm hover:shadow-lg";
 
-  const getServicesByCategory = (categoryId: number) => {
-    return services.filter((s) => s.categoryId === categoryId && s.isActive);
-  };
+  const modalCls = isDark
+    ? "bg-slate-900/88 backdrop-blur-3xl border border-white/[0.1] shadow-[0_32px_80px_rgba(0,0,0,0.7)]"
+    : "bg-white/96 backdrop-blur-xl border border-gray-200/70 shadow-2xl";
 
-  const getCategoryColor = (categoryId: number) => {
-    const colors = [
-      "from-blue-500 to-cyan-500",
-      "from-emerald-500 to-green-500",
-      "from-purple-500 to-pink-500",
-      "from-amber-500 to-orange-500",
-      "from-rose-500 to-red-500",
-      "from-indigo-500 to-blue-500",
-    ];
-    const index = categoryId % colors.length;
-    return colors[index];
-  };
+  const inputCls = `w-full h-11 px-4 rounded-xl text-sm border outline-none transition-all ${
+    isDark
+      ? "bg-white/[0.07] border-white/[0.09] text-white/90 placeholder-white/25 focus:border-indigo-400/50 focus:ring-1 focus:ring-indigo-400/20"
+      : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 focus:bg-white"
+  }`;
 
-  const getMasterInitial = (master: IMaster) => {
-    return `${master.surname[0]?.toUpperCase() || "М"}${master.name[0]?.toUpperCase() || "М"}`;
-  };
+  const sectionCls = `rounded-2xl p-4 border ${
+    isDark ? "bg-white/[0.04] border-white/[0.07]" : "bg-gray-50/60 border-gray-200/60"
+  }`;
 
-  const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return null;
-    return sortOrder === "asc" ? "↑" : "↓";
-  };
+  const SORT_OPTS: { f: SortField; l: string }[] = [
+    { f: "service", l: "Услуга" },
+    { f: "master", l: "Мастер" },
+    { f: "price", l: "Цена" },
+    { f: "status", l: "Статус" },
+  ];
 
-  // Для отладки - добавим проверку цен
-  useEffect(() => {
-    if (prices.length > 0) {
-      console.log("Все цены:", prices.map(p => ({id: p.id, price: p.price, type: typeof p.price})));
-      console.log("Статистика:", stats);
-    }
-  }, [prices, stats]);
+  const STAT_CARDS = [
+    { num: stats.total, label: "Всего цен", sub: "комбинаций", grad: "from-blue-500 to-indigo-600", glow: "shadow-blue-500/15" },
+    { num: stats.active, label: "Активных", sub: "доступны", grad: "from-emerald-500 to-teal-600", glow: "shadow-emerald-500/15" },
+    { num: stats.avg, label: "Средняя цена", sub: "₽", grad: "from-amber-500 to-orange-500", glow: "shadow-amber-500/15" },
+    { num: stats.max, label: "Макс. цена", sub: "₽", grad: "from-purple-500 to-pink-600", glow: "shadow-purple-500/15" },
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
-      <div className="max-w-9xl mx-auto">
-        {/* Заголовок и управление */}
-        <div className="mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+    <div className="min-h-screen p-4 md:p-6 lg:p-8">
+      <div className="max-w-9xl mx-auto space-y-6">
+        {/* HEADER */}
+        <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-3 mb-2"
-              >
-                <div className="p-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl">
-                  <DollarSign className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-2 mb-2.5">
+                <div
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border ${
+                    isDark
+                      ? "bg-white/[0.06] border-white/[0.09] text-white/40"
+                      : "bg-gray-100 border-gray-200 text-gray-400"
+                  }`}
+                >
+                  <DollarSign size={11} />
+                  Цены мастеров
                 </div>
-                <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-                  Управление ценами мастеров
-                </h1>
-              </motion.div>
-              <p className="text-gray-600">
-                Всего цен:{" "}
-                <span className="font-semibold text-gray-800">
-                  {stats.total}
-                </span>
-                {filteredAndSortedPrices.length !== stats.total && (
-                  <span className="ml-2">
-                    (показано {filteredAndSortedPrices.length})
-                  </span>
-                )}
-                {/* Для отладки: сумма цен и средняя */}
-                <span className="ml-4 text-sm text-gray-500">
-                  Сумма: {stats.totalSum?.toLocaleString()} ₽
-                </span>
+              </div>
+              <h1 className={`text-4xl md:text-5xl font-black leading-none tracking-tight ${isDark ? "text-white" : "text-gray-900"}`}>
+                Цены услуг
+              </h1>
+              <p className={`mt-2 text-sm ${isDark ? "text-white/35" : "text-gray-400"}`}>
+                {stats.total} комбинаций · {stats.active} активных
+                {filtered.length !== prices.length && ` · показано ${filtered.length}`}
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex gap-2.5 flex-wrap">
               <motion.button
                 whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-medium hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
-              >
-                <Filter className="w-4 h-4" />
-                Фильтры
-                {isFilterOpen ? (
-                  <ChevronDown className="w-4 h-4 rotate-180" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
-              </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => loadData(false)}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-medium hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.1] text-white/60 hover:text-white/80 hover:bg-white/[0.1]"
+                    : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
+                }`}
               >
-                <RefreshCw
-                  className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
-                />
+                <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
                 Обновить
               </motion.button>
 
               <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={openModalForAdd}
-                className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:from-indigo-700 hover:to-purple-700"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={openAdd}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all ${
+                  isDark
+                    ? "bg-gradient-to-r from-indigo-500 to-purple-600 shadow-purple-500/25 hover:shadow-purple-500/40"
+                    : "bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/20 hover:shadow-blue-500/35"
+                }`}
               >
-                <Plus className="w-5 h-5" />
+                <Plus size={16} />
                 Назначить цену
               </motion.button>
             </div>
           </div>
+        </motion.div>
 
-          {/* Расширенные фильтры */}
+        {/* STAT CARDS */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {STAT_CARDS.map((s, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.06 }}
+              whileHover={{ y: -3, scale: 1.02 }}
+              className={`relative rounded-2xl p-5 overflow-hidden transition-all duration-300 ${
+                isDark
+                  ? `bg-white/[0.07] backdrop-blur-xl border border-white/[0.1] shadow-lg hover:shadow-xl ${s.glow}`
+                  : `bg-white border border-gray-200/70 shadow-sm hover:shadow-md`
+              }`}
+            >
+              <div className={`absolute -top-5 -right-5 w-16 h-16 bg-gradient-to-br ${s.grad} opacity-[0.12] rounded-xl rotate-12 blur-sm`} />
+              <div className="relative">
+                <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${s.grad} flex items-center justify-center shadow-md mb-3`}>
+                  <DollarSign size={17} className="text-white" />
+                </div>
+                <div className={`text-3xl font-black leading-none mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
+                  {s.num}
+                  {s.label.includes("цена") && " ₽"}
+                </div>
+                <div className={`text-sm font-semibold ${isDark ? "text-white/70" : "text-gray-700"}`}>{s.label}</div>
+                <div className={`text-xs mt-0.5 ${isDark ? "text-white/30" : "text-gray-400"}`}>{s.sub}</div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* FILTER BAR */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className={`rounded-2xl p-4 ${glassCls}`}>
+          <div className="flex gap-3 flex-wrap">
+            <div className="flex-1 min-w-[180px] relative">
+              <Search size={15} className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`} />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Поиск по услуге, мастеру, цене..."
+                className={`w-full h-11 pl-10 pr-9 rounded-xl text-sm border outline-none transition-all ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.08] text-white/90 placeholder-white/25 focus:border-indigo-400/40"
+                    : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-300 focus:bg-white"
+                }`}
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDark ? "text-white/30 hover:text-white/60" : "text-gray-400"}`}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <div className="relative">
+              <Tag size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`} />
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className={`h-11 pl-9 pr-8 rounded-xl text-sm border outline-none appearance-none transition-all ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.09] text-white/90 focus:border-indigo-400/40"
+                    : "bg-gray-50 border-gray-200 text-gray-800 focus:border-blue-300"
+                }`}
+              >
+                <option value="">Все категории</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={13} className={`absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`} />
+            </div>
+
+            <div className="relative">
+              <Users size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`} />
+              <select
+                value={masterFilter}
+                onChange={(e) => setMasterFilter(e.target.value)}
+                className={`h-11 pl-9 pr-8 rounded-xl text-sm border outline-none appearance-none transition-all ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.09] text-white/90 focus:border-indigo-400/40"
+                    : "bg-gray-50 border-gray-200 text-gray-800 focus:border-blue-300"
+                }`}
+              >
+                <option value="">Все мастера</option>
+                {masters.filter((m) => m.isActive).map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.surname} {m.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={13} className={`absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`} />
+            </div>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setFilterOpen(!filterOpen)}
+              className={`h-11 flex items-center gap-2 px-4 rounded-xl text-sm font-semibold border transition-all ${
+                filterOpen
+                  ? isDark
+                    ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300"
+                    : "bg-blue-50 border-blue-300 text-blue-600"
+                  : isDark
+                  ? "bg-white/[0.07] border-white/[0.09] text-white/55 hover:bg-white/[0.1]"
+                  : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-white shadow-sm"
+              }`}
+            >
+              <SlidersHorizontal size={15} />
+              Сортировка
+              {filterOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </motion.button>
+
+            {(search || statusFilter || categoryFilter || masterFilter) && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("");
+                  setCategoryFilter("");
+                  setMasterFilter("");
+                }}
+                className={`h-11 px-4 rounded-xl text-sm font-semibold border transition-all ${
+                  isDark ? "bg-rose-500/10 border-rose-400/20 text-rose-400" : "bg-rose-50 border-rose-200 text-rose-500"
+                }`}
+              >
+                <X size={15} />
+              </motion.button>
+            )}
+          </div>
+
           <AnimatePresence>
-            {isFilterOpen && (
+            {filterOpen && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: "auto", marginTop: 12 }}
+                exit={{ opacity: 0, height: 0, marginTop: 0 }}
                 className="overflow-hidden"
               >
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 mb-6">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {/* Поиск */}
-                    <div className="md:col-span-2">
-                      <div className="relative">
-                        <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="text"
-                          placeholder="Поиск по услуге, мастеру, цене..."
-                          className="w-full pl-10 pr-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-gray-900 placeholder-gray-500 transition-all duration-300"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Фильтр по категории */}
-                    <select
-                      className="w-full px-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-gray-900 transition-all duration-300"
-                      value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
-                    >
-                      <option value="">Все категории</option>
-                      {getCategoryOptions().map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.title}
-                        </option>
-                      ))}
-                    </select>
-
-                    {/* Фильтр по статусу */}
-                    <select
-                      className="w-full px-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-gray-900 transition-all duration-300"
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                    >
-                      <option value="">Все статусы</option>
-                      <option value="active">Активные</option>
-                      <option value="inactive">Неактивные</option>
-                    </select>
-                  </div>
-
-                  {/* Мастер и сортировка */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <select
-                      className="w-full px-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-gray-900 transition-all duration-300"
-                      value={masterFilter}
-                      onChange={(e) => setMasterFilter(e.target.value)}
-                    >
-                      <option value="">Все мастера</option>
-                      {masters
-                        .filter((m) => m.isActive)
-                        .map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.surname} {m.name}
-                          </option>
-                        ))}
-                    </select>
-
-                    {/* Сортировка */}
-                    <div className="flex flex-wrap gap-2 items-center">
-                      <span className="text-sm font-medium text-gray-700">
-                        Сортировка:
-                      </span>
-                      {(
-                        ["service", "master", "price", "status"] as SortField[]
-                      ).map((field) => (
+                <div className={`pt-3 border-t space-y-3 ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}>
+                  <div>
+                    <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? "text-white/25" : "text-gray-400"}`}>Статус</p>
+                    <div className="flex gap-2">
+                      {[
+                        { v: "", l: "Все" },
+                        { v: "active", l: "Активные" },
+                        { v: "inactive", l: "Неактивные" },
+                      ].map((o) => (
                         <motion.button
-                          key={field}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => handleSortChange(field)}
-                          className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-all duration-300 border ${
-                            sortField === field
-                              ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md border-transparent"
-                              : "bg-white/80 text-gray-700 border-gray-300/50 hover:bg-gray-50/80"
+                          key={o.v}
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
+                          onClick={() => setStatusFilter(o.v)}
+                          className={`h-7 px-3 rounded-full text-xs font-semibold border transition-all ${
+                            statusFilter === o.v
+                              ? isDark
+                                ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300"
+                                : "bg-blue-100 border-blue-300 text-blue-700"
+                              : isDark
+                              ? "bg-white/[0.05] border-white/[0.07] text-white/45"
+                              : "bg-gray-50 border-gray-200 text-gray-500"
                           }`}
                         >
-                          {field === "service" && "Услуга"}
-                          {field === "master" && "Мастер"}
-                          {field === "price" && "Цена"}
-                          {field === "status" && "Статус"}
-                          {getSortIcon(field)}
+                          {o.l}
                         </motion.button>
                       ))}
                     </div>
                   </div>
 
-                  {(searchQuery ||
-                    categoryFilter ||
-                    masterFilter ||
-                    statusFilter) && (
-                    <motion.button
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      onClick={clearFilters}
-                      className="mt-4 flex items-center gap-2 px-4 py-2 text-red-600 hover:text-red-700 bg-red-50/50 hover:bg-red-50 rounded-xl border border-red-200/50 transition-all duration-300 text-sm font-medium"
-                    >
-                      <X className="w-4 h-4" />
-                      Сбросить фильтры
-                    </motion.button>
-                  )}
+                  <div>
+                    <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? "text-white/25" : "text-gray-400"}`}>Сортировка</p>
+                    <div className="flex flex-wrap gap-2">
+                      {SORT_OPTS.map((o) => (
+                        <motion.button
+                          key={o.f}
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
+                          onClick={() => handleSort(o.f)}
+                          className={`h-7 px-3 rounded-full text-xs font-semibold border transition-all flex items-center gap-1 ${
+                            sortField === o.f
+                              ? isDark
+                                ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300"
+                                : "bg-blue-100 border-blue-300 text-blue-700"
+                              : isDark
+                              ? "bg-white/[0.05] border-white/[0.07] text-white/45"
+                              : "bg-gray-50 border-gray-200 text-gray-500"
+                          }`}
+                        >
+                          {o.l}
+                          {sortField === o.f && <span className="text-[10px]">{sortOrder === "asc" ? "↑" : "↓"}</span>}
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </motion.div>
 
-        {/* Статистика */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <DollarSign className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">{stats.total}</div>
-              <div className="text-blue-100 font-medium">Всего цен</div>
-              <div className="text-sm text-blue-200/80 mt-2">
-                Назначено комбинаций
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-gradient-to-br from-emerald-500 to-green-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <Zap className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">{stats.active}</div>
-              <div className="text-emerald-100 font-medium">Активные</div>
-              <div className="text-sm text-emerald-200/80 mt-2">
-                Доступны клиентам
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <BarChart3 className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">
-                {stats.avgPrice.toLocaleString()} ₽
-              </div>
-              <div className="text-amber-100 font-medium">Средняя цена</div>
-              <div className="text-sm text-amber-200/80 mt-2">
-                По всем записям
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <Crown className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">
-                {stats.maxPrice.toLocaleString()} ₽
-              </div>
-              <div className="text-purple-100 font-medium">Максимум</div>
-              <div className="text-sm text-purple-200/80 mt-2">
-                Самая высокая цена
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Карточки цен */}
-        {isLoading ? (
-          <div className="text-center py-20">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent"></div>
-            <p className="mt-4 text-gray-500 font-medium">Загрузка цен...</p>
+        {/* RESULT LABEL */}
+        {!isLoading && (
+          <div className={`px-1 text-xs ${isDark ? "text-white/25" : "text-gray-400"}`}>
+            {filtered.length === prices.length ? `${filtered.length} цен` : `${filtered.length} из ${prices.length}`}
           </div>
-        ) : filteredAndSortedPrices.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="col-span-full bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-gray-200/50"
-          >
-            <div className="w-20 h-20 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-6">
-              <DollarSign className="w-10 h-10 text-gray-400" />
+        )}
+
+        {/* PRICE GRID */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-24">
+            <div className={`w-10 h-10 rounded-full border-t-transparent animate-spin mb-4 ${isDark ? "border-purple-400" : "border-blue-400"}`} style={{ borderWidth: 3, borderStyle: "solid" }} />
+            <p className={`text-sm ${isDark ? "text-white/35" : "text-gray-400"}`}>Загрузка цен...</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className={`rounded-2xl p-16 text-center ${glassCls}`}>
+            <div className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center ${isDark ? "bg-white/[0.06]" : "bg-gray-100"}`}>
+              <DollarSign size={26} className={isDark ? "text-white/20" : "text-gray-300"} />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">
-              Цены не назначены
-            </h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              {searchQuery || categoryFilter || masterFilter || statusFilter
-                ? "Попробуйте изменить параметры поиска"
-                : "Создайте первую комбинацию «мастер + услуга»"}
+            <p className={`text-lg font-bold mb-1 ${isDark ? "text-white/50" : "text-gray-500"}`}>
+              {prices.length === 0 ? "Нет цен" : "Ничего не найдено"}
             </p>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={openModalForAdd}
-              className="px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 inline-flex items-center gap-2"
-            >
-              <Plus className="w-5 h-5" />
-              Назначить цену
-            </motion.button>
-          </motion.div>
+            <p className={`text-sm mb-5 ${isDark ? "text-white/25" : "text-gray-400"}`}>
+              {search || statusFilter || categoryFilter || masterFilter
+                ? "Попробуйте изменить параметры поиска"
+                : "Назначьте первую цену мастеру"}
+            </p>
+            {search || statusFilter || categoryFilter || masterFilter ? (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("");
+                  setCategoryFilter("");
+                  setMasterFilter("");
+                }}
+                className={`px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all ${isDark ? "border-white/[0.1] text-white/50 hover:bg-white/[0.07]" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}
+              >
+                Сбросить фильтры
+              </motion.button>
+            ) : (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                onClick={openAdd}
+                className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg ${isDark ? "bg-gradient-to-r from-indigo-500 to-purple-600" : "bg-gradient-to-r from-blue-500 to-purple-600"}`}
+              >
+                + Назначить цену
+              </motion.button>
+            )}
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-            <AnimatePresence>
-              {filteredAndSortedPrices.map((price, index) => {
-                const displayDuration =
-                  price.durationOverride ??
-                  services.find((s) => s.id === price.serviceId)?.duration ??
-                  "—";
-                const isOverride = price.durationOverride != null;
-                const master = masters.find((m) => m.id === price.masterId);
-                const service = services.find((s) => s.id === price.serviceId);
-                const serviceDuration = service?.duration || 30;
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <AnimatePresence mode="popLayout">
+              {filtered.map((p, i) => {
+                const grad = catGrad(p.categoryId);
+                const service = services.find((s) => s.id === p.serviceId);
+                const displayDuration = p.durationOverride ?? service?.duration ?? "—";
+                const isOverride = p.durationOverride != null;
 
                 return (
                   <motion.div
-                    key={price.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    whileHover={{ scale: 1.01 }}
+                    key={p.id}
+                    layout
+                    initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
+                    transition={{ delay: i * 0.03, duration: 0.25 }}
+                    whileHover={{ y: -3 }}
+                    className={`relative rounded-2xl p-5 transition-all duration-300 overflow-hidden flex flex-col ${cardCls}`}
                   >
-                    <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow transition-all duration-200">
-                      {/* Заголовок */}
-                      <div className="mb-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <span
-                            className={`text-xs font-medium px-2 py-1 rounded ${price.isActive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}
+                    <div className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r ${grad} opacity-60`} />
+
+                    <div className="absolute top-4 right-4">
+                      <span
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
+                          p.isActive
+                            ? isDark
+                              ? "bg-emerald-500/10 border-emerald-400/15 text-emerald-400"
+                              : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                            : isDark
+                            ? "bg-rose-500/10 border-rose-400/15 text-rose-400"
+                            : "bg-rose-50 border-rose-200 text-rose-600"
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${p.isActive ? "bg-emerald-400" : "bg-rose-400"}`} />
+                        {p.isActive ? "Активна" : "Скрыта"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-start gap-3 mb-3 pr-20">
+                      <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${grad} flex items-center justify-center shadow-lg flex-shrink-0`}>
+                        <Package size={20} className="text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1 pt-0.5">
+                        <h3 className={`font-bold text-base leading-tight ${isDark ? "text-white/95" : "text-gray-900"}`}>{p.serviceTitle}</h3>
+                        <p className={`text-xs mt-0.5 ${isDark ? "text-white/45" : "text-gray-500"}`}>{p.categoryName}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 mb-4 p-2.5 rounded-xl bg-gradient-to-br from-white/[0.04] to-transparent border border-white/[0.08]">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                        {p.masterFullName.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <div className={`font-medium text-sm ${isDark ? "text-white/90" : "text-gray-900"} truncate`}>{p.masterFullName}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border ${isDark ? "bg-white/[0.06] border-white/[0.08] text-white/60" : "bg-gray-50 border-gray-200 text-gray-600"}`}>
+                        <div className={`w-3.5 h-3.5 rounded-md bg-gradient-to-br ${grad}`} />
+                        {p.categoryName}
+                      </span>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border ${isDark ? "bg-amber-500/8 border-amber-400/15 text-amber-400" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
+                        <Clock size={11} />
+                        {displayDuration} мин
+                        {isOverride && <span className="text-[10px] opacity-70">(инд.)</span>}
+                      </span>
+                    </div>
+
+                    <div className={`mt-auto pt-4 border-t ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}>
+                      <div className="flex items-center justify-between">
+                        <div className={`text-2xl font-black ${isDark ? "text-white" : "text-gray-900"}`}>{p.price.toLocaleString()} ₽</div>
+                        <div className="flex gap-1.5">
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => openEdit(p)}
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
+                              isDark
+                                ? "bg-blue-500/10 border-blue-400/15 text-blue-400 hover:bg-blue-500/20"
+                                : "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
+                            }`}
                           >
-                            {price.isActive ? "Активна" : "Неактивна"}
-                          </span>
-                          <span className="text-xs text-gray-400">
-                            #{price.id}
-                          </span>
+                            <Edit size={14} />
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => deletePrice(p.id)}
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
+                              isDark
+                                ? "bg-rose-500/10 border-rose-400/15 text-rose-400 hover:bg-rose-500/20"
+                                : "bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100"
+                            }`}
+                          >
+                            <Trash2 size={14} />
+                          </motion.button>
                         </div>
-                        <h3 className="font-semibold text-gray-900 text-base mb-1">
-                          {price.serviceTitle}
-                        </h3>
-                        <div className="text-sm text-gray-600">
-                          {price.categoryName}
-                        </div>
-                      </div>
-
-                      {/* Мастер */}
-                      <div className="flex items-center gap-2 mb-4 p-2 bg-gray-50 rounded-lg">
-                        <div className="w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
-                          {master ? getMasterInitial(master) : "М"}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">
-                            {price.masterFullName}
-                          </div>
-                          <div className="text-xs text-gray-500 truncate">
-                            {price.masterSpecialization || "Без специализации"}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Цена и длительность */}
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {Number(price.price).toLocaleString()} ₽
-                          </div>
-                          <div className="text-xs text-gray-500">Цена</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="flex items-center gap-1 justify-end">
-                            <div className="text-lg font-bold text-gray-900">
-                              {displayDuration} мин.
-                            </div>
-                            {isOverride && (
-                              <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
-                                инд.
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {isOverride && serviceDuration
-                              ? `Стандарт: ${serviceDuration} мин.`
-                              : "Длительность"}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Действия */}
-                      <div className="flex gap-2 pt-3 border-t border-gray-100">
-                        <button
-                          onClick={() => openModalForEdit(price)}
-                          className="flex-1 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1"
-                        >
-                          <Edit className="w-4 h-4" />
-                          Изменить
-                        </button>
-                        <button
-                          onClick={() => deletePrice(price.id)}
-                          className="flex-1 py-2 text-sm font-medium text-gray-600 hover:text-rose-600 hover:bg-gray-50 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Удалить
-                        </button>
                       </div>
                     </div>
                   </motion.div>
@@ -821,469 +758,262 @@ export default function MasterService() {
           </div>
         )}
 
-        {/* Информация внизу */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 text-sm text-gray-500">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-500 to-green-500"></div>
-              <span>Активные</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-rose-500 to-red-500"></div>
-              <span>Неактивные</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500"></div>
-              <span>Индивидуальная длительность</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <span>Загружено: {stats.total} цен</span>
-            <span className="text-indigo-600 font-medium flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              {stats.active} сейчас доступно
-            </span>
-          </div>
-        </div>
-
-        {/* Модальное окно */}
-        <AnimatePresence>
-          {isModalOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4"
-              onClick={closeModal}
-            >
-              <motion.div
-                initial={{ opacity: 0, y: 30, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 30, scale: 0.95 }}
-                onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md bg-gradient-to-br from-white to-gray-50/50 rounded-3xl shadow-2xl border border-gray-200/50 backdrop-blur-xl overflow-hidden max-h-[90vh] flex flex-col"
-              >
-                {/* Градиентный заголовок */}
-                <div className="relative px-6 py-5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-                  <div className="absolute top-0 right-0 p-4 opacity-20">
-                    <Sparkles className="w-12 h-12" />
-                  </div>
-
-                  <div className="relative z-10 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-                        <DollarSign className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-bold text-white">
-                          {editingPrice
-                            ? "Редактирование цены"
-                            : "Назначение цены"}
-                        </h2>
-                        <p className="text-white/80 text-xs mt-1">
-                          {editingPrice
-                            ? "Измените параметры цены"
-                            : "Создайте новую цену для мастера"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <motion.button
-                      whileHover={{ scale: 1.1, rotate: 90 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={closeModal}
-                      className="p-1.5 text-white/80 hover:text-white rounded-full hover:bg-white/10 transition-all duration-300"
-                    >
-                      <X className="w-5 h-5" />
-                    </motion.button>
-                  </div>
+        {/* FOOTER */}
+        {!isLoading && prices.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className={`flex flex-wrap items-center justify-between gap-3 pt-5 border-t text-xs ${
+              isDark ? "border-white/[0.06] text-white/20" : "border-gray-100 text-gray-400"
+            }`}
+          >
+            <div className="flex flex-wrap gap-4">
+              {[
+                { c: "bg-emerald-400", l: "Активные" },
+                { c: "bg-rose-400", l: "Неактивные" },
+              ].map((x) => (
+                <div key={x.l} className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${x.c}`} />
+                  {x.l}
                 </div>
+              ))}
+            </div>
+            <span className="flex items-center gap-1.5">
+              <TrendingUp size={12} />
+              {stats.active} из {stats.total} доступно
+            </span>
+          </motion.div>
+        )}
+      </div>
 
-                {/* Основной контент */}
-                <div className="flex-1 overflow-y-auto p-6">
-                  <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Категория и услуга */}
-                    <div className="bg-gradient-to-br from-indigo-50/30 to-purple-50/30 rounded-2xl p-4 border border-indigo-200/30">
-                      <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <Package className="w-4 h-4 text-indigo-500" />
-                        Категория и услуга *
-                      </div>
-                      <div className="grid grid-cols-1 gap-4">
-                        <div>
-                          <div className="text-xs text-gray-600 mb-2">
-                            Категория
-                          </div>
-                          <select
-                            value={
-                              formData.serviceId
-                                ? services.find(
-                                    (s) => s.id === formData.serviceId,
-                                  )?.categoryId || 0
-                                : 0
-                            }
-                            onChange={(e) => {
-                              const catId = Number(e.target.value);
-                              const firstService = services.find(
-                                (s) => s.categoryId === catId && s.isActive,
-                              );
-                              const duration = firstService?.duration || 30;
-                              setFormData((prev) => ({
-                                ...prev,
-                                serviceId: firstService?.id || 0,
-                                durationOverride: null,
-                                _baseDuration: duration,
-                              }));
-                            }}
-                            className="w-full px-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-gray-900 transition-all duration-300"
-                            required
-                          >
-                            <option value={0}>Выберите категорию</option>
-                            {getCategoryOptions().map((cat) => (
-                              <option key={cat.id} value={cat.id}>
-                                {cat.title}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-600 mb-2">
-                            Услуга
-                          </div>
-                          <select
-                            value={formData.serviceId}
-                            onChange={(e) => {
-                              const serviceId = Number(e.target.value);
-                              const service = services.find(
-                                (s) => s.id === serviceId,
-                              );
-                              const duration = service?.duration || 30;
-                              setFormData((prev) => ({
-                                ...prev,
-                                serviceId,
-                                durationOverride: null,
-                                _baseDuration: duration,
-                              }));
-                            }}
-                            className="w-full px-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-gray-900 transition-all duration-300"
-                            required
-                          >
-                            <option value={0}>Выберите услугу</option>
-                            {formData.serviceId
-                              ? getServicesByCategory(
-                                  services.find(
-                                    (s) => s.id === formData.serviceId,
-                                  )?.categoryId || 0,
-                                ).map((s) => (
-                                  <option key={s.id} value={s.id}>
-                                    {s.title} ({s.duration} мин.)
-                                  </option>
-                                ))
-                              : services
-                                  .filter((s) => s.isActive)
-                                  .map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                      {s.title} ({s.duration} мин.)
-                                    </option>
-                                  ))}
-                          </select>
-                        </div>
-                      </div>
+      {/* MODAL */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={(e) => e.target === e.currentTarget && closeModal()}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+            style={{ background: isDark ? "rgba(0,0,0,0.78)" : "rgba(15,23,42,0.42)", backdropFilter: "blur(16px)" }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 24 }}
+              transition={{ type: "spring", damping: 28, stiffness: 340 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`relative w-full max-w-lg rounded-3xl overflow-hidden my-4 flex flex-col max-h-[90vh] ${modalCls}`}
+            >
+              <div
+                className={`relative px-7 py-6 overflow-hidden flex-shrink-0 ${
+                  editingPrice
+                    ? "bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500"
+                    : "bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"
+                }`}
+              >
+                <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full" />
+                <div className="absolute bottom-0 left-0 right-0 h-px bg-white/15" />
+                <div className="relative flex items-center justify-between">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                      {editingPrice ? <Edit size={20} className="text-white" /> : <DollarSign size={20} className="text-white" />}
                     </div>
+                    <div>
+                      <h2 className="text-xl font-black text-white">
+                        {editingPrice ? "Редактировать цену" : "Новая цена"}
+                      </h2>
+                      <p className="text-white/65 text-xs mt-0.5">
+                        {editingPrice ? "Измените параметры" : "Назначьте цену мастеру"}
+                      </p>
+                    </div>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={closeModal}
+                    className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white hover:bg-white/25 transition-colors"
+                  >
+                    <X size={17} />
+                  </motion.button>
+                </div>
+              </div>
 
-                    {/* Мастер */}
-                    <div className="bg-gradient-to-br from-blue-50/30 to-cyan-50/30 rounded-2xl p-4 border border-blue-200/30">
-                      <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <Users className="w-4 h-4 text-blue-500" />
-                        Мастер *
-                      </div>
-                      <select
-                        name="masterId"
-                        value={formData.masterId}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-300"
-                        required
-                      >
-                        <option value={0}>Выберите мастера</option>
-                        {masters
-                          .filter((m) => m.isActive)
-                          .map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.surname} {m.name} — {m.specialization}
-                            </option>
-                          ))}
+              <div className="flex-1 overflow-y-auto">
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                  <div className={sectionCls}>
+                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${isDark ? "text-white/35" : "text-gray-400"}`}>Услуга *</label>
+                    <div className="relative">
+                      <Package size={14} className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`} />
+                      <select name="serviceId" value={form.serviceId} onChange={handleInput} required className={`${inputCls} pl-10 pr-8 appearance-none`}>
+                        <option value={0}>Выберите услугу</option>
+                        {services.filter((s) => s.isActive).map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.title} ({s.duration} мин)
+                          </option>
+                        ))}
                       </select>
+                      <ChevronDown size={13} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`} />
                     </div>
+                  </div>
 
-                    {/* Продолжительность */}
-                    <div className="bg-gradient-to-br from-amber-50/30 to-orange-50/30 rounded-2xl p-4 border border-amber-200/30">
-                      <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-amber-500" />
-                        Продолжительность
-                      </div>
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between p-3 bg-gradient-to-r from-amber-50/50 to-orange-50/50 rounded-xl border border-amber-200/30">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              Базовая длительность
-                            </div>
-                            <div className="text-xs text-gray-600">
-                              {formData._baseDuration} минут
-                            </div>
-                          </div>
-                          <div className="text-lg font-bold text-amber-700">
-                            {formData._baseDuration} мин.
-                          </div>
-                        </div>
-
-                        <div className="space-y-3">
-                          <label className="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50/50 to-white/30 rounded-xl border border-gray-200/30 cursor-pointer hover:bg-white/50 transition-all duration-300">
-                            <input
-                              type="radio"
-                              name="durationMode"
-                              checked={formData.durationOverride === null}
-                              onChange={() =>
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  durationOverride: null,
-                                }))
-                              }
-                              className="h-4 w-4 text-indigo-600"
-                            />
-                            <div className="flex-1">
-                              <div className="text-sm font-medium text-gray-900">
-                                Использовать базовую
-                              </div>
-                              <div className="text-xs text-gray-600">
-                                {formData._baseDuration} минут
-                              </div>
-                            </div>
-                          </label>
-
-                          <label className="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50/50 to-white/30 rounded-xl border border-gray-200/30 cursor-pointer hover:bg-white/50 transition-all duration-300">
-                            <input
-                              type="radio"
-                              name="durationMode"
-                              checked={formData.durationOverride !== null}
-                              onChange={() =>
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  durationOverride: prev._baseDuration || 30,
-                                }))
-                              }
-                              className="h-4 w-4 text-indigo-600"
-                            />
-                            <div className="flex-1">
-                              <div className="text-sm font-medium text-gray-900">
-                                Указать свою
-                              </div>
-                              <div className="text-xs text-gray-600">
-                                Индивидуальная длительность
-                              </div>
-                            </div>
-                          </label>
-                        </div>
-
-                        {formData.durationOverride !== null && (
-                          <div className="p-3 bg-gradient-to-r from-emerald-50/50 to-green-50/50 rounded-xl border border-emerald-200/30">
-                            <div className="text-xs text-gray-600 mb-2">
-                              Своя длительность
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <input
-                                type="number"
-                                value={formData.durationOverride || ""}
-                                onChange={(e) =>
-                                  setFormData((prev) => ({
-                                    ...prev,
-                                    durationOverride: Math.max(
-                                      5,
-                                      parseInt(e.target.value) || 0,
-                                    ),
-                                  }))
-                                }
-                                min="5"
-                                step="5"
-                                className="flex-1 px-4 py-2.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-gray-900 transition-all duration-300"
-                              />
-                              <span className="text-gray-600 whitespace-nowrap">
-                                минут
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                  <div className={sectionCls}>
+                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${isDark ? "text-white/35" : "text-gray-400"}`}>Мастер *</label>
+                    <div className="relative">
+                      <Users size={14} className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`} />
+                      <select name="masterId" value={form.masterId} onChange={handleInput} required className={`${inputCls} pl-10 pr-8 appearance-none`}>
+                        <option value={0}>Выберите мастера</option>
+                        {masters.filter((m) => m.isActive).map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.surname} {m.name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown size={13} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`} />
                     </div>
+                  </div>
 
-                    {/* Цена */}
-                    <div className="bg-gradient-to-br from-emerald-50/30 to-green-50/30 rounded-2xl p-4 border border-emerald-200/30">
-                      <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-emerald-500" />
-                        Цена (₽) *
-                      </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className={sectionCls}>
+                      <label className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${isDark ? "text-white/35" : "text-gray-400"}`}>Цена (₽) *</label>
                       <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                          ₽
-                        </span>
+                        <DollarSign size={14} className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`} />
+                        <input type="number" name="price" value={form.price} onChange={handleInput} min="100" step="50" required className={`${inputCls} pl-10 pr-10`} />
+                        <span className={`absolute right-3.5 top-1/2 -translate-y-1/2 text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}>₽</span>
+                      </div>
+                    </div>
+
+                    <div className={sectionCls}>
+                      <label className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${isDark ? "text-white/35" : "text-gray-400"}`}>Длительность</label>
+                      <div className="relative">
+                        <Clock size={14} className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`} />
                         <input
                           type="number"
-                          name="price"
-                          value={formData.price || ""}
-                          onChange={handleInputChange}
-                          min="0"
-                          step="50"
-                          placeholder="Например: 1500"
-                          className="w-full pl-10 pr-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-gray-900 placeholder-gray-500 transition-all duration-300"
-                          required
+                          name="durationOverride"
+                          value={form.durationOverride ?? ""}
+                          onChange={handleInput}
+                          placeholder="—"
+                          className={`${inputCls} pl-10 pr-10`}
                         />
+                        <span className={`absolute right-3.5 top-1/2 -translate-y-1/2 text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}>мин</span>
                       </div>
                     </div>
+                  </div>
 
-                    {/* Статус */}
-                    <div className="bg-gradient-to-br from-gray-50/30 to-white/30 rounded-2xl p-4 border border-gray-200/30">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`p-2 rounded-xl ${formData.isActive ? "bg-gradient-to-r from-emerald-500 to-green-500" : "bg-gradient-to-r from-rose-500 to-red-500"}`}
-                          >
-                            {formData.isActive ? (
-                              <Eye className="w-4 h-4 text-white" />
-                            ) : (
-                              <EyeOff className="w-4 h-4 text-white" />
-                            )}
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold text-gray-900">
-                              Статус цены
-                            </div>
-                            <div className="text-xs text-gray-600">
-                              {formData.isActive
-                                ? "Видна клиентам"
-                                : "Скрыта от клиентов"}
-                            </div>
-                          </div>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            name="isActive"
-                            checked={formData.isActive}
-                            onChange={handleInputChange}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r from-emerald-500 to-green-500"></div>
-                        </label>
+                  <div className={sectionCls}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className={`text-sm font-bold ${isDark ? "text-white/85" : "text-gray-800"}`}>Статус цены</p>
+                        <p className={`text-xs mt-0.5 ${isDark ? "text-white/35" : "text-gray-400"}`}>
+                          {form.isActive ? "Видна клиентам" : "Скрыта от клиентов"}
+                        </p>
                       </div>
-                    </div>
-
-                    {/* Сводная информация */}
-                    {formData.serviceId > 0 && formData.masterId > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="p-4 bg-gradient-to-r from-gray-50/50 to-white/30 border border-gray-200/30 rounded-2xl backdrop-blur-sm"
+                      <motion.button
+                        type="button"
+                        onClick={() => setForm((prev) => ({ ...prev, isActive: !prev.isActive }))}
+                        whileTap={{ scale: 0.95 }}
+                        className={`relative inline-flex h-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                          form.isActive
+                            ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                            : isDark
+                            ? "bg-white/[0.1]"
+                            : "bg-gray-200"
+                        }`}
+                        style={{ width: 52 }}
                       >
-                        <div className="text-xs text-gray-600 mb-2">
-                          Сводная информация
+                        <motion.span
+                          layout
+                          className="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg mt-0.5"
+                          animate={{ x: form.isActive ? 26 : 2 }}
+                          transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                        />
+                      </motion.button>
+                    </div>
+                    <div className={`flex items-center gap-1.5 mt-2.5 text-xs font-semibold ${form.isActive ? (isDark ? "text-emerald-400" : "text-emerald-700") : isDark ? "text-amber-400" : "text-amber-700"}`}>
+                      {form.isActive ? <Eye size={12} /> : <EyeOff size={12} />}
+                      {form.isActive ? "Цена активна" : "Цена скрыта"}
+                    </div>
+                  </div>
+
+                  <AnimatePresence>
+                    {form.serviceId > 0 && form.masterId > 0 && form.price > 0 && (
+                      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={`flex items-start justify-between p-3.5 rounded-2xl border ${isDark ? "bg-white/[0.05] border-white/[0.07]" : "bg-gray-50/80 border-gray-200/60"}`}>
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-xs mb-0.5 ${isDark ? "text-white/30" : "text-gray-400"}`}>Сводка</p>
+                          <p className={`text-sm font-bold truncate ${isDark ? "text-white/85" : "text-gray-800"}`}>
+                            {services.find((s) => s.id === form.serviceId)?.title}
+                          </p>
+                          <p className={`text-xs mt-0.5 ${isDark ? "text-white/30" : "text-gray-400"}`}>
+                            {masters.find((m) => m.id === form.masterId)?.surname} {masters.find((m) => m.id === form.masterId)?.name} · {form.price.toLocaleString()} ₽
+                          </p>
                         </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-700">
-                              Услуга:
-                            </span>
-                            <span className="text-sm font-medium text-gray-900">
-                              {
-                                services.find(
-                                  (s) => s.id === formData.serviceId,
-                                )?.title
-                              }
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-700">
-                              Мастер:
-                            </span>
-                            <span className="text-sm font-medium text-gray-900">
-                              {
-                                masters.find((m) => m.id === formData.masterId)
-                                  ?.surname
-                              }{" "}
-                              {
-                                masters.find((m) => m.id === formData.masterId)
-                                  ?.name
-                              }
-                            </span>
-                          </div>
-                          {formData.price > 0 && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-700">
-                                Цена:
-                              </span>
-                              <span className="text-sm font-bold text-emerald-700">
-                                {formData.price.toLocaleString()} ₽
-                              </span>
-                            </div>
-                          )}
+                        <div className={`ml-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border flex-shrink-0 ${form.isActive ? (isDark ? "bg-emerald-500/10 border-emerald-400/15 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-700") : isDark ? "bg-rose-500/10 border-rose-400/15 text-rose-400" : "bg-rose-50 border-rose-200 text-rose-600"}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${form.isActive ? "bg-emerald-400" : "bg-rose-400"}`} />
+                          {form.isActive ? "Активна" : "Скрыта"}
                         </div>
                       </motion.div>
                     )}
+                  </AnimatePresence>
 
-                    {/* Кнопки */}
-                    <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200/50">
-                      <motion.button
-                        type="button"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={closeModal}
-                        className="flex-1 px-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-semibold hover:bg-gray-50/80 transition-all duration-300 shadow-sm text-sm"
-                      >
-                        Отмена
-                      </motion.button>
-
-                      <motion.button
-                        type="submit"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        disabled={isLoading}
-                        className="flex-1 px-4 py-3.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 text-sm"
-                      >
-                        {isLoading ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Сохранение...
-                          </>
-                        ) : (
-                          <>
-                            {editingPrice ? (
-                              <Edit className="w-4 h-4" />
-                            ) : (
-                              <Plus className="w-4 h-4" />
-                            )}
-                            {editingPrice
-                              ? "Сохранить изменения"
-                              : "Создать цену"}
-                          </>
-                        )}
-                      </motion.button>
-                    </div>
-                  </form>
-                </div>
-
-                {/* Футер */}
-                <div className="px-6 py-3 border-t border-gray-200/50 bg-gradient-to-r from-gray-50/50 to-white/30">
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <div className="flex items-center gap-2">
-                      <Shield className="w-2.5 h-2.5" />
-                      <span>Данные защищены</span>
-                    </div>
-                    <span>ID: {editingPrice ? editingPrice.id : "Новый"}</span>
+                  <div className={`flex flex-col sm:flex-row gap-3 pt-5 border-t ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}>
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={closeModal}
+                      disabled={isLoading}
+                      className={`flex-1 h-12 rounded-2xl text-sm font-semibold border transition-all ${
+                        isDark
+                          ? "bg-white/[0.06] border-white/[0.1] text-white/60 hover:bg-white/[0.09]"
+                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm"
+                      }`}
+                    >
+                      Отмена
+                    </motion.button>
+                    <motion.button
+                      type="submit"
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.98 }}
+                      disabled={isLoading}
+                      className={`flex-1 h-12 rounded-2xl text-sm font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 ${
+                        editingPrice
+                          ? "bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500"
+                          : "bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"
+                      }`}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Сохранение...
+                        </>
+                      ) : editingPrice ? (
+                        <>
+                          <Edit size={16} />
+                          Сохранить изменения
+                        </>
+                      ) : (
+                        <>
+                          <DollarSign size={16} />
+                          Назначить цену
+                        </>
+                      )}
+                    </motion.button>
                   </div>
-                </div>
-              </motion.div>
+                </form>
+              </div>
+
+              <div className={`px-7 py-3 border-t flex items-center justify-between text-xs flex-shrink-0 ${isDark ? "border-white/[0.06] text-white/20 bg-white/[0.02]" : "border-gray-100 text-gray-400 bg-gray-50/50"}`}>
+                <span className="flex items-center gap-1.5">
+                  <Shield size={11} />
+                  Данные защищены
+                </span>
+                <span>ID: {editingPrice ? editingPrice.id : "Новый"}</span>
+              </div>
             </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

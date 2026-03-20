@@ -1,29 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Clock, 
-  User, 
-  Scissors, 
-  Calendar, 
-  Users, 
-  CheckCircle, 
-  XCircle,
-  AlertCircle,
+import {
   Clock4,
+  CheckCheck,
+  Ban,
   Edit,
   Trash2,
   MoreVertical,
   Phone,
-  ChevronRight,
+  Scissors,
+  User2,
+  CalendarDays,
   Zap,
-  CheckCheck,
   MapPin,
-  Star,
-  Ban,
+  Timer,
   Eye,
-  CalendarCheck
 } from "lucide-react";
 
 interface Appointment {
@@ -42,85 +35,111 @@ interface Appointment {
 
 interface AppointmentItemProps {
   appointment: Appointment;
-  onEdit?: (appointment: Appointment) => void;
+  onEdit?: (a: Appointment) => void;
   onDelete?: (id: string) => void;
   onComplete?: (id: string) => void;
   onCancel?: (id: string) => void;
+  hideActions?: boolean;
 }
 
-const formatDateTime = (rawDateTime: string) => {
-  const d = new Date(rawDateTime);
-  if (isNaN(d.getTime())) {
-    return "Дата не определена";
-  }
+const fmtDT = (s: string) => {
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return "—";
   return d.toLocaleString("ru-RU", {
     day: "2-digit",
-    month: "long",
+    month: "short",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
 };
 
-const getStatusConfig = (status: string) => {
-  const configs: Record<string, {
-    bg: string;
-    text: string;
-    border: string;
-    icon: React.ReactNode;
-    gradient: string;
-    badge: string;
-  }> = {
-    "Новый": {
-      bg: "bg-gradient-to-r from-amber-500/10 to-orange-500/10",
-      text: "text-amber-700",
-      border: "border-amber-200/50",
-      icon: <AlertCircle className="w-4 h-4" />,
-      gradient: "from-amber-500 to-orange-500",
-      badge: "bg-gradient-to-r from-amber-500 to-orange-500"
-    },
-    "Подтвержден": {
-      bg: "bg-gradient-to-r from-emerald-500/10 to-green-500/10",
-      text: "text-emerald-700",
-      border: "border-emerald-200/50",
-      icon: <CheckCircle className="w-4 h-4" />,
-      gradient: "from-emerald-500 to-green-500",
-      badge: "bg-gradient-to-r from-emerald-500 to-green-500"
-    },
-    "Завершен": {
-      bg: "bg-gradient-to-r from-blue-500/10 to-indigo-500/10",
-      text: "text-blue-700",
-      border: "border-blue-200/50",
-      icon: <Clock4 className="w-4 h-4" />,
-      gradient: "from-blue-500 to-indigo-500",
-      badge: "bg-gradient-to-r from-blue-500 to-indigo-500"
-    },
-    "Отменен": {
-      bg: "bg-gradient-to-r from-rose-500/10 to-red-500/10",
-      text: "text-rose-700",
-      border: "border-rose-200/50",
-      icon: <XCircle className="w-4 h-4" />,
-      gradient: "from-rose-500 to-red-500",
-      badge: "bg-gradient-to-r from-rose-500 to-red-500"
-    },
-  };
-
-  return configs[status] || {
-    bg: "bg-gradient-to-r from-gray-500/10 to-gray-600/10",
-    text: "text-gray-700",
-    border: "border-gray-200/50",
-    icon: <Clock className="w-4 h-4" />,
-    gradient: "from-gray-500 to-gray-600",
-    badge: "bg-gradient-to-r from-gray-500 to-gray-600"
-  };
+const fmtTime = (s: string) => {
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 };
 
-const getInitials = (name: string) => {
-  return name
-    .split(' ')
-    .map(n => n[0])
-    .join('')
+const getInitials = (n: string) =>
+  n
+    .split(" ")
+    .map((x) => x[0] ?? "")
+    .join("")
     .toUpperCase()
     .slice(0, 2);
+
+type SK = "Новый" | "Подтвержден" | "Завершен" | "Отменен";
+
+const STATUS_CFG: Record<
+  SK,
+  {
+    label: string;
+    dot: string;
+    gradFrom: string;
+    gradTo: string;
+    chipDark: string;
+    chipLight: string;
+    textDark: string;
+    textLight: string;
+    glowDark: string;
+  }
+> = {
+  Новый: {
+    label: "Новый",
+    dot: "#f59e0b",
+    gradFrom: "#f59e0b",
+    gradTo: "#ef4444",
+    chipDark: "bg-amber-500/15 border-amber-400/20",
+    chipLight: "bg-amber-50 border-amber-200",
+    textDark: "text-amber-300",
+    textLight: "text-amber-700",
+    glowDark: "shadow-amber-500/20",
+  },
+  Подтвержден: {
+    label: "Подтверждён",
+    dot: "#22c55e",
+    gradFrom: "#22c55e",
+    gradTo: "#10b981",
+    chipDark: "bg-emerald-500/15 border-emerald-400/20",
+    chipLight: "bg-emerald-50 border-emerald-200",
+    textDark: "text-emerald-300",
+    textLight: "text-emerald-700",
+    glowDark: "shadow-emerald-500/20",
+  },
+  Завершен: {
+    label: "Завершён",
+    dot: "#6366f1",
+    gradFrom: "#6366f1",
+    gradTo: "#8b5cf6",
+    chipDark: "bg-indigo-500/15 border-indigo-400/20",
+    chipLight: "bg-indigo-50 border-indigo-200",
+    textDark: "text-indigo-300",
+    textLight: "text-indigo-700",
+    glowDark: "shadow-indigo-500/20",
+  },
+  Отменен: {
+    label: "Отменён",
+    dot: "#ef4444",
+    gradFrom: "#ef4444",
+    gradTo: "#f43f5e",
+    chipDark: "bg-rose-500/15 border-rose-400/20",
+    chipLight: "bg-rose-50 border-rose-200",
+    textDark: "text-rose-300",
+    textLight: "text-rose-600",
+    glowDark: "shadow-rose-500/20",
+  },
+};
+
+const DEFAULT_CFG = {
+  label: "Статус",
+  dot: "#94a3b8",
+  gradFrom: "#94a3b8",
+  gradTo: "#64748b",
+  chipDark: "bg-slate-500/15 border-slate-400/20",
+  chipLight: "bg-slate-50 border-slate-200",
+  textDark: "text-slate-300",
+  textLight: "text-slate-600",
+  glowDark: "shadow-slate-500/10",
 };
 
 export default function AppointmentItem({
@@ -129,364 +148,335 @@ export default function AppointmentItem({
   onDelete,
   onComplete,
   onCancel,
+  hideActions = false,
 }: AppointmentItemProps) {
-  const [isHovered, setIsHovered] = useState(false);
-  const [showActions, setShowActions] = useState(false);
-  const statusConfig = getStatusConfig(appointment.status);
+  const [isDark, setIsDark] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  const handleCompleteClick = () => {
-    if (onComplete && window.confirm("Завершить запись?")) {
-      onComplete(appointment.id);
-    }
-  };
-
-  const handleCancelClick = () => {
-    if (onCancel && window.confirm("Отменить запись?")) {
-      onCancel(appointment.id);
-    }
-  };
-
-  const isActiveStatus = appointment.status === "Подтвержден";
-
-  // Определяем доступные действия в зависимости от статуса
-  const getAvailableActions = () => {
-    const actions = [];
-    
-    if (appointment.status === "Подтвержден") {
-      actions.push({
-        id: "complete",
-        label: "Завершить",
-        icon: <CheckCheck className="w-4 h-4" />,
-        color: "text-emerald-600",
-        bgColor: "bg-emerald-100",
-        onClick: handleCompleteClick
-      });
-    }
-    
-    if (appointment.status === "Подтвержден") {
-      actions.push({
-        id: "cancel",
-        label: "Отменить",
-        icon: <Ban className="w-4 h-4" />,
-        color: "text-rose-600",
-        bgColor: "bg-rose-100",
-        onClick: handleCancelClick
-      });
-    }
-    
-    actions.push({
-      id: "view",
-      label: "Подробнее",
-      icon: <Eye className="w-4 h-4" />,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
-      onClick: () => console.log("Просмотр деталей")
+  useEffect(() => {
+    const check = () =>
+      setIsDark(document.documentElement.classList.contains("dark"));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
     });
-    
-    if (onEdit) {
-      actions.push({
-        id: "edit",
-        label: "Редактировать",
-        icon: <Edit className="w-4 h-4" />,
-        color: "text-purple-600",
-        bgColor: "bg-purple-100",
-        onClick: () => onEdit(appointment)
-      });
-    }
-    
-    if (onDelete) {
-      actions.push({
-        id: "delete",
-        label: "Удалить",
-        icon: <Trash2 className="w-4 h-4" />,
-        color: "text-red-600",
-        bgColor: "bg-red-100",
-        onClick: () => {
-          if (window.confirm("Удалить запись?")) {
-            onDelete(appointment.id);
-          }
-        }
-      });
-    }
-    
-    return actions;
-  };
+    return () => obs.disconnect();
+  }, []);
 
-  const actions = getAvailableActions();
+  const st = STATUS_CFG[appointment.status as SK] ?? DEFAULT_CFG;
+  const isActive = appointment.status === "Подтвержден";
+  const isNew = appointment.status === "Новый";
+
+  const handleComplete = () =>
+    onComplete &&
+    window.confirm("Отметить как завершённую?") &&
+    onComplete(appointment.id);
+
+  const handleCancel = () =>
+    onCancel && window.confirm("Отменить запись?") && onCancel(appointment.id);
+
+  const handleDelete = () =>
+    onDelete &&
+    window.confirm("Удалить запись навсегда?") &&
+    onDelete(appointment.id);
+
+  // Card styles
+  const cardCls = isDark
+    ? `bg-white/[0.06] border border-white/[0.1] backdrop-blur-xl hover:bg-white/[0.09] hover:border-white/[0.15] shadow-[0_4px_24px_rgba(0,0,0,0.2)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)] ${st.glowDark}`
+    : "bg-white border border-gray-200/70 hover:border-gray-300/80 shadow-sm hover:shadow-md";
+
+  const avatarGrad = `linear-gradient(135deg, ${st.gradFrom}, ${st.gradTo})`;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      whileHover={{ scale: 1.005 }}
-      onHoverStart={() => setIsHovered(true)}
-      onHoverEnd={() => setIsHovered(false)}
-      className="group relative bg-gradient-to-br from-white to-gray-50/50 rounded-3xl border border-gray-200/50 p-6 hover:border-blue-300/50 hover:shadow-2xl transition-all duration-300 backdrop-blur-sm overflow-hidden"
+      layout
+      initial={{ opacity: 0, y: 12, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.98 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className={`relative rounded-2xl transition-all duration-300  ${cardCls}`}
     >
-      {/* Анимированный градиентный фон при наведении */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: isHovered ? 0.3 : 0 }}
-        className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-pink-500/5"
+      {/* Subtle top gradient line */}
+      <div
+        className="absolute top-0 left-0 right-0 h-[1.5px] opacity-60"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${st.gradFrom}60, transparent)`,
+        }}
       />
 
-      {/* Основной контент */}
-      <div className="relative z-10">
-        {/* Заголовок с аватаром и статусом */}
-        <div className="flex items-start justify-between mb-6">
-          {/* Левая часть - информация о клиенте */}
-          <div className="flex items-start gap-4 flex-1">
-            {/* Аватар клиента */}
-            <div className="relative">
-              <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${statusConfig.gradient} flex items-center justify-center text-white font-bold text-xl shadow-lg`}>
-                {getInitials(appointment.clientName)}
-              </div>
-            </div>
-            
-            {/* Информация о клиенте */}
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <h3 className="font-bold text-gray-900 text-2xl">
-                  {appointment.clientName}
-                </h3>
-                <motion.span
-                  whileHover={{ scale: 1.05 }}
-                  className={`px-4 py-1.5 text-sm font-semibold rounded-xl ${statusConfig.bg} ${statusConfig.text} border ${statusConfig.border} backdrop-blur-sm flex items-center gap-2`}
-                >
-                  {statusConfig.icon}
-                  {appointment.status}
-                </motion.span>
-              </div>
-              
-              {/* Время записи */}
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Clock className="w-5 h-5 text-blue-500" />
-                  <span className="font-medium">{formatDateTime(appointment.rawDateTime)}</span>
-                </div>
-                
-                {/* Длительность */}
-                <div className="flex items-center gap-2 text-gray-500">
-                  <Clock4 className="w-4 h-4" />
-                  <span>{appointment.duration} мин</span>
-                </div>
+      {/* NEW badge pulse */}
+      {isNew && (
+        <div className="absolute top-4 right-4">
+          <span
+            className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${
+              isDark
+                ? "bg-amber-500/15 text-amber-300 border border-amber-400/20"
+                : "bg-amber-50 text-amber-700 border border-amber-200"
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            Ожидает
+          </span>
+        </div>
+      )}
 
-                {/* Телефон */}
-                {appointment.clientPhone && (
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <Phone className="w-4 h-4" />
-                    <span className="text-sm">{appointment.clientPhone}</span>
-                  </div>
-                )}
+      <div className="p-5">
+        {/* ── TOP ROW ── */}
+        <div className="flex items-start gap-4">
+          {/* Avatar */}
+          <div className="relative flex-shrink-0">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-lg font-black shadow-lg"
+              style={{ background: avatarGrad }}
+            >
+              {getInitials(appointment.clientName)}
+            </div>
+            {/* Online dot */}
+            <div
+              className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center"
+              style={{
+                background: st.dot,
+                borderColor: isDark ? "rgba(15,23,42,1)" : "white",
+              }}
+            />
+          </div>
+
+          {/* Client info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-1.5">
+              <h3
+                className={`text-xl font-bold leading-tight ${isDark ? "text-white/95" : "text-gray-900"}`}
+              >
+                {appointment.clientName}
+              </h3>
+              <span
+                className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                  isDark
+                    ? `${st.chipDark} ${st.textDark}`
+                    : `${st.chipLight} ${st.textLight}`
+                }`}
+              >
+                {st.label}
+              </span>
+            </div>
+
+            {/* Time & duration */}
+            <div className="flex flex-wrap items-center gap-4 mb-3">
+              <div
+                className={`flex items-center gap-1.5 text-sm font-medium ${isDark ? "text-white/70" : "text-gray-600"}`}
+              >
+                <CalendarDays
+                  size={14}
+                  className={isDark ? "text-purple-400" : "text-blue-500"}
+                />
+                {fmtDT(appointment.rawDateTime)}
               </div>
+              <div
+                className={`flex items-center gap-1.5 text-sm ${isDark ? "text-white/40" : "text-gray-400"}`}
+              >
+                <Timer size={13} />
+                {appointment.duration} мин
+              </div>
+              {appointment.clientPhone && (
+                <div
+                  className={`flex items-center gap-1.5 text-sm ${isDark ? "text-white/40" : "text-gray-400"}`}
+                >
+                  <Phone size={13} />
+                  {appointment.clientPhone}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Правая часть - цена и кнопки */}
-          <div className="flex flex-col items-end gap-3">
-            {/* Цена */}
-            <div className={`text-3xl font-bold bg-gradient-to-r ${statusConfig.gradient} bg-clip-text text-transparent`}>
+          {/* Price */}
+          <div className="flex-shrink-0 text-right ml-2">
+            <div
+              className={`text-2xl font-black leading-none ${isDark ? "text-white" : "text-gray-900"}`}
+            >
               {appointment.price}
             </div>
-            
-            {/* Кнопки действий */}
-            {actions.length > 0 && (
-              <div className="flex items-center gap-2">
-                {/* Быстрые действия для подтвержденных записей */}
-                {isActiveStatus && (
-                  <>
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={handleCompleteClick}
-                      className="w-10 h-10 rounded-2xl flex items-center justify-center bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-                      title="Завершить запись"
-                    >
-                      <CheckCheck className="w-5 h-5" />
-                    </motion.button>
-                    
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={handleCancelClick}
-                      className="w-10 h-10 rounded-2xl flex items-center justify-center bg-gradient-to-r from-rose-500 to-red-500 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-                      title="Отменить запись"
-                    >
-                      <Ban className="w-5 h-5" />
-                    </motion.button>
-                  </>
-                )}
+            <div
+              className={`text-xs mt-1 ${isDark ? "text-white/40" : "text-gray-400"}`}
+            >
+              стоимость
+            </div>
+          </div>
+        </div>
 
-                {/* Кнопка редактирования */}
-                {onEdit && (
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => onEdit(appointment)}
-                    className="w-10 h-10 rounded-2xl flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-                    title="Редактировать"
+        {/* ── INFO PILLS ROW ── */}
+        <div className="flex flex-wrap gap-2 mt-4">
+          <InfoPill
+            isDark={isDark}
+            icon={
+              <Scissors
+                size={13}
+                className={isDark ? "text-purple-400" : "text-blue-500"}
+              />
+            }
+            label={appointment.service}
+            className={
+              isDark
+                ? "bg-purple-500/10 border-purple-400/15 text-white/75"
+                : "bg-blue-50/80 border-blue-100 text-blue-800"
+            }
+          />
+          <InfoPill
+            isDark={isDark}
+            icon={
+              <User2
+                size={13}
+                className={isDark ? "text-indigo-400" : "text-purple-500"}
+              />
+            }
+            label={appointment.master}
+            className={
+              isDark
+                ? "bg-indigo-500/10 border-indigo-400/15 text-white/75"
+                : "bg-purple-50/80 border-purple-100 text-purple-800"
+            }
+          />
+          <InfoPill
+            isDark={isDark}
+            icon={
+              <MapPin
+                size={13}
+                className={isDark ? "text-cyan-400" : "text-cyan-600"}
+              />
+            }
+            label="Основной зал"
+            className={
+              isDark
+                ? "bg-cyan-500/10 border-cyan-400/15 text-white/75"
+                : "bg-cyan-50/80 border-cyan-100 text-cyan-800"
+            }
+          />
+        </div>
+
+        {/* ── FOOTER ── */}
+        <div
+          className={`flex items-center justify-between mt-4 pt-4 border-t ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}
+        >
+          <div
+            className={`flex items-center gap-4 text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}
+          >
+            <span className="flex items-center gap-1.5">
+              <Zap size={12} className="opacity-60" />
+              ID: {appointment.id}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Clock4 size={12} />
+              {appointment.time}
+            </span>
+          </div>
+
+          {/* Action buttons */}
+          {!hideActions && (
+            <div className="flex items-center gap-2">
+              {isActive && (
+                <>
+                  <ActionBtn
+                    onClick={handleComplete}
+                    title="Завершить"
+                    className={
+                      isDark
+                        ? "bg-emerald-500/10 border-emerald-400/15 text-emerald-400 hover:bg-emerald-500/20"
+                        : "bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100"
+                    }
                   >
-                    <Edit className="w-5 h-5" />
-                  </motion.button>
-                )}
+                    <CheckCheck size={15} />
+                  </ActionBtn>
+                  <ActionBtn
+                    onClick={handleCancel}
+                    title="Отменить"
+                    className={
+                      isDark
+                        ? "bg-rose-500/10 border-rose-400/15 text-rose-400 hover:bg-rose-500/20"
+                        : "bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100"
+                    }
+                  >
+                    <Ban size={15} />
+                  </ActionBtn>
+                </>
+              )}
 
-                {/* Выпадающее меню дополнительных действий */}
-                {actions.length > 0 && (
-                  <div className="relative">
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => setShowActions(!showActions)}
-                      className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-300 ${
-                        showActions 
-                          ? "bg-gradient-to-r from-gray-600 to-gray-700 text-white shadow-lg" 
-                          : "bg-white/80 backdrop-blur-sm text-gray-600 hover:text-gray-700 border border-gray-200/50 hover:border-gray-300/50 hover:shadow-md"
-                      }`}
-                      title="Дополнительные действия"
-                    >
-                      <MoreVertical className="w-5 h-5" />
-                    </motion.button>
+              {onEdit && (
+                <ActionBtn
+                  onClick={() => onEdit(appointment)}
+                  title="Редактировать"
+                  className={
+                    isDark
+                      ? "bg-white/[0.07] border-white/10 text-white/60 hover:bg-white/[0.12] hover:text-white/80"
+                      : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
+                  }
+                >
+                  <Edit size={15} />
+                </ActionBtn>
+              )}
 
-                    {/* Выпадающее меню */}
-                    <AnimatePresence>
-                      {showActions && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.9, y: -10 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                          className="absolute top-full right-0 mt-2 w-64 bg-white/90 backdrop-blur-lg rounded-2xl shadow-2xl border border-gray-200/50 overflow-hidden z-50"
-                        >
-                          <div className="p-2 space-y-1">
-                            {actions.map((action) => (
-                              <motion.button
-                                key={action.id}
-                                whileHover={{ x: 5 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => {
-                                  action.onClick();
-                                  setShowActions(false);
-                                }}
-                                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 transition-all duration-200 text-gray-700"
-                              >
-                                <div className={`w-8 h-8 rounded-lg ${action.bgColor} flex items-center justify-center`}>
-                                  <div className={action.color}>
-                                    {action.icon}
-                                  </div>
-                                </div>
-                                <div className="text-left flex-1">
-                                  <p className="font-medium">{action.label}</p>
-                                  {action.id === "complete" && (
-                                    <p className="text-xs text-gray-500">Отметить как выполненную</p>
-                                  )}
-                                  {action.id === "cancel" && (
-                                    <p className="text-xs text-gray-500">Отменить запись</p>
-                                  )}
-                                  {action.id === "edit" && (
-                                    <p className="text-xs text-gray-500">Изменить данные записи</p>
-                                  )}
-                                  {action.id === "delete" && (
-                                    <p className="text-xs text-gray-500">Удалить запись навсегда</p>
-                                  )}
-                                  {action.id === "view" && (
-                                    <p className="text-xs text-gray-500">Просмотр деталей</p>
-                                  )}
-                                </div>
-                              </motion.button>
-                            ))}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Детали услуги */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 ml-20">
-          {/* Услуга */}
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300"
-          >
-            <div className="flex items-start gap-3">
-              <div className={`p-2 rounded-xl ${statusConfig.bg}`}>
-                <Scissors className="w-5 h-5 text-gray-700" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">
-                  Услуга
-                </p>
-                <p className="font-bold text-gray-900 text-lg">{appointment.service}</p>
+              {/* Context menu */}
+              <div className="relative">
+                <ActionBtn
+                  onClick={handleDelete}
+                  title="Удалить"
+                  className={
+                    isDark
+                      ? "bg-rose-500/10 border-rose-400/15 text-rose-400 hover:bg-rose-500/20"
+                      : "bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100"
+                  }
+                >
+                  <Trash2 color="red" size={15} />
+                </ActionBtn>
               </div>
             </div>
-          </motion.div>
-
-          {/* Мастер */}
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300"
-          >
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-500/10 to-green-500/10">
-                <User className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">
-                  Мастер
-                </p>
-                <p className="font-bold text-gray-900 text-lg">{appointment.master}</p>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Дата */}
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300"
-          >
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10">
-                <Calendar className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">
-                  Дата записи
-                </p>
-                <p className="font-bold text-gray-900 text-lg">{appointment.date}</p>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Футер с дополнительной информацией */}
-        <div className="mt-6 pt-6 border-t border-gray-200/50">
-          <div className="flex items-center justify-between text-sm text-gray-400">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Zap className="w-3 h-3 text-amber-500" />
-                <span>ID: {appointment.id}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-3 h-3" />
-                <span>1 клиент</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="w-3 h-3" />
-                <span>Основной зал</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star key={star} className="w-3 h-3 text-amber-400 fill-amber-400" />
-              ))}
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </motion.div>
+  );
+}
+
+function InfoPill({
+  icon,
+  label,
+  className,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  className: string;
+  isDark: boolean;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border ${className}`}
+    >
+      {icon}
+      {label}
+    </span>
+  );
+}
+
+function ActionBtn({
+  children,
+  onClick,
+  title,
+  className,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  title: string;
+  className: string;
+}) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.08 }}
+      whileTap={{ scale: 0.93 }}
+      onClick={onClick}
+      title={title}
+      className={`w-8 h-8 rounded-xl border flex items-center justify-center transition-all duration-150 ${className}`}
+    >
+      {children}
+    </motion.button>
   );
 }

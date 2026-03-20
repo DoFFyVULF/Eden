@@ -2,94 +2,65 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { Variants } from "framer-motion";
 import { masterService } from "@/services/master/master.service";
 import { masterScheduleService } from "@/services/schedule/schedule.service";
 import type { IMaster } from "@/types/masters.type";
-import { 
-  X, 
-  Calendar, 
-  Clock, 
-  Users, 
-  CalendarDays, 
-  CalendarRange,
-  CalendarIcon,
-  Loader2,
-  CheckCircle,
-  Sparkles,
-  Shield
+import {
+  X, Calendar, Clock, Users, CalendarDays, CalendarRange,
+  Loader2, CheckCircle, Shield, ChevronDown, AlertCircle,
 } from "lucide-react";
 
 type Mode = "template" | "specific";
 
-interface ScheduleModalProps {
+interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
 }
 
-const overlayAnimation: Variants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1 },
-  exit: { opacity: 0 }
-};
+const DAY_NAMES = [
+  "Понедельник", "Вторник", "Среда", "Четверг",
+  "Пятница", "Суббота", "Воскресенье",
+];
 
-const modalAnimation: Variants = {
-  hidden: { opacity: 0, y: 30, scale: 0.95 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    scale: 1,
-    transition: {
-      type: "spring" as const,
-      damping: 25,
-      stiffness: 300
-    }
-  },
-  exit: { opacity: 0, y: 30, scale: 0.95 }
-};
-
-export default function ScheduleModal({
-  isOpen,
-  onClose,
-  onSuccess,
-}: ScheduleModalProps) {
+export default function ScheduleModal({ isOpen, onClose, onSuccess }: Props) {
   const [mode, setMode] = useState<Mode>("template");
   const [masters, setMasters] = useState<IMaster[]>([]);
   const [selectedMaster, setSelectedMaster] = useState<number | "">("");
-  const [dayOfWeek, setDayOfWeek] = useState<number>(0);
-  const [specificDate, setSpecificDate] = useState<string>(() => {
-    const d = new Date();
-    return d.toISOString().split("T")[0];
-  });
+  const [dayOfWeek, setDayOfWeek] = useState(0);
+  const [specificDate, setSpecificDate] = useState(() =>
+    new Date().toISOString().split("T")[0]
+  );
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("18:00");
   const [loading, setLoading] = useState(false);
+  const [loadingMasters, setLoadingMasters] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDark, setIsDark] = useState(false);
 
-  // Загрузка мастеров
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains("dark"));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
-    setLoading(true);
+    setLoadingMasters(true);
     masterService
       .getAll()
-      .then((data) => {
-        setMasters(data.filter((m) => m.isActive));
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setError("Не удалось загрузить мастеров");
-        setLoading(false);
-      });
+      .then(data => setMasters(data.filter(m => m.isActive)))
+      .catch(() => setError("Не удалось загрузить мастеров"))
+      .finally(() => setLoadingMasters(false));
   }, [isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedMaster) return setError("Выберите мастера");
-    if (mode === "specific" && !specificDate) return setError("Укажите дату");
-    if (startTime >= endTime)
-      return setError("Время окончания должно быть позже начала");
+    if (!selectedMaster) { setError("Выберите мастера"); return; }
+    if (mode === "specific" && !specificDate) { setError("Укажите дату"); return; }
+    if (startTime >= endTime) { setError("Время окончания должно быть позже начала"); return; }
 
     setLoading(true);
     setError(null);
@@ -99,32 +70,23 @@ export default function ScheduleModal({
 
       if (mode === "template") {
         const now = new Date();
-        let date = new Date(now);
-        const currentWeekday = (now.getDay() + 6) % 7;
-        const diff = dayOfWeek - currentWeekday;
-        date.setDate(now.getDate() + diff + (diff < 0 ? 7 : 0));
-
-        const isoDatePart = date.toISOString().split("T")[0];
-        const startISO = `${isoDatePart}T${startTime}:00`;
-        const endISO = `${isoDatePart}T${endTime}:00`;
-
+        const curDay = (now.getDay() + 6) % 7;
+        const diff = dayOfWeek - curDay;
+        const d = new Date(now);
+        d.setDate(now.getDate() + diff + (diff < 0 ? 7 : 0));
+        const iso = d.toISOString().split("T")[0];
         payload = {
           masterId: Number(selectedMaster),
-          dayOfWeek: dayOfWeek,
-          startTime: startISO,
-          endTime: endISO,
+          dayOfWeek,
+          startTime: `${iso}T${startTime}:00`,
+          endTime:   `${iso}T${endTime}:00`,
         };
       } else {
-        const startISO = new Date(
-          `${specificDate}T${startTime}:00`
-        ).toISOString();
-        const endISO = new Date(`${specificDate}T${endTime}:00`).toISOString();
-
         payload = {
           masterId: Number(selectedMaster),
-          startTime: startISO,
-          endTime: endISO,
           dayOfWeek: null,
+          startTime: new Date(`${specificDate}T${startTime}:00`).toISOString(),
+          endTime:   new Date(`${specificDate}T${endTime}:00`).toISOString(),
         };
       }
 
@@ -132,382 +94,392 @@ export default function ScheduleModal({
       onSuccess?.();
       onClose();
 
-      // Сброс
+      // Reset
       setSelectedMaster("");
       setDayOfWeek(0);
       setSpecificDate(new Date().toISOString().split("T")[0]);
       setStartTime("09:00");
       setEndTime("18:00");
     } catch (err: any) {
-      console.error("Ошибка:", err);
-      const msg =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
-        err.message ||
-        "Неизвестная ошибка";
+      const msg = err.response?.data?.message || err.message || "Неизвестная ошибка";
       setError(typeof msg === "string" ? msg : JSON.stringify(msg));
     } finally {
       setLoading(false);
     }
   };
 
-  // Названия дней для подсказки
-  const dayNames = useMemo(
-    () => [
-      "Понедельник",
-      "Вторник",
-      "Среда",
-      "Четверг",
-      "Пятница",
-      "Суббота",
-      "Воскресенье",
-    ],
-    []
-  );
+  const duration = useMemo(() => {
+    const s = new Date(`2000-01-01T${startTime}:00`);
+    const e = new Date(`2000-01-01T${endTime}:00`);
+    const diff = (e.getTime() - s.getTime()) / (1000 * 60 * 60);
+    return diff > 0 ? `${diff} ч` : "—";
+  }, [startTime, endTime]);
 
-  // Получаем цвет градиента в зависимости от режима
-  const gradientColors = mode === "template" 
-    ? "from-blue-600 via-indigo-600 to-purple-600" 
-    : "from-emerald-600 via-teal-600 to-cyan-600";
+  const selectedMasterObj = masters.find(m => m.id === Number(selectedMaster));
+  const isTemplate = mode === "template";
 
-  const buttonIcon = mode === "template" ? <CalendarDays className="w-4 h-4" /> : <CalendarRange className="w-4 h-4" />;
-  const modalTitle = mode === "template" ? "Еженедельная смена" : "Индивидуальная смена";
-  const modalDescription = mode === "template" 
-    ? "Повторяется каждую неделю в выбранный день" 
-    : "Работа в конкретный день";
+  // ── design tokens ───────────────────────────────────────────────────────────
+  const modeGrad = isTemplate
+    ? "from-blue-500 via-indigo-500 to-purple-500"
+    : "from-emerald-500 via-teal-500 to-cyan-500";
+
+  const modalCls = isDark
+    ? "bg-slate-900/88 backdrop-blur-3xl border border-white/[0.1] shadow-[0_32px_80px_rgba(0,0,0,0.7)]"
+    : "bg-white/96 backdrop-blur-xl border border-gray-200/70 shadow-2xl";
+
+  const inputCls = `w-full h-11 pl-10 pr-4 rounded-xl text-sm border outline-none transition-all appearance-none ${
+    isDark
+      ? "bg-white/[0.07] border-white/[0.09] text-white/90 placeholder-white/25 focus:border-indigo-400/50 focus:ring-1 focus:ring-indigo-400/20"
+      : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 focus:bg-white"
+  }`;
+
+  const sectionCls = `rounded-2xl p-4 border ${
+    isDark ? "bg-white/[0.04] border-white/[0.07]" : "bg-gray-50/60 border-gray-200/60"
+  }`;
+
+  const infoBoxCls = (accent: string) => `mt-2.5 px-3 py-2 rounded-xl border flex items-center justify-between ${
+    isDark
+      ? `bg-${accent}-500/8 border-${accent}-400/15`
+      : `bg-${accent}-50/80 border-${accent}-200/60`
+  }`;
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          onClick={e => e.target === e.currentTarget && onClose()}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+          style={{
+            background: isDark ? "rgba(0,0,0,0.78)" : "rgba(15,23,42,0.42)",
+            backdropFilter: "blur(16px)",
+          }}
+        >
           <motion.div
-            variants={overlayAnimation}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-3 md:p-4"
-            onClick={onClose}
+            initial={{ opacity: 0, scale: 0.96, y: 24 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 24 }}
+            transition={{ type: "spring", damping: 28, stiffness: 340 }}
+            onClick={e => e.stopPropagation()}
+            className={`relative w-full max-w-lg rounded-3xl overflow-hidden my-4 flex flex-col max-h-[90vh] ${modalCls}`}
           >
-            <motion.div
-              variants={modalAnimation}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-[95vw] sm:max-w-[90vw] md:max-w-lg lg:max-w-xl xl:max-w-2xl bg-gradient-to-br from-white to-gray-50/50 rounded-3xl shadow-2xl border border-gray-200/50 backdrop-blur-xl overflow-hidden max-h-[90vh] flex flex-col"
-            >
-              {/* Градиентный заголовок */}
-              <div className={`relative px-4 sm:px-5 md:px-6 py-4 md:py-5 bg-gradient-to-r ${gradientColors} flex-shrink-0`}>
-                <div className="absolute top-0 right-0 p-3 sm:p-4 opacity-20">
-                  <Sparkles className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12" />
-                </div>
-                
-                <div className="relative z-10 flex items-center justify-between">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="p-1.5 sm:p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-                      <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg sm:text-xl font-bold text-white leading-tight">{modalTitle}</h2>
-                      <p className="text-white/80 text-xs mt-0.5 sm:mt-1">
-                        {modalDescription}
-                      </p>
-                    </div>
+            {/* ── HEADER ── */}
+            <div className={`relative px-7 py-6 bg-gradient-to-r ${modeGrad} overflow-hidden flex-shrink-0`}>
+              <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full" />
+              <div className="absolute bottom-0 left-0 right-0 h-px bg-white/15" />
+              <div className="relative flex items-center justify-between">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                    {isTemplate
+                      ? <CalendarDays size={20} className="text-white" />
+                      : <CalendarRange size={20} className="text-white" />
+                    }
                   </div>
-                  
-                  <motion.button
-                    whileHover={{ scale: 1.1, rotate: 90 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={onClose}
-                    className="p-1 sm:p-1.5 text-white/80 hover:text-white rounded-full hover:bg-white/10 transition-all duration-300 flex-shrink-0"
-                  >
-                    <X className="w-4 h-4 sm:w-5 sm:h-5" />
-                  </motion.button>
+                  <div>
+                    <h2 className="text-xl font-black text-white">Добавить смену</h2>
+                    <p className="text-white/65 text-xs mt-0.5">
+                      {isTemplate ? "Повторяется каждую неделю" : "Конкретный день"}
+                    </p>
+                  </div>
                 </div>
+                <motion.button
+                  whileHover={{ scale: 1.1, rotate: 90 }} whileTap={{ scale: 0.9 }}
+                  transition={{ duration: 0.18 }}
+                  onClick={onClose}
+                  className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white hover:bg-white/25 transition-colors"
+                >
+                  <X size={17} />
+                </motion.button>
               </div>
+            </div>
 
-              {/* Основной контент с прокруткой */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-4 p-3 sm:p-4 bg-gradient-to-r from-red-50/80 to-rose-50/80 backdrop-blur-sm border border-red-200/50 text-red-700 text-sm rounded-2xl"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                        <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.768 0L4.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                        </svg>
-                      </div>
-                      <span className="text-xs sm:text-sm">{error}</span>
-                    </div>
-                  </motion.div>
-                )}
+            {/* ── BODY ── */}
+            <div className="flex-1 overflow-y-auto">
+              <form onSubmit={handleSubmit} className="p-6 space-y-4">
 
-                {/* 🔁 Переключатель режимов */}
-                <div className="mb-4 sm:mb-5 md:mb-6">
-                  <div className="flex flex-col sm:flex-row bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-2xl p-1.5 border border-gray-200/50 backdrop-blur-sm">
-                    <motion.button
-                      type="button"
-                      onClick={() => setMode("template")}
-                      className={`flex-1 py-2.5 sm:py-3 px-3 sm:px-4 text-sm font-medium rounded-xl transition-all duration-300 flex items-center justify-center gap-2 ${
-                        mode === "template"
-                          ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg"
-                          : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
+                {/* Error */}
+                <AnimatePresence>
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                      className={`flex items-center gap-2.5 p-3 rounded-xl border text-sm ${
+                        isDark
+                          ? "bg-rose-500/10 border-rose-400/20 text-rose-400"
+                          : "bg-rose-50 border-rose-200 text-rose-600"
                       }`}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
                     >
-                      <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      <span className="text-xs sm:text-sm">Еженедельно</span>
-                    </motion.button>
-                    <motion.button
-                      type="button"
-                      onClick={() => setMode("specific")}
-                      className={`flex-1 py-2.5 sm:py-3 px-3 sm:px-4 text-sm font-medium rounded-xl transition-all duration-300 flex items-center justify-center gap-2 mt-1.5 sm:mt-0 sm:ml-1.5 ${
-                        mode === "specific"
-                          ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg"
-                          : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
+                      <AlertCircle size={14} className="flex-shrink-0" />
+                      {error}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Mode toggle */}
+                <div className={`flex rounded-2xl p-1.5 border ${
+                  isDark ? "bg-white/[0.05] border-white/[0.08]" : "bg-gray-100/80 border-gray-200/60"
+                }`}>
+                  {(["template", "specific"] as Mode[]).map(m => (
+                    <motion.button key={m} type="button"
+                      whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+                      onClick={() => setMode(m)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
+                        mode === m
+                          ? `text-white shadow-lg bg-gradient-to-r ${m === "template" ? "from-blue-500 to-indigo-600" : "from-emerald-500 to-teal-600"}`
+                          : isDark
+                            ? "text-white/45 hover:text-white/65"
+                            : "text-gray-500 hover:text-gray-700"
                       }`}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
                     >
-                      <CalendarRange className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      <span className="text-xs sm:text-sm">Конкретная дата</span>
+                      {m === "template" ? <CalendarDays size={15} /> : <CalendarRange size={15} />}
+                      {m === "template" ? "Еженедельно" : "Конкретная дата"}
                     </motion.button>
-                  </div>
-                  <div className="text-xs text-gray-500 mt-2 px-2">
-                    {mode === "template" 
-                      ? "Смена будет повторяться каждую неделю в выбранный день" 
-                      : "Смена запланирована только на одну конкретную дату"}
-                  </div>
+                  ))}
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 md:space-y-6">
-                  {/* Выбор мастера */}
-                  <div className="bg-gradient-to-br from-gray-50 to-white/50 rounded-2xl p-3 sm:p-4 border border-gray-200/50">
-                    <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />
-                      <span className="text-sm">Выбор сотрудника</span>
-                    </div>
+                <p className={`text-xs px-1 ${isDark ? "text-white/30" : "text-gray-400"}`}>
+                  {isTemplate
+                    ? "Смена будет повторяться каждую неделю в выбранный день"
+                    : "Смена запланирована только на одну конкретную дату"}
+                </p>
+
+                {/* Master */}
+                <div className={sectionCls}>
+                  <label className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${
+                    isDark ? "text-white/35" : "text-gray-400"
+                  }`}>
+                    Сотрудник *
+                  </label>
+                  <div className="relative">
+                    <Users size={14} className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${
+                      isDark ? "text-white/25" : "text-gray-400"
+                    }`} />
+                    <select
+                      value={selectedMaster}
+                      onChange={e => setSelectedMaster(e.target.value as any)}
+                      required
+                      className={inputCls}
+                    >
+                      <option value="">
+                        {loadingMasters ? "Загрузка..." : "Выберите сотрудника"}
+                      </option>
+                      {masters.map(m => (
+                        <option key={m.id} value={m.id}>{m.surname} {m.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className={`absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${
+                      isDark ? "text-white/25" : "text-gray-400"
+                    }`} />
+                  </div>
+                  <p className={`flex items-center gap-1.5 text-xs mt-2 ${
+                    isDark ? "text-white/20" : "text-gray-400"
+                  }`}>
+                    <Shield size={11} />
+                    Только активные сотрудники
+                  </p>
+                </div>
+
+                {/* Day / Date */}
+                {isTemplate ? (
+                  <div className={sectionCls}>
+                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${
+                      isDark ? "text-white/35" : "text-gray-400"
+                    }`}>
+                      День недели *
+                    </label>
                     <div className="relative">
-                      <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <Calendar size={14} className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${
+                        isDark ? "text-white/25" : "text-gray-400"
+                      }`} />
                       <select
-                        value={selectedMaster}
-                        onChange={(e) => setSelectedMaster(e.target.value as any)}
-                        className="w-full pl-9 sm:pl-10 pr-4 py-2.5 sm:py-3 md:py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-300 appearance-none text-sm sm:text-base"
-                        required
+                        value={dayOfWeek}
+                        onChange={e => setDayOfWeek(Number(e.target.value))}
+                        className={inputCls}
                       >
-                        <option value="">Выберите сотрудника</option>
-                        {masters.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.surname} {m.name}
-                          </option>
+                        {DAY_NAMES.map((name, i) => (
+                          <option key={i} value={i}>{name}</option>
                         ))}
                       </select>
+                      <ChevronDown size={14} className={`absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${
+                        isDark ? "text-white/25" : "text-gray-400"
+                      }`} />
                     </div>
-                    <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-                      <Shield className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                      <span className="text-xs">Показаны только активные сотрудники</span>
+                    <div className={`mt-2.5 px-3 py-2 rounded-xl border flex items-center justify-between ${
+                      isDark
+                        ? "bg-indigo-500/8 border-indigo-400/15"
+                        : "bg-blue-50/80 border-blue-200/60"
+                    }`}>
+                      <span className={`text-xs ${isDark ? "text-white/35" : "text-gray-400"}`}>
+                        Выбранный день
+                      </span>
+                      <span className={`text-sm font-bold ${isDark ? "text-indigo-300" : "text-blue-700"}`}>
+                        {DAY_NAMES[dayOfWeek]}
+                      </span>
                     </div>
                   </div>
-
-                  {/* Режим "По дням недели" */}
-                  {mode === "template" && (
-                    <div className="bg-gradient-to-br from-blue-50/30 to-indigo-50/30 rounded-2xl p-3 sm:p-4 border border-blue-200/30">
-                      <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />
-                        <span className="text-sm">День недели</span>
-                      </div>
-                      <div className="relative">
-                        <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        <select
-                          value={dayOfWeek}
-                          onChange={(e) => setDayOfWeek(Number(e.target.value))}
-                          className="w-full pl-9 sm:pl-10 pr-4 py-2.5 sm:py-3 md:py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-300 text-sm sm:text-base"
-                          required
-                        >
-                          {dayNames.map((name, i) => (
-                            <option key={i} value={i}>
-                              {name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="mt-3 p-3 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-xl border border-blue-200/30">
-                        <div className="text-xs text-gray-700 font-medium mb-1">Выбранный день:</div>
-                        <div className="text-sm font-bold text-blue-700">{dayNames[dayOfWeek]}</div>
-                      </div>
+                ) : (
+                  <div className={sectionCls}>
+                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${
+                      isDark ? "text-white/35" : "text-gray-400"
+                    }`}>
+                      Дата *
+                    </label>
+                    <div className="relative">
+                      <Calendar size={14} className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${
+                        isDark ? "text-white/25" : "text-gray-400"
+                      }`} />
+                      <input
+                        type="date"
+                        value={specificDate}
+                        onChange={e => setSpecificDate(e.target.value)}
+                        min={new Date().toISOString().split("T")[0]}
+                        required
+                        className={inputCls}
+                      />
                     </div>
-                  )}
-
-                  {/* Режим "Конкретная дата" */}
-                  {mode === "specific" && (
-                    <div className="bg-gradient-to-br from-emerald-50/30 to-teal-50/30 rounded-2xl p-3 sm:p-4 border border-emerald-200/30">
-                      <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <CalendarRange className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
-                        <span className="text-sm">Выбор даты</span>
+                    {specificDate && (
+                      <div className={`mt-2.5 px-3 py-2 rounded-xl border flex items-center justify-between ${
+                        isDark
+                          ? "bg-emerald-500/8 border-emerald-400/15"
+                          : "bg-emerald-50/80 border-emerald-200/60"
+                      }`}>
+                        <span className={`text-xs ${isDark ? "text-white/35" : "text-gray-400"}`}>
+                          Выбранная дата
+                        </span>
+                        <span className={`text-sm font-bold ${isDark ? "text-emerald-300" : "text-emerald-700"}`}>
+                          {new Date(specificDate).toLocaleDateString("ru-RU", {
+                            weekday: "short", day: "numeric", month: "long",
+                          })}
+                        </span>
                       </div>
-                      <div className="relative">
-                        <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        <input
-                          type="date"
-                          value={specificDate}
-                          onChange={(e) => setSpecificDate(e.target.value)}
-                          className="w-full pl-9 sm:pl-10 pr-4 py-2.5 sm:py-3 md:py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-gray-900 transition-all duration-300 text-sm sm:text-base"
-                          required
-                          min={new Date().toISOString().split("T")[0]}
-                        />
-                      </div>
-                      {specificDate && (
-                        <div className="mt-3 p-3 bg-gradient-to-r from-emerald-50/50 to-teal-50/50 rounded-xl border border-emerald-200/30">
-                          <div className="text-xs text-gray-700 font-medium mb-1">Выбранная дата:</div>
-                          <div className="text-sm font-bold text-emerald-700">
-                            {new Date(specificDate).toLocaleDateString('ru-RU', {
-                              weekday: 'long',
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    )}
+                  </div>
+                )}
 
-                  {/* Время работы */}
-                  <div className="bg-gradient-to-br from-amber-50/30 to-orange-50/30 rounded-2xl p-3 sm:p-4 border border-amber-200/30">
-                    <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
-                      <span className="text-sm">Время работы</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                      <div>
-                        <div className="text-xs font-medium text-gray-600 mb-2">Начало смены</div>
+                {/* Time */}
+                <div className={sectionCls}>
+                  <label className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${
+                    isDark ? "text-white/35" : "text-gray-400"
+                  }`}>
+                    Время работы *
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Начало",  val: startTime, set: setStartTime },
+                      { label: "Конец",   val: endTime,   set: setEndTime   },
+                    ].map(f => (
+                      <div key={f.label}>
+                        <p className={`text-xs mb-1.5 ${isDark ? "text-white/30" : "text-gray-400"}`}>
+                          {f.label}
+                        </p>
                         <div className="relative">
-                          <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          <Clock size={13} className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${
+                            isDark ? "text-white/25" : "text-gray-400"
+                          }`} />
                           <input
                             type="time"
-                            value={startTime}
-                            onChange={(e) => setStartTime(e.target.value)}
-                            className="w-full pl-9 sm:pl-10 pr-4 py-2.5 sm:py-3 md:py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 text-gray-900 transition-all duration-300 text-sm sm:text-base"
+                            value={f.val}
+                            onChange={e => f.set(e.target.value)}
                             required
+                            className={inputCls}
                           />
                         </div>
                       </div>
-                      <div>
-                        <div className="text-xs font-medium text-gray-600 mb-2">Окончание смены</div>
-                        <div className="relative">
-                          <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          <input
-                            type="time"
-                            value={endTime}
-                            onChange={(e) => setEndTime(e.target.value)}
-                            className="w-full pl-9 sm:pl-10 pr-4 py-2.5 sm:py-3 md:py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 text-gray-900 transition-all duration-300 text-sm sm:text-base"
-                            required
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Информация о времени */}
-                    <div className="mt-4 p-3 bg-gradient-to-r from-amber-50/50 to-orange-50/50 rounded-xl border border-amber-200/30">
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs text-gray-700 font-medium">Продолжительность:</div>
-                        <div className="text-sm font-bold text-amber-700">
-                          {(() => {
-                            const start = new Date(`2000-01-01T${startTime}:00`);
-                            const end = new Date(`2000-01-01T${endTime}:00`);
-                            const diff = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-                            return `${diff} часов`;
-                          })()}
-                        </div>
-                      </div>
-                      <div className="text-xs text-gray-600 mt-1">
-                        {startTime} — {endTime}
-                      </div>
-                    </div>
+                    ))}
                   </div>
+                  <div className={`mt-2.5 px-3 py-2 rounded-xl border flex items-center justify-between ${
+                    isDark ? "bg-amber-500/8 border-amber-400/15" : "bg-amber-50/80 border-amber-200/60"
+                  }`}>
+                    <span className={`text-xs ${isDark ? "text-white/35" : "text-gray-400"}`}>
+                      Продолжительность
+                    </span>
+                    <span className={`text-sm font-bold ${isDark ? "text-amber-300" : "text-amber-700"}`}>
+                      {duration}
+                    </span>
+                  </div>
+                </div>
 
-                  {/* Сводная информация */}
-                  {selectedMaster && (
+                {/* Summary */}
+                <AnimatePresence>
+                  {selectedMasterObj && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="p-3 sm:p-4 bg-gradient-to-r from-gray-50/50 to-white/30 border border-gray-200/30 rounded-2xl backdrop-blur-sm"
+                      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                      className={`flex items-center justify-between p-3.5 rounded-2xl border ${
+                        isDark ? "bg-white/[0.05] border-white/[0.07]" : "bg-gray-50/80 border-gray-200/60"
+                      }`}
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
-                        <div>
-                          <p className="text-xs text-gray-600 mb-1">Сводная информация</p>
-                          <p className="text-sm font-medium text-gray-900">
-                            {masters.find(m => m.id === Number(selectedMaster))?.surname}{' '}
-                            {masters.find(m => m.id === Number(selectedMaster))?.name}
-                          </p>
-                          <p className="text-xs text-gray-600 mt-1">
-                            {mode === "template" 
-                              ? `Каждый ${dayNames[dayOfWeek].toLowerCase()}`
-                              : `Дата: ${new Date(specificDate).toLocaleDateString('ru-RU')}`
-                            }
-                          </p>
-                        </div>
-                        <div className="text-right mt-2 sm:mt-0">
-                          <div className="inline-block px-3 py-1 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 rounded-full text-xs font-bold">
-                            Готово
-                          </div>
-                        </div>
+                      <div>
+                        <p className={`text-xs mb-0.5 ${isDark ? "text-white/30" : "text-gray-400"}`}>Сводка</p>
+                        <p className={`text-sm font-bold ${isDark ? "text-white/85" : "text-gray-800"}`}>
+                          {selectedMasterObj.surname} {selectedMasterObj.name}
+                        </p>
+                        <p className={`text-xs mt-0.5 ${isDark ? "text-white/30" : "text-gray-400"}`}>
+                          {isTemplate
+                            ? `Каждый ${DAY_NAMES[dayOfWeek].toLowerCase()}`
+                            : new Date(specificDate).toLocaleDateString("ru-RU")
+                          }
+                          {" · "}{startTime} — {endTime}
+                        </p>
+                      </div>
+                      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                        isDark
+                          ? "bg-emerald-500/10 border-emerald-400/15 text-emerald-400"
+                          : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                      }`}>
+                        <CheckCircle size={11} />
+                        Готово
                       </div>
                     </motion.div>
                   )}
+                </AnimatePresence>
 
-                  {/* Кнопки */}
-                  <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200/50">
-                    <motion.button
-                      type="button"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={onClose}
-                      className="flex-1 px-4 py-3 sm:py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-semibold hover:bg-gray-50/80 transition-all duration-300 shadow-sm text-sm sm:text-base"
-                    >
-                      Отмена
-                    </motion.button>
-                    
-                    <motion.button
-                      type="submit"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      disabled={loading}
-                      className={`flex-1 px-4 py-3 sm:py-3.5 bg-gradient-to-r ${gradientColors} text-white rounded-xl font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 text-sm sm:text-base`}
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
-                          <span>Сохранение...</span>
-                        </>
-                      ) : (
-                        <>
-                          {buttonIcon}
-                          <span>Сохранить смену</span>
-                        </>
-                      )}
-                    </motion.button>
-                  </div>
-                </form>
+                {/* Buttons */}
+                <div className={`flex flex-col sm:flex-row gap-3 pt-5 border-t ${
+                  isDark ? "border-white/[0.07]" : "border-gray-100"
+                }`}>
+                  <motion.button
+                    type="button" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+                    onClick={onClose}
+                    className={`flex-1 h-12 rounded-2xl text-sm font-semibold border transition-all ${
+                      isDark
+                        ? "bg-white/[0.06] border-white/[0.1] text-white/60 hover:bg-white/[0.09]"
+                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm"
+                    }`}
+                  >
+                    Отмена
+                  </motion.button>
 
-                {/* Информация внизу */}
-                <div className="mt-4 sm:mt-6 pt-4 border-t border-gray-200/50">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-gray-500 gap-2 sm:gap-0">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-emerald-500" />
-                      <span>Автоматическое обновление</span>
-                    </div>
-                    <span>ID: Новый</span>
-                  </div>
+                  <motion.button
+                    type="submit" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+                    disabled={loading || loadingMasters}
+                    className={`flex-1 h-12 rounded-2xl text-sm font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 bg-gradient-to-r ${modeGrad}`}
+                  >
+                    {loading ? (
+                      <><Loader2 size={16} className="animate-spin" />Сохранение...</>
+                    ) : (
+                      <>
+                        {isTemplate ? <CalendarDays size={16} /> : <CalendarRange size={16} />}
+                        Сохранить смену
+                      </>
+                    )}
+                  </motion.button>
                 </div>
-              </div>
-            </motion.div>
+              </form>
+            </div>
+
+            {/* ── FOOTER ── */}
+            <div className={`px-7 py-3 border-t flex items-center justify-between text-xs flex-shrink-0 ${
+              isDark
+                ? "border-white/[0.06] text-white/20 bg-white/[0.02]"
+                : "border-gray-100 text-gray-400 bg-gray-50/50"
+            }`}>
+              <span className="flex items-center gap-1.5">
+                <Shield size={11} />
+                Данные защищены
+              </span>
+              <span>ID: Новый</span>
+            </div>
           </motion.div>
-        </>
+        </motion.div>
       )}
     </AnimatePresence>
   );

@@ -16,6 +16,7 @@ import {
   RefreshCw,
   ArrowLeft,
   ChevronDown,
+  ChevronUp,
   Activity,
   BarChart3,
   LineChart as LineChartIcon,
@@ -27,6 +28,9 @@ import {
   Users,
   TrendingUp as Growth,
   Percent,
+  SlidersHorizontal,
+  ArrowUpRight,
+  ArrowDownRight,
 } from "lucide-react";
 import {
   LineChart,
@@ -62,26 +66,45 @@ const COLORS = {
 
 export default function AppointmentsAnalyticsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>(
-    TimePeriod.MONTH
+    TimePeriod.MONTH,
   );
   const [analyticsData, setAnalyticsData] = useState<KeyMetricsResponse | null>(
-    null
+    null,
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
     "overview" | "status" | "conversion" | "timeline"
   >("overview");
+  const [isDark, setIsDark] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const { formatCurrency, formatPercent, formatNumber, getPeriodDisplayName } =
     useAnalytics();
 
   useEffect(() => {
+    const checkDarkMode = () =>
+      setIsDark(document.documentElement.classList.contains("dark"));
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     loadAppointmentsData();
   }, [selectedPeriod]);
 
-  const loadAppointmentsData = async () => {
-    setIsLoading(true);
+  const loadAppointmentsData = async (showLoading = true) => {
+    if (showLoading) {
+      setIsLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     setError(null);
     try {
       const data = await analyticsService.getKeyMetrics({
@@ -93,6 +116,7 @@ export default function AppointmentsAnalyticsPage() {
       console.error("Ошибка загрузки:", err);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -114,6 +138,11 @@ export default function AppointmentsAnalyticsPage() {
     }
   };
 
+  // Стили
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1] shadow-[0_4px_24px_rgba(0,0,0,0.2)]"
+    : "bg-white border border-gray-200/70 shadow-sm";
+
   const tabs = [
     { id: "overview", label: "Обзор", icon: BarChart3 },
     { id: "status", label: "По статусам", icon: PieChartIcon },
@@ -121,58 +150,102 @@ export default function AppointmentsAnalyticsPage() {
     { id: "timeline", label: "Динамика", icon: LineChartIcon },
   ];
 
-  if (!analyticsData && !isLoading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-500">Загрузка данных...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
-      {/* Декоративный фон */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-pink-500/5 rounded-full blur-[100px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[80px]" />
-      </div>
-
-      <div className="relative z-10 p-4 md:p-8 max-w-[1800px] mx-auto">
-        {/* Хедер */}
+    <div className="min-h-screen p-4 md:p-6 lg:p-8">
+      <div className="max-w-9xl mx-auto">
+        {/* HEADER with back button */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center gap-4 mb-4">
             <motion.a
               href={ADMIN_ROUTES.ANALYTICS.DASHBOARD}
-              whileHover={{ scale: 1.05, x: -4 }}
+              whileHover={{ scale: 1.05, x: -2 }}
               whileTap={{ scale: 0.95 }}
-              className="p-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl transition-all shadow-sm"
+              className={`p-2.5 rounded-xl transition-all duration-200 ${
+                isDark
+                  ? "bg-white/[0.07] border border-white/[0.1] text-white/60 hover:text-white/80 hover:bg-white/[0.1]"
+                  : "bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
+              }`}
             >
-              <ArrowLeft className="w-5 h-5 text-gray-700" />
+              <ArrowLeft size={18} />
             </motion.a>
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg">
-                  <Calendar className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-sm font-medium text-gray-500 uppercase tracking-wider">
-                  Аналитика записей
-                </span>
-              </div>
-              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent">
-                Статистика и эффективность 📅
-              </h1>
+              <p
+                className={`text-xs font-semibold tracking-widest uppercase ${
+                  isDark ? "text-white/30" : "text-gray-400"
+                }`}
+              >
+                Аналитика записей
+              </p>
             </div>
           </div>
 
-          {/* Управление */}
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <h1
+                className={`text-4xl md:text-5xl font-black leading-none tracking-tight ${
+                  isDark ? "text-white" : "text-gray-900"
+                }`}
+              >
+                Статистика и эффективность 📅
+              </h1>
+              <p
+                className={`mt-2 text-sm ${
+                  isDark ? "text-white/40" : "text-gray-400"
+                }`}
+              >
+                Детальный анализ записей и их статусов
+              </p>
+            </div>
+
+            <div className="flex gap-2.5 flex-wrap">
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => loadAppointmentsData(false)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.1] text-white/60 hover:text-white/80 hover:bg-white/[0.1]"
+                    : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
+                }`}
+              >
+                <RefreshCw
+                  size={15}
+                  className={isRefreshing ? "animate-spin" : ""}
+                />
+                Обновить
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={handleExport}
+                disabled={isLoading || isRefreshing}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 shadow-lg ${
+                  isDark
+                    ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-purple-500/25 hover:shadow-purple-500/40"
+                    : "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-purple-500/20 hover:shadow-purple-500/35"
+                }`}
+              >
+                <Download size={17} />
+                Экспорт
+              </motion.button>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* TABS & FILTERS */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className={`rounded-2xl p-4 mb-6 transition-all duration-300 ${glassCls}`}
+        >
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+            {/* Tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2 lg:pb-0 no-scrollbar">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
@@ -183,105 +256,209 @@ export default function AppointmentsAnalyticsPage() {
                     whileTap={{ scale: 0.98 }}
                     onClick={() =>
                       setActiveTab(
-                        tab.id as "overview" | "status" | "conversion" | "timeline"
+                        tab.id as
+                          | "overview"
+                          | "status"
+                          | "conversion"
+                          | "timeline",
                       )
                     }
                     className={`
-                      flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all
+                      flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
                       ${
                         activeTab === tab.id
-                          ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/25"
-                          : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 shadow-sm"
+                          ? isDark
+                            ? "bg-purple-500/20 border border-purple-400/30 text-purple-300"
+                            : "bg-purple-50 border border-purple-300 text-purple-600"
+                          : isDark
+                            ? "bg-white/[0.07] border border-white/[0.1] text-white/60 hover:text-white/80"
+                            : "bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
                       }
                     `}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon size={16} />
                     <span className="whitespace-nowrap">{tab.label}</span>
                   </motion.button>
                 );
               })}
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <div className="relative group">
+            {/* Controls */}
+            <div className="flex gap-3">
+              {/* Period selector */}
+              <div className="relative">
+                <Calendar
+                  size={16}
+                  className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${
+                    isDark ? "text-white/30" : "text-gray-400"
+                  }`}
+                />
                 <select
                   value={selectedPeriod}
                   onChange={(e) =>
                     setSelectedPeriod(e.target.value as TimePeriod)
                   }
                   disabled={isLoading}
-                  className="pl-11 pr-10 py-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl text-gray-900 font-medium appearance-none cursor-pointer transition-all shadow-sm disabled:opacity-50 focus:ring-2 focus:ring-purple-500/50 focus:outline-none focus:border-purple-500"
+                  className={`h-11 pl-10 pr-8 rounded-xl text-sm border outline-none appearance-none cursor-pointer transition-all ${
+                    isDark
+                      ? "bg-white/[0.07] border-white/[0.1] text-white/90 focus:border-white/20"
+                      : "bg-gray-50 border-gray-200 text-gray-700 focus:border-purple-300 focus:bg-white"
+                  }`}
                 >
                   <option value={TimePeriod.WEEK}>За неделю</option>
                   <option value={TimePeriod.MONTH}>За месяц</option>
                   <option value={TimePeriod.QUARTER}>За квартал</option>
                   <option value={TimePeriod.YEAR}>За год</option>
                 </select>
-                <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                <ChevronDown
+                  size={14}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${
+                    isDark ? "text-white/30" : "text-gray-400"
+                  }`}
+                />
               </div>
 
+              {/* Filter toggle */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={loadAppointmentsData}
-                disabled={isLoading}
-                className="px-4 py-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-medium transition-all shadow-sm disabled:opacity-50"
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className={`h-11 flex items-center gap-2 px-4 rounded-xl text-sm font-semibold border transition-all duration-200 ${
+                  isFilterOpen
+                    ? isDark
+                      ? "bg-purple-500/20 border-purple-400/30 text-purple-300"
+                      : "bg-purple-50 border-purple-300 text-purple-600"
+                    : isDark
+                      ? "bg-white/[0.07] border-white/[0.1] text-white/60 hover:text-white/80"
+                      : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-white shadow-sm"
+                }`}
               >
-                <RefreshCw
-                  className={`w-5 h-5 text-gray-700 ${isLoading ? "animate-spin" : ""}`}
-                />
-              </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleExport}
-                disabled={isLoading}
-                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl font-semibold shadow-lg shadow-purple-500/25 transition-all disabled:opacity-50"
-              >
-                <Download className="w-5 h-5" />
-                <span className="hidden sm:inline">Экспорт</span>
+                <SlidersHorizontal size={15} />
+                Детализация
+                {isFilterOpen ? (
+                  <ChevronUp size={13} />
+                ) : (
+                  <ChevronDown size={13} />
+                )}
               </motion.button>
             </div>
           </div>
 
+          {/* Error display */}
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3"
+              className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-3"
             >
-              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-              <p className="text-red-700 text-sm">{error}</p>
+              <AlertCircle className="w-5 h-5 text-rose-500 flex-shrink-0" />
+              <p className="text-rose-700 text-sm">{error}</p>
             </motion.div>
           )}
+
+          {/* Expanded filters */}
+          <AnimatePresence>
+            {isFilterOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: "auto", marginTop: 12 }}
+                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                className="overflow-hidden"
+              >
+                <div
+                  className={`pt-3 border-t ${
+                    isDark ? "border-white/[0.07]" : "border-gray-100"
+                  }`}
+                >
+                  <p
+                    className={`text-xs font-semibold mb-2.5 ${
+                      isDark ? "text-white/30" : "text-gray-400"
+                    }`}
+                  >
+                    Детальная информация:
+                  </p>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500" />
+                      <span
+                        className={isDark ? "text-white/60" : "text-gray-600"}
+                      >
+                        Новые записи
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
+                      <span
+                        className={isDark ? "text-white/60" : "text-gray-600"}
+                      >
+                        Подтверждённые
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-500 to-green-500" />
+                      <span
+                        className={isDark ? "text-white/60" : "text-gray-600"}
+                      >
+                        Завершённые
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gradient-to-r from-red-500 to-pink-500" />
+                      <span
+                        className={isDark ? "text-white/60" : "text-gray-600"}
+                      >
+                        Отменённые
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
-        {/* Основной контент */}
-        {analyticsData && (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
+        {/* MAIN CONTENT */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-24">
+            <div
+              className={`w-10 h-10 rounded-full border-3 border-t-transparent animate-spin mb-4 ${
+                isDark ? "border-purple-400" : "border-purple-400"
+              }`}
+              style={{ borderWidth: 3 }}
+            />
+            <p
+              className={`text-sm ${
+                isDark ? "text-white/40" : "text-gray-400"
+              }`}
             >
-              {activeTab === "overview" && (
-                <OverviewTab data={analyticsData} isLoading={isLoading} />
-              )}
-              {activeTab === "status" && (
-                <StatusTab data={analyticsData} isLoading={isLoading} />
-              )}
-              {activeTab === "conversion" && (
-                <ConversionTab data={analyticsData} isLoading={isLoading} />
-              )}
-              {activeTab === "timeline" && (
-                <TimelineTab data={analyticsData} isLoading={isLoading} />
-              )}
-            </motion.div>
-          </AnimatePresence>
+              Загрузка данных записей...
+            </p>
+          </div>
+        ) : (
+          analyticsData && (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                {activeTab === "overview" && (
+                  <OverviewTab data={analyticsData} isDark={isDark} />
+                )}
+                {activeTab === "status" && (
+                  <StatusTab data={analyticsData} isDark={isDark} />
+                )}
+                {activeTab === "conversion" && (
+                  <ConversionTab data={analyticsData} isDark={isDark} />
+                )}
+                {activeTab === "timeline" && (
+                  <TimelineTab data={analyticsData} isDark={isDark} />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          )
         )}
       </div>
     </div>
@@ -291,12 +468,16 @@ export default function AppointmentsAnalyticsPage() {
 // ===== ВКЛАДКА "ОБЗОР" =====
 function OverviewTab({
   data,
-  isLoading,
+  isDark,
 }: {
   data: KeyMetricsResponse;
-  isLoading: boolean;
+  isDark: boolean;
 }) {
   const { formatPercent, formatNumber } = useAnalytics();
+
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1]"
+    : "bg-white border border-gray-200/70";
 
   const stats = [
     {
@@ -304,8 +485,9 @@ function OverviewTab({
       value: formatNumber(data.appointments.totalAppointments),
       change: 100,
       icon: Calendar,
-      bgColor: "bg-purple-50",
-      textColor: "text-purple-600",
+      gradient: "from-purple-500 to-pink-500",
+      bgColor: isDark ? "bg-purple-500/10" : "bg-purple-50",
+      textColor: isDark ? "text-purple-400" : "text-purple-600",
       description: "За период",
     },
     {
@@ -313,8 +495,9 @@ function OverviewTab({
       value: formatNumber(data.appointments.confirmedAppointments),
       change: 15,
       icon: CalendarCheck,
-      bgColor: "bg-blue-50",
-      textColor: "text-blue-600",
+      gradient: "from-blue-500 to-cyan-500",
+      bgColor: isDark ? "bg-blue-500/10" : "bg-blue-50",
+      textColor: isDark ? "text-blue-400" : "text-blue-600",
       description: "Ожидают визита",
     },
     {
@@ -322,8 +505,9 @@ function OverviewTab({
       value: formatNumber(data.appointments.completedAppointments),
       change: 12,
       icon: CheckCircle2,
-      bgColor: "bg-emerald-50",
-      textColor: "text-emerald-600",
+      gradient: "from-emerald-500 to-green-500",
+      bgColor: isDark ? "bg-emerald-500/10" : "bg-emerald-50",
+      textColor: isDark ? "text-emerald-400" : "text-emerald-600",
       description: "Успешно выполнено",
     },
     {
@@ -331,8 +515,9 @@ function OverviewTab({
       value: formatNumber(data.appointments.cancelledAppointments),
       change: -5,
       icon: XCircle,
-      bgColor: "bg-red-50",
-      textColor: "text-red-600",
+      gradient: "from-red-500 to-pink-500",
+      bgColor: isDark ? "bg-red-500/10" : "bg-red-50",
+      textColor: isDark ? "text-red-400" : "text-red-600",
       description: "Отменённые записи",
     },
   ];
@@ -374,36 +559,65 @@ function OverviewTab({
               key={index}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              whileHover={{ y: -4, scale: 1.02 }}
-              className="group relative overflow-hidden"
+              transition={{ delay: index * 0.06 }}
+              whileHover={{ y: -4 }}
+              className={`relative rounded-2xl p-5 overflow-hidden transition-all duration-300 ${
+                isDark
+                  ? `bg-white/[0.07] border border-white/[0.1] backdrop-blur-xl shadow-lg`
+                  : "bg-white border border-gray-200/70 shadow-sm hover:shadow-md"
+              }`}
             >
-              <div className="relative p-6 bg-white border border-gray-200 rounded-2xl hover:border-gray-300 hover:shadow-lg transition-all">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`p-3 ${stat.bgColor} rounded-xl`}>
-                    <Icon className={`w-6 h-6 ${stat.textColor}`} />
+              {/* Gradient accent */}
+              <div
+                className={`absolute -top-4 -right-4 w-20 h-20 rounded-full bg-gradient-to-br ${stat.gradient} opacity-${isDark ? "15" : "8"} blur-xl`}
+              />
+
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`p-2 rounded-xl ${stat.bgColor}`}>
+                    <Icon className={`w-5 h-5 ${stat.textColor}`} />
                   </div>
                   <div
-                    className={`
-                    flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-semibold
-                    ${isPositive ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}
-                  `}
+                    className={`flex items-center gap-1 text-sm font-medium ${
+                      isPositive
+                        ? isDark
+                          ? "text-emerald-400"
+                          : "text-emerald-600"
+                        : isDark
+                          ? "text-rose-400"
+                          : "text-rose-600"
+                    }`}
                   >
                     {isPositive ? (
-                      <TrendingUp className="w-4 h-4" />
+                      <ArrowUpRight size={16} />
                     ) : (
-                      <TrendingDown className="w-4 h-4" />
+                      <ArrowDownRight size={16} />
                     )}
                     {Math.abs(stat.change).toFixed(1)}%
                   </div>
                 </div>
-                <div className="text-3xl font-bold text-gray-900 mb-1">
+
+                <div
+                  className={`text-2xl font-bold leading-none mb-1 ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
+                >
                   {stat.value}
                 </div>
-                <div className="text-sm font-medium text-gray-900 mb-1">
+                <div
+                  className={`text-sm font-medium ${
+                    isDark ? "text-white/70" : "text-gray-700"
+                  }`}
+                >
                   {stat.title}
                 </div>
-                <div className="text-xs text-gray-500">{stat.description}</div>
+                <div
+                  className={`text-xs ${
+                    isDark ? "text-white/40" : "text-gray-500"
+                  } mt-1`}
+                >
+                  {stat.description}
+                </div>
               </div>
             </motion.div>
           );
@@ -417,33 +631,50 @@ function OverviewTab({
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
-          className="p-6 bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-2xl"
+          className={`rounded-2xl p-6 transition-all duration-300 bg-gradient-to-br from-purple-500/20 via-pink-500/20 to-purple-500/10 border ${
+            isDark ? "border-purple-500/30" : "border-purple-200"
+          }`}
         >
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 bg-purple-500 rounded-xl">
+            <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl">
               <Target className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900">
+              <h3
+                className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+              >
                 Конверсия записей
               </h3>
-              <p className="text-sm text-gray-600">
+              <p
+                className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"}`}
+              >
                 Завершённые из общего числа
               </p>
             </div>
           </div>
-          <div className="text-5xl font-bold text-purple-600 mb-2">
-            {formatPercent(data.appointments.conversionRate)}
+          <div
+            className={`text-5xl font-bold ${isDark ? "text-purple-400" : "text-purple-600"} mb-2`}
+          >
+            {(
+              (data.appointments.completedAppointments /
+                data.appointments.totalAppointments) *
+              100
+            ).toFixed(1)}
+            %
           </div>
-          <p className="text-sm text-gray-700">
+          <p
+            className={`text-sm ${isDark ? "text-white/70" : "text-gray-700"}`}
+          >
             {data.appointments.completedAppointments} из{" "}
             {data.appointments.totalAppointments} записей завершены успешно
           </p>
 
-          <div className="mt-4 h-3 bg-gray-200 rounded-full overflow-hidden">
+          <div className="mt-4 h-3 bg-gray-200 dark:bg-white/[0.07] rounded-full overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${data.appointments.conversionRate}%` }}
+              animate={{
+                width: `${(data.appointments.completedAppointments / data.appointments.totalAppointments) * 100}%`,
+              }}
               transition={{ duration: 1, delay: 0.5 }}
               className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
             />
@@ -455,45 +686,76 @@ function OverviewTab({
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
-          className="relative overflow-hidden rounded-2xl"
+          className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
         >
-          <div className="relative p-6 bg-white border border-gray-200 shadow-sm">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div
+              className={`p-2 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500`}
+            >
+              <PieChartIcon className="w-5 h-5 text-white" />
+            </div>
+            <h3
+              className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+            >
               Распределение по статусам
             </h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <RechartsPieChart>
-                <Pie
-                  data={statusData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={(entry: any) => {
-                    const dataItem = statusData[entry.index];
-                    const percent =
-                      (dataItem.value / data.appointments.totalAppointments) *
-                      100;
-                    return `${dataItem.name} ${percent.toFixed(0)}%`;
-                  }}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
+          </div>
+
+          <ResponsiveContainer width="100%" height={200}>
+            <RechartsPieChart>
+              <Pie
+                data={statusData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={(entry: any) => {
+                  const dataItem = statusData[entry.index];
+                  const percent =
+                    (dataItem.value / data.appointments.totalAppointments) *
+                    100;
+                  return `${dataItem.name} ${percent.toFixed(0)}%`;
+                }}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {statusData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: isDark ? "#1F2937" : "white",
+                  border: isDark ? "1px solid #ffffff20" : "1px solid #E5E7EB",
+                  borderRadius: "12px",
+                  padding: "12px",
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                }}
+              />
+            </RechartsPieChart>
+          </ResponsiveContainer>
+
+          <div className="mt-4 space-y-2">
+            {statusData.map((item, index) => (
+              <div key={index} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span
+                    className={`text-sm ${isDark ? "text-white/70" : "text-gray-700"}`}
+                  >
+                    {item.name}
+                  </span>
+                </div>
+                <span
+                  className={`text-sm font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
                 >
-                  {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "white",
-                    border: "1px solid #E5E7EB",
-                    borderRadius: "12px",
-                    padding: "12px",
-                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                  }}
-                />
-              </RechartsPieChart>
-            </ResponsiveContainer>
+                  {item.value} записей
+                </span>
+              </div>
+            ))}
           </div>
         </motion.div>
       </div>
@@ -503,57 +765,171 @@ function OverviewTab({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="relative overflow-hidden rounded-2xl"
+        className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
       >
-        <div className="relative p-6 bg-white border border-gray-200 shadow-sm">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Award className="w-5 h-5 text-purple-600" />
-            </div>
-            <h3 className="text-xl font-bold text-gray-900">
-              Топ мастера по количеству записей
-            </h3>
+        <div className="flex items-center gap-3 mb-6">
+          <div
+            className={`p-2 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500`}
+          >
+            <Award className="w-5 h-5 text-white" />
           </div>
+          <h3
+            className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+          >
+            Топ мастера по количеству записей
+          </h3>
+        </div>
 
-          <div className="space-y-3">
-            {data.masters.topMasters.slice(0, 5).map((master, index) => (
-              <div
-                key={master.masterId}
-                className="group p-4 bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-xl transition-all"
-              >
-                <div className="flex items-center justify-between mb-2">
+        <div className="space-y-4">
+          {data.masters.topMasters.slice(0, 5).map((master, index) => {
+            const percentage =
+              (master.appointmentsCount / data.appointments.totalAppointments) *
+              100;
+            return (
+              <div key={master.masterId} className="space-y-2">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg text-sm font-bold text-white">
+                    <div
+                      className={`flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 text-xs font-bold text-white`}
+                    >
                       {index + 1}
                     </div>
-                    <div>
-                      <div className="font-semibold text-gray-900">
-                        {master.masterName}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {master.appointmentsCount} записей
-                      </div>
-                    </div>
+                    <span
+                      className={`text-sm font-medium ${isDark ? "text-white" : "text-gray-900"}`}
+                    >
+                      {master.masterName}
+                    </span>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold text-lg text-gray-900">
+                    <span
+                      className={`text-sm font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+                    >
                       {formatNumber(master.appointmentsCount)}
-                    </div>
-                    <div className="text-xs text-gray-500">записей</div>
+                    </span>
                   </div>
                 </div>
-                <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-1.5 ${isDark ? "bg-white/[0.07]" : "bg-gray-200"} rounded-full overflow-hidden`}
+                >
                   <motion.div
                     initial={{ width: 0 }}
-                    animate={{
-                      width: `${(master.appointmentsCount / data.appointments.totalAppointments) * 100}%`,
-                    }}
+                    animate={{ width: `${percentage}%` }}
                     transition={{ duration: 1, delay: index * 0.1 }}
                     className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
                   />
                 </div>
+                <div className="flex justify-end text-xs">
+                  <span className={isDark ? "text-white/40" : "text-gray-500"}>
+                    {percentage.toFixed(1)}%
+                  </span>
+                </div>
               </div>
-            ))}
+            );
+          })}
+        </div>
+      </motion.div>
+
+      {/* Дополнительная статистика */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className={`rounded-2xl p-6 transition-all duration-300 bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-purple-500/5 border ${
+          isDark ? "border-purple-500/20" : "border-purple-200"
+        }`}
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl">
+            <Info className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h3
+              className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+            >
+              Статистика записей
+            </h3>
+            <p
+              className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"}`}
+            >
+              Основные показатели за выбранный период
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div
+            className={`p-5 rounded-xl ${isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-white border border-gray-200/50"}`}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Clock
+                className={`w-4 h-4 ${isDark ? "text-purple-400" : "text-purple-600"}`}
+              />
+              <span
+                className={`text-sm ${isDark ? "text-white/60" : "text-gray-600"}`}
+              >
+                Среднее время
+              </span>
+            </div>
+            <div
+              className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-1`}
+            >
+              45 мин
+            </div>
+            <div
+              className={`text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}
+            >
+              На одну запись
+            </div>
+          </div>
+
+          <div
+            className={`p-5 rounded-xl ${isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-white border border-gray-200/50"}`}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Users
+                className={`w-4 h-4 ${isDark ? "text-emerald-400" : "text-emerald-600"}`}
+              />
+              <span
+                className={`text-sm ${isDark ? "text-white/60" : "text-gray-600"}`}
+              >
+                Уникальных клиентов
+              </span>
+            </div>
+            <div
+              className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-1`}
+            >
+              {data.clients.totalClients}
+            </div>
+            <div
+              className={`text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}
+            >
+              За период
+            </div>
+          </div>
+
+          <div
+            className={`p-5 rounded-xl ${isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-white border border-gray-200/50"}`}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Activity
+                className={`w-4 h-4 ${isDark ? "text-amber-400" : "text-amber-600"}`}
+              />
+              <span
+                className={`text-sm ${isDark ? "text-white/60" : "text-gray-600"}`}
+              >
+                Загруженность
+              </span>
+            </div>
+            <div
+              className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-1`}
+            >
+              78%
+            </div>
+            <div
+              className={`text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}
+            >
+              От общего времени
+            </div>
           </div>
         </div>
       </motion.div>
@@ -564,52 +940,56 @@ function OverviewTab({
 // ===== ВКЛАДКА "ПО СТАТУСАМ" =====
 function StatusTab({
   data,
-  isLoading,
+  isDark,
 }: {
   data: KeyMetricsResponse;
-  isLoading: boolean;
+  isDark: boolean;
 }) {
   const { formatNumber, formatPercent } = useAnalytics();
+
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1]"
+    : "bg-white border border-gray-200/70";
 
   const statusCards = [
     {
       title: "Новые записи",
       value: data.appointments.newAppointments,
       icon: AlertCircle,
-      color: "from-amber-500 to-orange-500",
-      bgColor: "bg-amber-50",
-      textColor: "text-amber-600",
-      borderColor: "border-amber-200",
+      gradient: "from-amber-500 to-orange-500",
+      bgColor: isDark ? "bg-amber-500/10" : "bg-amber-50",
+      textColor: isDark ? "text-amber-400" : "text-amber-600",
+      borderColor: isDark ? "border-amber-500/30" : "border-amber-200",
       description: "Ожидают обработки",
     },
     {
       title: "Подтверждённые",
       value: data.appointments.confirmedAppointments,
       icon: CalendarCheck,
-      color: "from-blue-500 to-cyan-500",
-      bgColor: "bg-blue-50",
-      textColor: "text-blue-600",
-      borderColor: "border-blue-200",
+      gradient: "from-blue-500 to-cyan-500",
+      bgColor: isDark ? "bg-blue-500/10" : "bg-blue-50",
+      textColor: isDark ? "text-blue-400" : "text-blue-600",
+      borderColor: isDark ? "border-blue-500/30" : "border-blue-200",
       description: "Ожидают визита",
     },
     {
       title: "Завершённые",
       value: data.appointments.completedAppointments,
       icon: CheckCircle2,
-      color: "from-emerald-500 to-green-500",
-      bgColor: "bg-emerald-50",
-      textColor: "text-emerald-600",
-      borderColor: "border-emerald-200",
+      gradient: "from-emerald-500 to-green-500",
+      bgColor: isDark ? "bg-emerald-500/10" : "bg-emerald-50",
+      textColor: isDark ? "text-emerald-400" : "text-emerald-600",
+      borderColor: isDark ? "border-emerald-500/30" : "border-emerald-200",
       description: "Успешно выполнены",
     },
     {
       title: "Отменённые",
       value: data.appointments.cancelledAppointments,
       icon: XCircle,
-      color: "from-red-500 to-pink-500",
-      bgColor: "bg-red-50",
-      textColor: "text-red-600",
-      borderColor: "border-red-200",
+      gradient: "from-red-500 to-pink-500",
+      bgColor: isDark ? "bg-red-500/10" : "bg-red-50",
+      textColor: isDark ? "text-red-400" : "text-red-600",
+      borderColor: isDark ? "border-red-500/30" : "border-red-200",
       description: "Не состоялись",
     },
   ];
@@ -635,37 +1015,59 @@ function StatusTab({
               key={index}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              whileHover={{ y: -4, scale: 1.02 }}
-              className="relative overflow-hidden rounded-2xl"
+              transition={{ delay: index * 0.06 }}
+              whileHover={{ y: -4 }}
+              className={`relative rounded-2xl p-5 overflow-hidden transition-all duration-300 ${
+                isDark
+                  ? `bg-white/[0.07] border border-white/[0.1] backdrop-blur-xl shadow-lg`
+                  : "bg-white border border-gray-200/70 shadow-sm hover:shadow-md"
+              }`}
             >
+              {/* Gradient accent */}
               <div
-                className={`relative p-6 bg-white border ${card.borderColor} shadow-sm`}
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`p-3 ${card.bgColor} rounded-xl`}>
-                    <Icon className={`w-6 h-6 ${card.textColor}`} />
+                className={`absolute -top-4 -right-4 w-20 h-20 rounded-full bg-gradient-to-br ${card.gradient} opacity-${isDark ? "15" : "8"} blur-xl`}
+              />
+
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`p-2 rounded-xl ${card.bgColor}`}>
+                    <Icon className={`w-5 h-5 ${card.textColor}`} />
                   </div>
                   <div
-                    className={`px-3 py-1 ${card.bgColor} ${card.textColor} rounded-lg text-sm font-semibold`}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${card.bgColor} ${card.textColor}`}
                   >
-                    {formatPercent(percentage)}
+                    {percentage.toFixed(1)}%
                   </div>
                 </div>
-                <div className="text-3xl font-bold text-gray-900 mb-1">
+
+                <div
+                  className={`text-2xl font-bold leading-none mb-1 ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
+                >
                   {formatNumber(card.value)}
                 </div>
-                <div className="text-sm font-medium text-gray-900 mb-1">
+                <div
+                  className={`text-sm font-medium ${
+                    isDark ? "text-white/70" : "text-gray-700"
+                  }`}
+                >
                   {card.title}
                 </div>
-                <div className="text-xs text-gray-500">{card.description}</div>
+                <div
+                  className={`text-xs ${
+                    isDark ? "text-white/40" : "text-gray-500"
+                  } mt-1`}
+                >
+                  {card.description}
+                </div>
 
-                <div className="mt-4 h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="mt-4 h-1.5 bg-gray-200 dark:bg-white/[0.07] rounded-full overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${percentage}%` }}
                     transition={{ duration: 1, delay: index * 0.1 }}
-                    className={`h-full bg-gradient-to-r ${card.color} rounded-full`}
+                    className={`h-full bg-gradient-to-r ${card.gradient} rounded-full`}
                   />
                 </div>
               </div>
@@ -679,36 +1081,64 @@ function StatusTab({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="relative overflow-hidden rounded-2xl"
+        className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
       >
-        <div className="relative p-6 bg-white border border-gray-200 shadow-sm">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">
-            Сравнение по статусам
-          </h3>
-          <ResponsiveContainer width="100%" height={400}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis dataKey="name" stroke="#9CA3AF" tick={{ fill: "#6B7280" }} />
-              <YAxis stroke="#9CA3AF" tick={{ fill: "#6B7280" }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #E5E7EB",
-                  borderRadius: "12px",
-                  padding: "12px",
-                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                }}
-                cursor={{ fill: "rgba(139, 92, 246, 0.1)" }}
-              />
-              <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                <Cell fill={COLORS.new} />
-                <Cell fill={COLORS.confirmed} />
-                <Cell fill={COLORS.completed} />
-                <Cell fill={COLORS.cancelled} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <h3
+          className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-6`}
+        >
+          Сравнение по статусам
+        </h3>
+        <ResponsiveContainer width="100%" height={400}>
+          <BarChart data={chartData}>
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke={isDark ? "#ffffff10" : "#E5E7EB"}
+            />
+            <XAxis
+              dataKey="name"
+              stroke={isDark ? "#ffffff30" : "#9CA3AF"}
+              tick={{ fill: isDark ? "#ffffff60" : "#6B7280" }}
+            />
+            <YAxis
+              stroke={isDark ? "#ffffff30" : "#9CA3AF"}
+              tick={{ fill: isDark ? "#ffffff60" : "#6B7280" }}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: isDark ? "#1F2937" : "white",
+                border: isDark ? "1px solid #ffffff20" : "1px solid #E5E7EB",
+                borderRadius: "12px",
+                padding: "12px",
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+              }}
+              cursor={{
+                fill: isDark ? "#8B5CF620" : "rgba(139, 92, 246, 0.1)",
+              }}
+              formatter={(value: any) => [value, "Количество"]}
+            />
+            // В компоненте StatusTab, в месте где используется Cell
+            <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+              {chartData.map((entry, index) => {
+                // Получаем цвет в зависимости от индекса
+                const getColor = () => {
+                  switch (index) {
+                    case 0:
+                      return COLORS.new;
+                    case 1:
+                      return COLORS.confirmed;
+                    case 2:
+                      return COLORS.completed;
+                    case 3:
+                      return COLORS.cancelled;
+                    default:
+                      return COLORS.primary[0];
+                  }
+                };
+                return <Cell key={`cell-${index}`} fill={getColor()} />;
+              })}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </motion.div>
     </div>
   );
@@ -717,19 +1147,23 @@ function StatusTab({
 // ===== ВКЛАДКА "КОНВЕРСИЯ" =====
 function ConversionTab({
   data,
-  isLoading,
+  isDark,
 }: {
   data: KeyMetricsResponse;
-  isLoading: boolean;
+  isDark: boolean;
 }) {
   const { formatPercent, formatNumber } = useAnalytics();
+
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1]"
+    : "bg-white border border-gray-200/70";
 
   const conversionFunnel = [
     {
       stage: "Всего записей",
       value: data.appointments.totalAppointments,
       percentage: 100,
-      color: "bg-purple-500",
+      color: "from-purple-500 to-pink-500",
     },
     {
       stage: "Подтверждено",
@@ -738,13 +1172,16 @@ function ConversionTab({
         (data.appointments.confirmedAppointments /
           data.appointments.totalAppointments) *
         100,
-      color: "bg-blue-500",
+      color: "from-blue-500 to-cyan-500",
     },
     {
       stage: "Завершено",
       value: data.appointments.completedAppointments,
-      percentage: data.appointments.conversionRate,
-      color: "bg-emerald-500",
+      percentage:
+        (data.appointments.completedAppointments /
+          data.appointments.totalAppointments) *
+        100,
+      color: "from-emerald-500 to-green-500",
     },
   ];
 
@@ -754,7 +1191,7 @@ function ConversionTab({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="p-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl text-white"
+        className={`rounded-2xl p-8 transition-all duration-300 bg-gradient-to-br from-purple-500 to-pink-500 text-white`}
       >
         <div className="flex items-center gap-4 mb-6">
           <div className="p-4 bg-white/20 rounded-xl backdrop-blur-sm">
@@ -762,13 +1199,16 @@ function ConversionTab({
           </div>
           <div>
             <h2 className="text-2xl font-bold mb-1">Общая конверсия</h2>
-            <p className="text-white/80">
-              Завершённые записи из общего числа
-            </p>
+            <p className="text-white/80">Завершённые записи из общего числа</p>
           </div>
         </div>
         <div className="text-7xl font-bold mb-4">
-          {formatPercent(data.appointments.conversionRate)}
+          {(
+            (data.appointments.completedAppointments /
+              data.appointments.totalAppointments) *
+            100
+          ).toFixed(1)}
+          %
         </div>
         <p className="text-lg text-white/90">
           {formatNumber(data.appointments.completedAppointments)} завершённых из{" "}
@@ -781,42 +1221,50 @@ function ConversionTab({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="relative overflow-hidden rounded-2xl"
+        className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
       >
-        <div className="relative p-6 bg-white border border-gray-200 shadow-sm">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">
-            Воронка конверсии
-          </h3>
+        <h3
+          className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-6`}
+        >
+          Воронка конверсии
+        </h3>
 
-          <div className="space-y-4">
-            {conversionFunnel.map((stage, index) => (
-              <div key={index} className="relative">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">
-                    {stage.stage}
+        <div className="space-y-4">
+          {conversionFunnel.map((stage, index) => (
+            <div key={index} className="relative">
+              <div className="flex items-center justify-between mb-2">
+                <span
+                  className={`text-sm font-medium ${isDark ? "text-white/70" : "text-gray-700"}`}
+                >
+                  {stage.stage}
+                </span>
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+                  >
+                    {formatNumber(stage.value)}
                   </span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg font-bold text-gray-900">
-                      {formatNumber(stage.value)}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      {formatPercent(stage.percentage)}
-                    </span>
-                  </div>
-                </div>
-                <div className="h-12 bg-gray-100 rounded-xl overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${stage.percentage}%` }}
-                    transition={{ duration: 1, delay: index * 0.2 }}
-                    className={`h-full ${stage.color} flex items-center justify-center text-white font-semibold`}
+                  <span
+                    className={`text-sm ${isDark ? "text-white/40" : "text-gray-500"}`}
                   >
                     {stage.percentage.toFixed(1)}%
-                  </motion.div>
+                  </span>
                 </div>
               </div>
-            ))}
-          </div>
+              <div
+                className={`h-12 ${isDark ? "bg-white/[0.07]" : "bg-gray-100"} rounded-xl overflow-hidden`}
+              >
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${stage.percentage}%` }}
+                  transition={{ duration: 1, delay: index * 0.2 }}
+                  className={`h-full bg-gradient-to-r ${stage.color} flex items-center justify-center text-white font-semibold`}
+                >
+                  {stage.percentage.toFixed(1)}%
+                </motion.div>
+              </div>
+            </div>
+          ))}
         </div>
       </motion.div>
 
@@ -826,17 +1274,36 @@ function ConversionTab({
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
-          className="p-6 bg-white border border-gray-200 rounded-xl"
+          className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
         >
           <div className="flex items-center gap-2 mb-4">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-            <h4 className="font-semibold text-gray-900">Успешные записи</h4>
+            <div
+              className={`p-2 rounded-xl ${isDark ? "bg-emerald-500/20" : "bg-emerald-100"}`}
+            >
+              <CheckCircle2
+                className={`w-5 h-5 ${isDark ? "text-emerald-400" : "text-emerald-600"}`}
+              />
+            </div>
+            <h4
+              className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
+            >
+              Успешные записи
+            </h4>
           </div>
-          <div className="text-3xl font-bold text-gray-900 mb-2">
+          <div
+            className={`text-3xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-2`}
+          >
             {formatNumber(data.appointments.completedAppointments)}
           </div>
-          <p className="text-sm text-gray-600">
-            {formatPercent(data.appointments.conversionRate)} от общего числа
+          <p
+            className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"}`}
+          >
+            {(
+              (data.appointments.completedAppointments /
+                data.appointments.totalAppointments) *
+              100
+            ).toFixed(1)}
+            % от общего числа
           </p>
         </motion.div>
 
@@ -844,22 +1311,36 @@ function ConversionTab({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="p-6 bg-white border border-gray-200 rounded-xl"
+          className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
         >
           <div className="flex items-center gap-2 mb-4">
-            <XCircle className="w-5 h-5 text-red-600" />
-            <h4 className="font-semibold text-gray-900">Отменённые</h4>
+            <div
+              className={`p-2 rounded-xl ${isDark ? "bg-red-500/20" : "bg-red-100"}`}
+            >
+              <XCircle
+                className={`w-5 h-5 ${isDark ? "text-red-400" : "text-red-600"}`}
+              />
+            </div>
+            <h4
+              className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
+            >
+              Отменённые
+            </h4>
           </div>
-          <div className="text-3xl font-bold text-gray-900 mb-2">
+          <div
+            className={`text-3xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-2`}
+          >
             {formatNumber(data.appointments.cancelledAppointments)}
           </div>
-          <p className="text-sm text-gray-600">
-            {formatPercent(
+          <p
+            className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"}`}
+          >
+            {(
               (data.appointments.cancelledAppointments /
                 data.appointments.totalAppointments) *
-                100
-            )}{" "}
-            от общего числа
+              100
+            ).toFixed(1)}
+            % от общего числа
           </p>
         </motion.div>
 
@@ -867,19 +1348,35 @@ function ConversionTab({
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.4 }}
-          className="p-6 bg-white border border-gray-200 rounded-xl"
+          className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
         >
           <div className="flex items-center gap-2 mb-4">
-            <Activity className="w-5 h-5 text-purple-600" />
-            <h4 className="font-semibold text-gray-900">В процессе</h4>
+            <div
+              className={`p-2 rounded-xl ${isDark ? "bg-purple-500/20" : "bg-purple-100"}`}
+            >
+              <Activity
+                className={`w-5 h-5 ${isDark ? "text-purple-400" : "text-purple-600"}`}
+              />
+            </div>
+            <h4
+              className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
+            >
+              В процессе
+            </h4>
           </div>
-          <div className="text-3xl font-bold text-gray-900 mb-2">
+          <div
+            className={`text-3xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-2`}
+          >
             {formatNumber(
               data.appointments.confirmedAppointments +
-                data.appointments.newAppointments
+                data.appointments.newAppointments,
             )}
           </div>
-          <p className="text-sm text-gray-600">Новые и подтверждённые</p>
+          <p
+            className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"}`}
+          >
+            Новые и подтверждённые
+          </p>
         </motion.div>
       </div>
     </div>
@@ -889,12 +1386,16 @@ function ConversionTab({
 // ===== ВКЛАДКА "ДИНАМИКА" =====
 function TimelineTab({
   data,
-  isLoading,
+  isDark,
 }: {
   data: KeyMetricsResponse;
-  isLoading: boolean;
+  isDark: boolean;
 }) {
   const { formatNumber } = useAnalytics();
+
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1]"
+    : "bg-white border border-gray-200/70";
 
   // Подготовка данных для временной линии (используем данные клиентов как пример)
   const timelineData = data.clients.clientsByMonth.map((item) => ({
@@ -908,93 +1409,160 @@ function TimelineTab({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-2xl"
+        className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
       >
-        <div className="relative p-6 bg-white border border-gray-200 shadow-sm">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">
-            Динамика записей по месяцам
-          </h3>
-          <ResponsiveContainer width="100%" height={400}>
-            <AreaChart data={timelineData}>
-              <defs>
-                <linearGradient
-                  id="appointmentsGradient"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.6} />
-                  <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0.1} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis dataKey="month" stroke="#9CA3AF" tick={{ fill: "#6B7280" }} />
-              <YAxis stroke="#9CA3AF" tick={{ fill: "#6B7280" }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #E5E7EB",
-                  borderRadius: "12px",
-                  padding: "12px",
-                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                }}
-                labelStyle={{ color: "#374151", marginBottom: "8px" }}
-              />
-              <Area
-                type="monotone"
-                dataKey="appointments"
-                stroke="#8B5CF6"
-                strokeWidth={2}
-                fill="url(#appointmentsGradient)"
-                name="Записей"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+        <h3
+          className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-6`}
+        >
+          Динамика записей по месяцам
+        </h3>
+        <ResponsiveContainer width="100%" height={400}>
+          <AreaChart data={timelineData}>
+            <defs>
+              <linearGradient
+                id="appointmentsGradient"
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.6} />
+                <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0.1} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke={isDark ? "#ffffff10" : "#E5E7EB"}
+            />
+            <XAxis
+              dataKey="month"
+              stroke={isDark ? "#ffffff30" : "#9CA3AF"}
+              tick={{ fill: isDark ? "#ffffff60" : "#6B7280" }}
+            />
+            <YAxis
+              stroke={isDark ? "#ffffff30" : "#9CA3AF"}
+              tick={{ fill: isDark ? "#ffffff60" : "#6B7280" }}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: isDark ? "#1F2937" : "white",
+                border: isDark ? "1px solid #ffffff20" : "1px solid #E5E7EB",
+                borderRadius: "12px",
+                padding: "12px",
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+              }}
+              labelStyle={{
+                color: isDark ? "#ffffff80" : "#374151",
+                marginBottom: "8px",
+              }}
+              formatter={(value: any) => [value, "Записей"]}
+            />
+            <Area
+              type="monotone"
+              dataKey="appointments"
+              stroke="#8B5CF6"
+              strokeWidth={2}
+              fill="url(#appointmentsGradient)"
+              name="Записей"
+            />
+          </AreaChart>
+        </ResponsiveContainer>
       </motion.div>
 
-      {/* Статистика */}
+      {/* Статистика и рекомендации */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="p-6 bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-2xl"
+        className={`rounded-2xl p-6 transition-all duration-300 bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-purple-500/5 border ${
+          isDark ? "border-purple-500/20" : "border-purple-200"
+        }`}
       >
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-purple-500 rounded-lg">
-            <Info className="w-5 h-5 text-white" />
+          <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl">
+            <Zap className="w-5 h-5 text-white" />
           </div>
-          <h3 className="text-xl font-bold text-gray-900">
+          <h3
+            className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+          >
             Рекомендации по улучшению
           </h3>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 bg-white rounded-xl border border-purple-200">
+          <div
+            className={`p-4 rounded-xl ${
+              isDark
+                ? "bg-white/[0.04] border border-white/[0.05]"
+                : "bg-white border border-gray-200/50"
+            }`}
+          >
             <div className="flex items-center gap-2 mb-2">
-              <Zap className="w-5 h-5 text-purple-600" />
-              <h4 className="font-semibold text-purple-900">
+              <Target
+                className={`w-5 h-5 ${isDark ? "text-purple-400" : "text-purple-600"}`}
+              />
+              <h4
+                className={`font-semibold ${isDark ? "text-purple-400" : "text-purple-900"}`}
+              >
                 Увеличьте конверсию
               </h4>
             </div>
-            <p className="text-sm text-gray-700">
+            <p
+              className={`text-sm ${isDark ? "text-white/60" : "text-gray-700"}`}
+            >
               Сократите время подтверждения новых записей для улучшения
               конверсии
             </p>
           </div>
 
-          <div className="p-4 bg-white rounded-xl border border-pink-200">
+          <div
+            className={`p-4 rounded-xl ${
+              isDark
+                ? "bg-white/[0.04] border border-white/[0.05]"
+                : "bg-white border border-gray-200/50"
+            }`}
+          >
             <div className="flex items-center gap-2 mb-2">
-              <Target className="w-5 h-5 text-pink-600" />
-              <h4 className="font-semibold text-pink-900">
+              <Info
+                className={`w-5 h-5 ${isDark ? "text-pink-400" : "text-pink-600"}`}
+              />
+              <h4
+                className={`font-semibold ${isDark ? "text-pink-400" : "text-pink-900"}`}
+              >
                 Снизьте отмены
               </h4>
             </div>
-            <p className="text-sm text-gray-700">
+            <p
+              className={`text-sm ${isDark ? "text-white/60" : "text-gray-700"}`}
+            >
               Отправляйте напоминания клиентам за день до визита
             </p>
           </div>
+        </div>
+
+        <div
+          className={`mt-4 p-4 rounded-xl ${
+            isDark
+              ? "bg-emerald-500/10 border border-emerald-500/20"
+              : "bg-emerald-50 border border-emerald-200"
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp
+              className={`w-5 h-5 ${isDark ? "text-emerald-400" : "text-emerald-600"}`}
+            />
+            <h4
+              className={`font-semibold ${isDark ? "text-emerald-400" : "text-emerald-900"}`}
+            >
+              Тренд записей
+            </h4>
+          </div>
+          <p
+            className={`text-sm ${isDark ? "text-white/60" : "text-gray-700"}`}
+          >
+            Наблюдается рост количества записей. Рекомендуется оптимизировать
+            расписание мастеров.
+          </p>
         </div>
       </motion.div>
     </div>

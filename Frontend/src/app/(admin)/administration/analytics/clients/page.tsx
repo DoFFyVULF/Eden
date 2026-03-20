@@ -18,6 +18,7 @@ import {
   RefreshCw,
   ArrowLeft,
   ChevronDown,
+  ChevronUp,
   Activity,
   BarChart3,
   LineChart as LineChartIcon,
@@ -30,6 +31,14 @@ import {
   Target,
   Clock,
   TrendingUp as Growth,
+  SlidersHorizontal,
+  ArrowUpRight,
+  ArrowDownRight,
+  DollarSign,
+  Receipt,
+  Wallet,
+  Package,
+  Zap,
 } from "lucide-react";
 import {
   LineChart,
@@ -75,20 +84,39 @@ export default function ClientAnalyticsPage() {
     null
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
     "overview" | "growth" | "retention" | "segmentation"
   >("overview");
+  const [isDark, setIsDark] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const { formatCurrency, formatPercent, formatNumber, getPeriodDisplayName } =
     useAnalytics();
 
   useEffect(() => {
+    const checkDarkMode = () =>
+      setIsDark(document.documentElement.classList.contains("dark"));
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     loadClientData();
   }, [selectedPeriod]);
 
-  const loadClientData = async () => {
-    setIsLoading(true);
+  const loadClientData = async (showLoading = true) => {
+    if (showLoading) {
+      setIsLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     setError(null);
     try {
       const data = await analyticsService.getKeyMetrics({
@@ -100,6 +128,7 @@ export default function ClientAnalyticsPage() {
       console.error("Ошибка загрузки:", err);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -121,6 +150,11 @@ export default function ClientAnalyticsPage() {
     }
   };
 
+  // Стили
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1] shadow-[0_4px_24px_rgba(0,0,0,0.2)]"
+    : "bg-white border border-gray-200/70 shadow-sm";
+
   const tabs = [
     { id: "overview", label: "Обзор", icon: BarChart3 },
     { id: "growth", label: "Рост базы", icon: Growth },
@@ -128,58 +162,102 @@ export default function ClientAnalyticsPage() {
     { id: "segmentation", label: "Сегментация", icon: PieChartIcon },
   ];
 
-  if (!analyticsData && !isLoading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-500">Загрузка данных...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
-      {/* Декоративный фон */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-[100px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-[80px]" />
-      </div>
-
-      <div className="relative z-10 p-4 md:p-8 max-w-[1800px] mx-auto">
-        {/* Хедер */}
+    <div className="min-h-screen p-4 md:p-6 lg:p-8">
+      <div className="max-w-9xl mx-auto">
+        {/* HEADER with back button */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center gap-4 mb-4">
             <motion.a
               href={ADMIN_ROUTES.ANALYTICS.DASHBOARD}
-              whileHover={{ scale: 1.05, x: -4 }}
+              whileHover={{ scale: 1.05, x: -2 }}
               whileTap={{ scale: 0.95 }}
-              className="p-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl transition-all shadow-sm"
+              className={`p-2.5 rounded-xl transition-all duration-200 ${
+                isDark
+                  ? "bg-white/[0.07] border border-white/[0.1] text-white/60 hover:text-white/80 hover:bg-white/[0.1]"
+                  : "bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
+              }`}
             >
-              <ArrowLeft className="w-5 h-5 text-gray-700" />
+              <ArrowLeft size={18} />
             </motion.a>
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
-                  <Users className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-sm font-medium text-gray-500 uppercase tracking-wider">
-                  Клиентская аналитика
-                </span>
-              </div>
-              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-purple-600 bg-clip-text text-transparent">
-                Анализ клиентской базы 👥
-              </h1>
+              <p
+                className={`text-xs font-semibold tracking-widest uppercase ${
+                  isDark ? "text-white/30" : "text-gray-400"
+                }`}
+              >
+                Клиентская аналитика
+              </p>
             </div>
           </div>
 
-          {/* Управление */}
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <h1
+                className={`text-4xl md:text-5xl font-black leading-none tracking-tight ${
+                  isDark ? "text-white" : "text-gray-900"
+                }`}
+              >
+                Анализ клиентской базы 👥
+              </h1>
+              <p
+                className={`mt-2 text-sm ${
+                  isDark ? "text-white/40" : "text-gray-400"
+                }`}
+              >
+                Детальный анализ клиентов и их активности
+              </p>
+            </div>
+
+            <div className="flex gap-2.5 flex-wrap">
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => loadClientData(false)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.1] text-white/60 hover:text-white/80 hover:bg-white/[0.1]"
+                    : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
+                }`}
+              >
+                <RefreshCw
+                  size={15}
+                  className={isRefreshing ? "animate-spin" : ""}
+                />
+                Обновить
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={handleExport}
+                disabled={isLoading || isRefreshing}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 shadow-lg ${
+                  isDark
+                    ? "bg-gradient-to-r from-blue-500 to-cyan-600 text-white shadow-blue-500/25 hover:shadow-blue-500/40"
+                    : "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-blue-500/20 hover:shadow-blue-500/35"
+                }`}
+              >
+                <Download size={17} />
+                Экспорт
+              </motion.button>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* TABS & FILTERS */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className={`rounded-2xl p-4 mb-6 transition-all duration-300 ${glassCls}`}
+        >
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+            {/* Tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2 lg:pb-0 no-scrollbar">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
@@ -194,101 +272,187 @@ export default function ClientAnalyticsPage() {
                       )
                     }
                     className={`
-                      flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all
+                      flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
                       ${
                         activeTab === tab.id
-                          ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/25"
-                          : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 shadow-sm"
+                          ? isDark
+                            ? "bg-blue-500/20 border border-blue-400/30 text-blue-300"
+                            : "bg-blue-50 border border-blue-300 text-blue-600"
+                          : isDark
+                            ? "bg-white/[0.07] border border-white/[0.1] text-white/60 hover:text-white/80"
+                            : "bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
                       }
                     `}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon size={16} />
                     <span className="whitespace-nowrap">{tab.label}</span>
                   </motion.button>
                 );
               })}
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <div className="relative group">
+            {/* Controls */}
+            <div className="flex gap-3">
+              {/* Period selector */}
+              <div className="relative">
+                <Calendar
+                  size={16}
+                  className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${
+                    isDark ? "text-white/30" : "text-gray-400"
+                  }`}
+                />
                 <select
                   value={selectedPeriod}
                   onChange={(e) =>
                     setSelectedPeriod(e.target.value as TimePeriod)
                   }
                   disabled={isLoading}
-                  className="pl-11 pr-10 py-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl text-gray-900 font-medium appearance-none cursor-pointer transition-all shadow-sm disabled:opacity-50 focus:ring-2 focus:ring-blue-500/50 focus:outline-none focus:border-blue-500"
+                  className={`h-11 pl-10 pr-8 rounded-xl text-sm border outline-none appearance-none cursor-pointer transition-all ${
+                    isDark
+                      ? "bg-white/[0.07] border-white/[0.1] text-white/90 focus:border-white/20"
+                      : "bg-gray-50 border-gray-200 text-gray-700 focus:border-blue-300 focus:bg-white"
+                  }`}
                 >
                   <option value={TimePeriod.WEEK}>За неделю</option>
                   <option value={TimePeriod.MONTH}>За месяц</option>
                   <option value={TimePeriod.QUARTER}>За квартал</option>
                   <option value={TimePeriod.YEAR}>За год</option>
                 </select>
-                <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                <ChevronDown
+                  size={14}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${
+                    isDark ? "text-white/30" : "text-gray-400"
+                  }`}
+                />
               </div>
 
+              {/* Filter toggle */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={loadClientData}
-                disabled={isLoading}
-                className="px-4 py-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-medium transition-all shadow-sm disabled:opacity-50"
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className={`h-11 flex items-center gap-2 px-4 rounded-xl text-sm font-semibold border transition-all duration-200 ${
+                  isFilterOpen
+                    ? isDark
+                      ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300"
+                      : "bg-indigo-50 border-indigo-300 text-indigo-600"
+                    : isDark
+                      ? "bg-white/[0.07] border-white/[0.1] text-white/60 hover:text-white/80"
+                      : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-white shadow-sm"
+                }`}
               >
-                <RefreshCw
-                  className={`w-5 h-5 text-gray-700 ${isLoading ? "animate-spin" : ""}`}
-                />
-              </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleExport}
-                disabled={isLoading}
-                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl font-semibold shadow-lg shadow-blue-500/25 transition-all disabled:opacity-50"
-              >
-                <Download className="w-5 h-5" />
-                <span className="hidden sm:inline">Экспорт</span>
+                <SlidersHorizontal size={15} />
+                Детализация
+                {isFilterOpen ? (
+                  <ChevronUp size={13} />
+                ) : (
+                  <ChevronDown size={13} />
+                )}
               </motion.button>
             </div>
           </div>
 
+          {/* Error display */}
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3"
+              className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-3"
             >
-              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-              <p className="text-red-700 text-sm">{error}</p>
+              <AlertCircle className="w-5 h-5 text-rose-500 flex-shrink-0" />
+              <p className="text-rose-700 text-sm">{error}</p>
             </motion.div>
           )}
+
+          {/* Expanded filters */}
+          <AnimatePresence>
+            {isFilterOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: "auto", marginTop: 12 }}
+                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                className="overflow-hidden"
+              >
+                <div
+                  className={`pt-3 border-t ${
+                    isDark ? "border-white/[0.07]" : "border-gray-100"
+                  }`}
+                >
+                  <p
+                    className={`text-xs font-semibold mb-2.5 ${
+                      isDark ? "text-white/30" : "text-gray-400"
+                    }`}
+                  >
+                    Детальная информация:
+                  </p>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
+                      <span className={isDark ? "text-white/60" : "text-gray-600"}>
+                        Новые и повторные клиенты
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gradient-to-r from-purple-500 to-pink-500" />
+                      <span className={isDark ? "text-white/60" : "text-gray-600"}>
+                        Удержание и лояльность
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-500 to-green-500" />
+                      <span className={isDark ? "text-white/60" : "text-gray-600"}>
+                        Активность и конверсия
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
-        {/* Основной контент */}
-        {analyticsData && (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
+        {/* MAIN CONTENT */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-24">
+            <div
+              className={`w-10 h-10 rounded-full border-3 border-t-transparent animate-spin mb-4 ${
+                isDark ? "border-blue-400" : "border-blue-400"
+              }`}
+              style={{ borderWidth: 3 }}
+            />
+            <p
+              className={`text-sm ${
+                isDark ? "text-white/40" : "text-gray-400"
+              }`}
             >
-              {activeTab === "overview" && (
-                <OverviewTab data={analyticsData} isLoading={isLoading} />
-              )}
-              {activeTab === "growth" && (
-                <GrowthTab data={analyticsData} isLoading={isLoading} />
-              )}
-              {activeTab === "retention" && (
-                <RetentionTab data={analyticsData} isLoading={isLoading} />
-              )}
-              {activeTab === "segmentation" && (
-                <SegmentationTab data={analyticsData} isLoading={isLoading} />
-              )}
-            </motion.div>
-          </AnimatePresence>
+              Загрузка данных клиентов...
+            </p>
+          </div>
+        ) : (
+          analyticsData && (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                {activeTab === "overview" && (
+                  <OverviewTab data={analyticsData} isDark={isDark} />
+                )}
+                {activeTab === "growth" && (
+                  <GrowthTab data={analyticsData} isDark={isDark} />
+                )}
+                {activeTab === "retention" && (
+                  <RetentionTab data={analyticsData} isDark={isDark} />
+                )}
+                {activeTab === "segmentation" && (
+                  <SegmentationTab data={analyticsData} isDark={isDark} />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          )
         )}
       </div>
     </div>
@@ -298,12 +462,16 @@ export default function ClientAnalyticsPage() {
 // ===== ВКЛАДКА "ОБЗОР" =====
 function OverviewTab({
   data,
-  isLoading,
+  isDark,
 }: {
   data: KeyMetricsResponse;
-  isLoading: boolean;
+  isDark: boolean;
 }) {
   const { formatPercent, formatNumber, getPeriodDisplayName } = useAnalytics();
+
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1]"
+    : "bg-white border border-gray-200/70";
 
   const stats = [
     {
@@ -311,8 +479,9 @@ function OverviewTab({
       value: formatNumber(data.clients.totalClients),
       change: 15,
       icon: Users,
-      bgColor: "bg-blue-50",
-      textColor: "text-blue-600",
+      gradient: "from-blue-500 to-cyan-500",
+      bgColor: isDark ? "bg-blue-500/10" : "bg-blue-50",
+      textColor: isDark ? "text-blue-400" : "text-blue-600",
       description: "База клиентов",
     },
     {
@@ -320,8 +489,9 @@ function OverviewTab({
       value: formatNumber(data.clients.newClients),
       change: 22,
       icon: UserPlus,
-      bgColor: "bg-emerald-50",
-      textColor: "text-emerald-600",
+      gradient: "from-emerald-500 to-green-500",
+      bgColor: isDark ? "bg-emerald-500/10" : "bg-emerald-50",
+      textColor: isDark ? "text-emerald-400" : "text-emerald-600",
       description: "За период",
     },
     {
@@ -329,8 +499,9 @@ function OverviewTab({
       value: formatNumber(data.clients.returningClients),
       change: 8,
       icon: Repeat,
-      bgColor: "bg-purple-50",
-      textColor: "text-purple-600",
+      gradient: "from-purple-500 to-pink-500",
+      bgColor: isDark ? "bg-purple-500/10" : "bg-purple-50",
+      textColor: isDark ? "text-purple-400" : "text-purple-600",
       description: "Вернулись повторно",
     },
     {
@@ -338,8 +509,9 @@ function OverviewTab({
       value: formatPercent(data.clients.retentionRate),
       change: 5,
       icon: Heart,
-      bgColor: "bg-rose-50",
-      textColor: "text-rose-600",
+      gradient: "from-rose-500 to-red-500",
+      bgColor: isDark ? "bg-rose-500/10" : "bg-rose-50",
+      textColor: isDark ? "text-rose-400" : "text-rose-600",
       description: "Retention rate",
     },
   ];
@@ -367,36 +539,61 @@ function OverviewTab({
               key={index}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              whileHover={{ y: -4, scale: 1.02 }}
-              className="group relative overflow-hidden"
+              transition={{ delay: index * 0.06 }}
+              whileHover={{ y: -4 }}
+              className={`relative rounded-2xl p-5 overflow-hidden transition-all duration-300 ${
+                isDark
+                  ? `bg-white/[0.07] border border-white/[0.1] backdrop-blur-xl shadow-lg`
+                  : "bg-white border border-gray-200/70 shadow-sm hover:shadow-md"
+              }`}
             >
-              <div className="relative p-6 bg-white border border-gray-200 rounded-2xl hover:border-gray-300 hover:shadow-lg transition-all">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`p-3 ${stat.bgColor} rounded-xl`}>
-                    <Icon className={`w-6 h-6 ${stat.textColor}`} />
+              {/* Gradient accent */}
+              <div
+                className={`absolute -top-4 -right-4 w-20 h-20 rounded-full bg-gradient-to-br ${stat.gradient} opacity-${isDark ? "15" : "8"} blur-xl`}
+              />
+
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`p-2 rounded-xl ${stat.bgColor}`}>
+                    <Icon className={`w-5 h-5 ${stat.textColor}`} />
                   </div>
                   <div
-                    className={`
-                    flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-semibold
-                    ${isPositive ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}
-                  `}
+                    className={`flex items-center gap-1 text-sm font-medium ${
+                      isPositive
+                        ? isDark ? "text-emerald-400" : "text-emerald-600"
+                        : isDark ? "text-rose-400" : "text-rose-600"
+                    }`}
                   >
                     {isPositive ? (
-                      <TrendingUp className="w-4 h-4" />
+                      <ArrowUpRight size={16} />
                     ) : (
-                      <TrendingDown className="w-4 h-4" />
+                      <ArrowDownRight size={16} />
                     )}
                     {Math.abs(stat.change).toFixed(1)}%
                   </div>
                 </div>
-                <div className="text-3xl font-bold text-gray-900 mb-1">
+
+                <div
+                  className={`text-2xl font-bold leading-none mb-1 ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
+                >
                   {stat.value}
                 </div>
-                <div className="text-sm font-medium text-gray-900 mb-1">
+                <div
+                  className={`text-sm font-medium ${
+                    isDark ? "text-white/70" : "text-gray-700"
+                  }`}
+                >
                   {stat.title}
                 </div>
-                <div className="text-xs text-gray-500">{stat.description}</div>
+                <div
+                  className={`text-xs ${
+                    isDark ? "text-white/40" : "text-gray-500"
+                  } mt-1`}
+                >
+                  {stat.description}
+                </div>
               </div>
             </motion.div>
           );
@@ -408,53 +605,73 @@ function OverviewTab({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="relative overflow-hidden rounded-2xl"
+        className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
       >
-        <div className="relative p-6 bg-white border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-1">
-                Рост клиентской базы
-              </h3>
-              <p className="text-sm text-gray-500">
-                Количество клиентов по месяцам
-              </p>
-            </div>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-1`}>
+              Рост клиентской базы
+            </h3>
+            <p className={`text-sm ${isDark ? "text-white/40" : "text-gray-500"}`}>
+              Количество клиентов по месяцам
+            </p>
           </div>
-
-          <ResponsiveContainer width="100%" height={350}>
-            <AreaChart data={data.clients.clientsByMonth}>
-              <defs>
-                <linearGradient id="clientsGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.4} />
-                  <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis dataKey="month" stroke="#9CA3AF" tick={{ fill: "#6B7280" }} />
-              <YAxis stroke="#9CA3AF" tick={{ fill: "#6B7280" }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #E5E7EB",
-                  borderRadius: "12px",
-                  padding: "12px",
-                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                }}
-                labelStyle={{ color: "#374151", marginBottom: "8px" }}
-                itemStyle={{ color: "#3B82F6", fontWeight: 600 }}
-                formatter={(value: any) => [value, "Клиентов"]}
-              />
-              <Area
-                type="monotone"
-                dataKey="clients"
-                stroke="#3B82F6"
-                strokeWidth={3}
-                fill="url(#clientsGradient)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+            isDark ? "bg-blue-500/20" : "bg-blue-100"
+          }`}>
+            <TrendingUp className={`w-4 h-4 ${
+              isDark ? "text-blue-400" : "text-blue-700"
+            }`} />
+            <span className={`text-sm font-semibold ${
+              isDark ? "text-blue-400" : "text-blue-700"
+            }`}>
+              +15.2%
+            </span>
+          </div>
         </div>
+
+        <ResponsiveContainer width="100%" height={350}>
+          <AreaChart data={data.clients.clientsByMonth}>
+            <defs>
+              <linearGradient id="clientsGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.4} />
+                <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid 
+              strokeDasharray="3 3" 
+              stroke={isDark ? "#ffffff10" : "#E5E7EB"} 
+            />
+            <XAxis
+              dataKey="month"
+              stroke={isDark ? "#ffffff30" : "#9CA3AF"}
+              tick={{ fill: isDark ? "#ffffff60" : "#6B7280" }}
+            />
+            <YAxis
+              stroke={isDark ? "#ffffff30" : "#9CA3AF"}
+              tick={{ fill: isDark ? "#ffffff60" : "#6B7280" }}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: isDark ? "#1F2937" : "white",
+                border: isDark ? "1px solid #ffffff20" : "1px solid #E5E7EB",
+                borderRadius: "12px",
+                padding: "12px",
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                color: isDark ? "#fff" : "#374151",
+              }}
+              labelStyle={{ color: isDark ? "#ffffff80" : "#374151", marginBottom: "8px" }}
+              formatter={(value: any) => [value, "Клиентов"]}
+            />
+            <Area
+              type="monotone"
+              dataKey="clients"
+              stroke="#3B82F6"
+              strokeWidth={3}
+              fill="url(#clientsGradient)"
+            />
+          </AreaChart>
+        </ResponsiveContainer>
       </motion.div>
 
       {/* Двухколоночная секция */}
@@ -464,132 +681,211 @@ function OverviewTab({
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3 }}
-          className="relative overflow-hidden rounded-2xl"
+          className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
         >
-          <div className="relative p-6 bg-white border border-gray-200 shadow-sm">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className={`p-2 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500`}>
+              <PieChartIcon className="w-5 h-5 text-white" />
+            </div>
+            <h3 className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
               Распределение клиентов
             </h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <RechartsPieChart>
-                <Pie
-                  data={clientTypeData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={(entry: any) => {
-                    const dataItem = clientTypeData[entry.index];
-                    const percent =
-                      (dataItem.value / data.clients.totalClients) * 100;
-                    return `${dataItem.name} ${percent.toFixed(0)}%`;
-                  }}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {clientTypeData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "white",
-                    border: "1px solid #E5E7EB",
-                    borderRadius: "12px",
-                    padding: "12px",
-                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                  }}
-                />
-              </RechartsPieChart>
-            </ResponsiveContainer>
+          </div>
 
-            <div className="mt-4 space-y-2">
-              {clientTypeData.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="text-sm text-gray-700">{item.name}</span>
-                  </div>
-                  <span className="text-sm font-semibold text-gray-900">
-                    {item.value} клиентов
+          <ResponsiveContainer width="100%" height={250}>
+            <RechartsPieChart>
+              <Pie
+                data={clientTypeData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={(entry: any) => {
+                  const dataItem = clientTypeData[entry.index];
+                  const percent =
+                    (dataItem.value / data.clients.totalClients) * 100;
+                  return `${dataItem.name} ${percent.toFixed(0)}%`;
+                }}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {clientTypeData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: isDark ? "#1F2937" : "white",
+                  border: isDark ? "1px solid #ffffff20" : "1px solid #E5E7EB",
+                  borderRadius: "12px",
+                  padding: "12px",
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                }}
+              />
+            </RechartsPieChart>
+          </ResponsiveContainer>
+
+          <div className="mt-4 space-y-2">
+            {clientTypeData.map((item, index) => (
+              <div key={index} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span className={`text-sm ${isDark ? "text-white/70" : "text-gray-700"}`}>
+                    {item.name}
                   </span>
                 </div>
-              ))}
-            </div>
+                <span className={`text-sm font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+                  {item.value} клиентов
+                </span>
+              </div>
+            ))}
           </div>
         </motion.div>
 
-        {/* Статистика */}
+        {/* Ключевые показатели */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3 }}
-          className="relative overflow-hidden rounded-2xl"
+          className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
         >
-          <div className="relative p-6 bg-white border border-gray-200 shadow-sm">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className={`p-2 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500`}>
+              <Target className="w-5 h-5 text-white" />
+            </div>
+            <h3 className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
               Ключевые показатели
             </h3>
+          </div>
 
-            <div className="space-y-4">
-              <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <Target className="w-5 h-5 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-900">
-                    Конверсия в постоянных
-                  </span>
-                </div>
-                <div className="text-2xl font-bold text-blue-900 mb-1">
-                  {formatPercent(
-                    data.clients.totalClients > 0
-                      ? (data.clients.returningClients /
-                          data.clients.totalClients) *
-                          100
-                      : 0
-                  )}
-                </div>
-                <p className="text-xs text-blue-700">
-                  {data.clients.returningClients} из {data.clients.totalClients}{" "}
-                  клиентов вернулись
-                </p>
+          <div className="space-y-4">
+            <div className={`p-4 rounded-xl ${
+              isDark ? "bg-blue-500/20 border border-blue-500/30" : "bg-blue-50 border border-blue-200"
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <Target className={`w-5 h-5 ${isDark ? "text-blue-400" : "text-blue-600"}`} />
+                <span className={`text-sm font-medium ${isDark ? "text-blue-400" : "text-blue-900"}`}>
+                  Конверсия в постоянных
+                </span>
               </div>
+              <div className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-1`}>
+                {((data.clients.returningClients / data.clients.totalClients) * 100).toFixed(1)}%
+              </div>
+              <p className={`text-xs ${isDark ? "text-white/40" : "text-gray-600"}`}>
+                {data.clients.returningClients} из {data.clients.totalClients} клиентов вернулись
+              </p>
+            </div>
 
-              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <Activity className="w-5 h-5 text-emerald-600" />
-                  <span className="text-sm font-medium text-emerald-900">
-                    Активность новых клиентов
-                  </span>
-                </div>
-                <div className="text-2xl font-bold text-emerald-900 mb-1">
-                  {data.clients.newClients}
-                </div>
-                <p className="text-xs text-emerald-700">
-                  За {getPeriodDisplayName(data.period).toLowerCase()}
-                </p>
+            <div className={`p-4 rounded-xl ${
+              isDark ? "bg-emerald-500/20 border border-emerald-500/30" : "bg-emerald-50 border border-emerald-200"
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <UserPlus className={`w-5 h-5 ${isDark ? "text-emerald-400" : "text-emerald-600"}`} />
+                <span className={`text-sm font-medium ${isDark ? "text-emerald-400" : "text-emerald-900"}`}>
+                  Активность новых клиентов
+                </span>
               </div>
+              <div className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-1`}>
+                {data.clients.newClients}
+              </div>
+              <p className={`text-xs ${isDark ? "text-white/40" : "text-gray-600"}`}>
+                За выбранный период
+              </p>
+            </div>
 
-              <div className="p-4 bg-purple-50 rounded-xl border border-purple-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <Heart className="w-5 h-5 text-purple-600" />
-                  <span className="text-sm font-medium text-purple-900">
-                    Лояльность клиентов
-                  </span>
-                </div>
-                <div className="text-2xl font-bold text-purple-900 mb-1">
-                  {formatPercent(data.clients.retentionRate)}
-                </div>
-                <p className="text-xs text-purple-700">
-                  Retention rate за период
-                </p>
+            <div className={`p-4 rounded-xl ${
+              isDark ? "bg-purple-500/20 border border-purple-500/30" : "bg-purple-50 border border-purple-200"
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <Heart className={`w-5 h-5 ${isDark ? "text-purple-400" : "text-purple-600"}`} />
+                <span className={`text-sm font-medium ${isDark ? "text-purple-400" : "text-purple-900"}`}>
+                  Лояльность клиентов
+                </span>
               </div>
+              <div className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-1`}>
+                {data.clients.retentionRate.toFixed(1)}%
+              </div>
+              <p className={`text-xs ${isDark ? "text-white/40" : "text-gray-600"}`}>
+                Retention rate за период
+              </p>
             </div>
           </div>
         </motion.div>
       </div>
+
+      {/* Дополнительная статистика */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className={`rounded-2xl p-6 transition-all duration-300 bg-gradient-to-br from-blue-500/10 via-cyan-500/10 to-blue-500/5 border ${
+          isDark ? "border-blue-500/20" : "border-blue-200"
+        }`}
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl">
+            <Info className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h3 className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+              Статистика активности
+            </h3>
+            <p className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"}`}>
+              Основные показатели за выбранный период
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className={`p-5 rounded-xl ${isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-white border border-gray-200/50"}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className={`w-4 h-4 ${isDark ? "text-blue-400" : "text-blue-600"}`} />
+              <span className={`text-sm ${isDark ? "text-white/60" : "text-gray-600"}`}>
+                Всего записей
+              </span>
+            </div>
+            <div className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-1`}>
+              {data.appointments.totalAppointments.toLocaleString()}
+            </div>
+            <div className={`text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}>
+              Завершено: {data.appointments.completedAppointments}
+            </div>
+          </div>
+
+          <div className={`p-5 rounded-xl ${isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-white border border-gray-200/50"}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <DollarSign className={`w-4 h-4 ${isDark ? "text-emerald-400" : "text-emerald-600"}`} />
+              <span className={`text-sm ${isDark ? "text-white/60" : "text-gray-600"}`}>
+                Средний чек
+              </span>
+            </div>
+            <div className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-1`}>
+              {data.financial.averageCheck.toLocaleString()} ₽
+            </div>
+            <div className={`text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}>
+              На одного клиента
+            </div>
+          </div>
+
+          <div className={`p-5 rounded-xl ${isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-white border border-gray-200/50"}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <Target className={`w-4 h-4 ${isDark ? "text-purple-400" : "text-purple-600"}`} />
+              <span className={`text-sm ${isDark ? "text-white/60" : "text-gray-600"}`}>
+                Конверсия
+              </span>
+            </div>
+            <div className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-1`}>
+              {data.appointments.conversionRate.toFixed(1)}%
+            </div>
+            <div className={`text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}>
+              В завершенные записи
+            </div>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
@@ -597,12 +893,16 @@ function OverviewTab({
 // ===== ВКЛАДКА "РОСТ БАЗЫ" =====
 function GrowthTab({
   data,
-  isLoading,
+  isDark,
 }: {
   data: KeyMetricsResponse;
-  isLoading: boolean;
+  isDark: boolean;
 }) {
   const { formatNumber } = useAnalytics();
+
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1]"
+    : "bg-white border border-gray-200/70";
 
   return (
     <div className="space-y-6">
@@ -610,44 +910,53 @@ function GrowthTab({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-2xl"
+        className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
       >
-        <div className="relative p-6 bg-white border border-gray-200 shadow-sm">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">
-            Динамика роста клиентской базы
-          </h3>
-          <ResponsiveContainer width="100%" height={400}>
-            <AreaChart data={data.clients.clientsByMonth}>
-              <defs>
-                <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.6} />
-                  <stop offset="100%" stopColor="#3B82F6" stopOpacity={0.1} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis dataKey="month" stroke="#9CA3AF" tick={{ fill: "#6B7280" }} />
-              <YAxis stroke="#9CA3AF" tick={{ fill: "#6B7280" }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #E5E7EB",
-                  borderRadius: "12px",
-                  padding: "12px",
-                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                }}
-                labelStyle={{ color: "#374151", marginBottom: "8px" }}
-              />
-              <Area
-                type="monotone"
-                dataKey="clients"
-                stroke="#3B82F6"
-                strokeWidth={2}
-                fill="url(#growthGradient)"
-                name="Клиентов"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+        <h3 className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-6`}>
+          Динамика роста клиентской базы
+        </h3>
+        <ResponsiveContainer width="100%" height={400}>
+          <AreaChart data={data.clients.clientsByMonth}>
+            <defs>
+              <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.6} />
+                <stop offset="100%" stopColor="#3B82F6" stopOpacity={0.1} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid 
+              strokeDasharray="3 3" 
+              stroke={isDark ? "#ffffff10" : "#E5E7EB"} 
+            />
+            <XAxis
+              dataKey="month"
+              stroke={isDark ? "#ffffff30" : "#9CA3AF"}
+              tick={{ fill: isDark ? "#ffffff60" : "#6B7280" }}
+            />
+            <YAxis
+              stroke={isDark ? "#ffffff30" : "#9CA3AF"}
+              tick={{ fill: isDark ? "#ffffff60" : "#6B7280" }}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: isDark ? "#1F2937" : "white",
+                border: isDark ? "1px solid #ffffff20" : "1px solid #E5E7EB",
+                borderRadius: "12px",
+                padding: "12px",
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+              }}
+              labelStyle={{ color: isDark ? "#ffffff80" : "#374151", marginBottom: "8px" }}
+              formatter={(value: any) => [value, "Клиентов"]}
+            />
+            <Area
+              type="monotone"
+              dataKey="clients"
+              stroke="#3B82F6"
+              strokeWidth={2}
+              fill="url(#growthGradient)"
+              name="Клиентов"
+            />
+          </AreaChart>
+        </ResponsiveContainer>
       </motion.div>
 
       {/* Статистика прироста */}
@@ -656,59 +965,68 @@ function GrowthTab({
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
-          className="p-6 bg-white border border-gray-200 rounded-xl"
+          className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
         >
           <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Users className="w-5 h-5 text-blue-600" />
+            <div className={`p-2 rounded-xl ${isDark ? "bg-blue-500/20" : "bg-blue-100"}`}>
+              <Users className={`w-5 h-5 ${isDark ? "text-blue-400" : "text-blue-600"}`} />
             </div>
-            <h4 className="font-semibold text-gray-900">Всего клиентов</h4>
+            <h4 className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+              Всего клиентов
+            </h4>
           </div>
-          <div className="text-3xl font-bold text-gray-900 mb-2">
+          <div className={`text-3xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-2`}>
             {formatNumber(data.clients.totalClients)}
           </div>
-          <p className="text-sm text-gray-600">Общая база клиентов</p>
+          <p className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"}`}>
+            Общая база клиентов
+          </p>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="p-6 bg-white border border-gray-200 rounded-xl"
+          className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
         >
           <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-emerald-100 rounded-lg">
-              <UserPlus className="w-5 h-5 text-emerald-600" />
+            <div className={`p-2 rounded-xl ${isDark ? "bg-emerald-500/20" : "bg-emerald-100"}`}>
+              <UserPlus className={`w-5 h-5 ${isDark ? "text-emerald-400" : "text-emerald-600"}`} />
             </div>
-            <h4 className="font-semibold text-gray-900">Новых клиентов</h4>
+            <h4 className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+              Новых клиентов
+            </h4>
           </div>
-          <div className="text-3xl font-bold text-gray-900 mb-2">
+          <div className={`text-3xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-2`}>
             +{formatNumber(data.clients.newClients)}
           </div>
-          <p className="text-sm text-gray-600">Прирост за период</p>
+          <p className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"}`}>
+            Прирост за период
+          </p>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3 }}
-          className="p-6 bg-white border border-gray-200 rounded-xl"
+          className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
         >
           <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Activity className="w-5 h-5 text-purple-600" />
+            <div className={`p-2 rounded-xl ${isDark ? "bg-purple-500/20" : "bg-purple-100"}`}>
+              <Activity className={`w-5 h-5 ${isDark ? "text-purple-400" : "text-purple-600"}`} />
             </div>
-            <h4 className="font-semibold text-gray-900">Темп роста</h4>
+            <h4 className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+              Темп роста
+            </h4>
           </div>
-          <div className="text-3xl font-bold text-gray-900 mb-2">
+          <div className={`text-3xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-2`}>
             {data.clients.totalClients > 0
-              ? ((data.clients.newClients / data.clients.totalClients) * 100).toFixed(
-                  1
-                )
-              : 0}
-            %
+              ? ((data.clients.newClients / data.clients.totalClients) * 100).toFixed(1)
+              : 0}%
           </div>
-          <p className="text-sm text-gray-600">За выбранный период</p>
+          <p className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"}`}>
+            За выбранный период
+          </p>
         </motion.div>
       </div>
     </div>
@@ -718,12 +1036,16 @@ function GrowthTab({
 // ===== ВКЛАДКА "УДЕРЖАНИЕ" =====
 function RetentionTab({
   data,
-  isLoading,
+  isDark,
 }: {
   data: KeyMetricsResponse;
-  isLoading: boolean;
+  isDark: boolean;
 }) {
   const { formatPercent, formatNumber } = useAnalytics();
+
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1]"
+    : "bg-white border border-gray-200/70";
 
   return (
     <div className="space-y-6">
@@ -732,23 +1054,27 @@ function RetentionTab({
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="p-6 bg-gradient-to-br from-rose-50 to-pink-50 border border-rose-200 rounded-2xl"
+          className={`rounded-2xl p-6 transition-all duration-300 bg-gradient-to-br from-rose-500/20 via-pink-500/20 to-rose-500/10 border ${
+            isDark ? "border-rose-500/30" : "border-rose-200"
+          }`}
         >
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 bg-rose-500 rounded-xl">
+            <div className="p-3 bg-gradient-to-br from-rose-500 to-pink-500 rounded-xl">
               <Heart className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900">
+              <h3 className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
                 Уровень удержания
               </h3>
-              <p className="text-sm text-gray-600">Retention Rate</p>
+              <p className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"}`}>
+                Retention Rate
+              </p>
             </div>
           </div>
-          <div className="text-5xl font-bold text-rose-600 mb-2">
+          <div className={`text-5xl font-bold ${isDark ? "text-rose-400" : "text-rose-600"} mb-2`}>
             {formatPercent(data.clients.retentionRate)}
           </div>
-          <p className="text-sm text-gray-700">
+          <p className={`text-sm ${isDark ? "text-white/70" : "text-gray-700"}`}>
             {data.clients.returningClients} клиентов вернулись повторно
           </p>
         </motion.div>
@@ -756,23 +1082,27 @@ function RetentionTab({
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="p-6 bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-2xl"
+          className={`rounded-2xl p-6 transition-all duration-300 bg-gradient-to-br from-purple-500/20 via-blue-500/20 to-purple-500/10 border ${
+            isDark ? "border-purple-500/30" : "border-purple-200"
+          }`}
         >
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 bg-purple-500 rounded-xl">
+            <div className="p-3 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl">
               <Repeat className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900">
+              <h3 className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
                 Повторные клиенты
               </h3>
-              <p className="text-sm text-gray-600">Вернулись за период</p>
+              <p className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"}`}>
+                Вернулись за период
+              </p>
             </div>
           </div>
-          <div className="text-5xl font-bold text-purple-600 mb-2">
+          <div className={`text-5xl font-bold ${isDark ? "text-purple-400" : "text-purple-600"} mb-2`}>
             {formatNumber(data.clients.returningClients)}
           </div>
-          <p className="text-sm text-gray-700">
+          <p className={`text-sm ${isDark ? "text-white/70" : "text-gray-700"}`}>
             Из {data.clients.totalClients} общих клиентов
           </p>
         </motion.div>
@@ -783,45 +1113,51 @@ function RetentionTab({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="p-6 bg-white border border-gray-200 rounded-2xl"
+        className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
       >
-        <h3 className="text-xl font-bold text-gray-900 mb-6">
+        <h3 className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-6`}>
           Анализ лояльности
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+          <div className={`p-4 rounded-xl ${
+            isDark ? "bg-emerald-500/20 border border-emerald-500/30" : "bg-emerald-50 border border-emerald-200"
+          }`}>
             <div className="flex items-center gap-2 mb-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              <span className="text-sm font-medium text-emerald-900">
+              <CheckCircle2 className={`w-5 h-5 ${isDark ? "text-emerald-400" : "text-emerald-600"}`} />
+              <span className={`text-sm font-medium ${isDark ? "text-emerald-400" : "text-emerald-900"}`}>
                 Активные клиенты
               </span>
             </div>
-            <div className="text-2xl font-bold text-emerald-900">
+            <div className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
               {formatNumber(data.clients.totalClients)}
             </div>
           </div>
 
-          <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+          <div className={`p-4 rounded-xl ${
+            isDark ? "bg-blue-500/20 border border-blue-500/30" : "bg-blue-50 border border-blue-200"
+          }`}>
             <div className="flex items-center gap-2 mb-2">
-              <UserCheck className="w-5 h-5 text-blue-600" />
-              <span className="text-sm font-medium text-blue-900">
+              <UserPlus className={`w-5 h-5 ${isDark ? "text-blue-400" : "text-blue-600"}`} />
+              <span className={`text-sm font-medium ${isDark ? "text-blue-400" : "text-blue-900"}`}>
                 Новые за период
               </span>
             </div>
-            <div className="text-2xl font-bold text-blue-900">
+            <div className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
               {formatNumber(data.clients.newClients)}
             </div>
           </div>
 
-          <div className="p-4 bg-purple-50 rounded-xl border border-purple-200">
+          <div className={`p-4 rounded-xl ${
+            isDark ? "bg-purple-500/20 border border-purple-500/30" : "bg-purple-50 border border-purple-200"
+          }`}>
             <div className="flex items-center gap-2 mb-2">
-              <Award className="w-5 h-5 text-purple-600" />
-              <span className="text-sm font-medium text-purple-900">
+              <Award className={`w-5 h-5 ${isDark ? "text-purple-400" : "text-purple-600"}`} />
+              <span className={`text-sm font-medium ${isDark ? "text-purple-400" : "text-purple-900"}`}>
                 Лояльные клиенты
               </span>
             </div>
-            <div className="text-2xl font-bold text-purple-900">
+            <div className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
               {formatNumber(data.clients.returningClients)}
             </div>
           </div>
@@ -834,12 +1170,16 @@ function RetentionTab({
 // ===== ВКЛАДКА "СЕГМЕНТАЦИЯ" =====
 function SegmentationTab({
   data,
-  isLoading,
+  isDark,
 }: {
   data: KeyMetricsResponse;
-  isLoading: boolean;
+  isDark: boolean;
 }) {
   const { formatNumber, formatPercent } = useAnalytics();
+
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1]"
+    : "bg-white border border-gray-200/70";
 
   const segmentData = [
     {
@@ -866,9 +1206,9 @@ function SegmentationTab({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="p-6 bg-white border border-gray-200 rounded-2xl"
+        className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
       >
-        <h3 className="text-xl font-bold text-gray-900 mb-6">
+        <h3 className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-6`}>
           Сегментация клиентской базы
         </h3>
 
@@ -878,7 +1218,9 @@ function SegmentationTab({
             return (
               <div
                 key={index}
-                className="p-5 bg-gray-50 rounded-xl border border-gray-200"
+                className={`p-5 rounded-xl ${
+                  isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-gray-50 border border-gray-200"
+                }`}
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
@@ -892,22 +1234,24 @@ function SegmentationTab({
                       />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">
+                      <h4 className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
                         {segment.name}
                       </h4>
-                      <p className="text-sm text-gray-600">
+                      <p className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"}`}>
                         {formatPercent(segment.percentage)} от общей базы
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">
+                    <div className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
                       {formatNumber(segment.value)}
                     </div>
-                    <div className="text-sm text-gray-600">клиентов</div>
+                    <div className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"}`}>
+                      клиентов
+                    </div>
                   </div>
                 </div>
-                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className={`h-2 ${isDark ? "bg-white/[0.07]" : "bg-gray-200"} rounded-full overflow-hidden`}>
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${segment.percentage}%` }}
@@ -927,41 +1271,66 @@ function SegmentationTab({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="p-6 bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-2xl"
+        className={`rounded-2xl p-6 transition-all duration-300 bg-gradient-to-br from-blue-500/10 via-cyan-500/10 to-blue-500/5 border ${
+          isDark ? "border-blue-500/20" : "border-blue-200"
+        }`}
       >
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-blue-500 rounded-lg">
-            <Info className="w-5 h-5 text-white" />
+          <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl">
+            <Zap className="w-5 h-5 text-white" />
           </div>
-          <h3 className="text-xl font-bold text-gray-900">
+          <h3 className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
             Рекомендации по работе с клиентами
           </h3>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 bg-white rounded-xl border border-blue-200">
+          <div className={`p-4 rounded-xl ${
+            isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-white border border-gray-200/50"
+          }`}>
             <div className="flex items-center gap-2 mb-2">
-              <Target className="w-5 h-5 text-blue-600" />
-              <h4 className="font-semibold text-blue-900">Новые клиенты</h4>
+              <Target className={`w-5 h-5 ${isDark ? "text-blue-400" : "text-blue-600"}`} />
+              <h4 className={`font-semibold ${isDark ? "text-blue-400" : "text-blue-900"}`}>
+                Новые клиенты
+              </h4>
             </div>
-            <p className="text-sm text-gray-700">
+            <p className={`text-sm ${isDark ? "text-white/60" : "text-gray-700"}`}>
               Сфокусируйтесь на адаптации новых клиентов и создании позитивного
               первого впечатления
             </p>
           </div>
 
-          <div className="p-4 bg-white rounded-xl border border-purple-200">
+          <div className={`p-4 rounded-xl ${
+            isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-white border border-gray-200/50"
+          }`}>
             <div className="flex items-center gap-2 mb-2">
-              <Heart className="w-5 h-5 text-purple-600" />
-              <h4 className="font-semibold text-purple-900">
+              <Heart className={`w-5 h-5 ${isDark ? "text-purple-400" : "text-purple-600"}`} />
+              <h4 className={`font-semibold ${isDark ? "text-purple-400" : "text-purple-900"}`}>
                 Повторные клиенты
               </h4>
             </div>
-            <p className="text-sm text-gray-700">
+            <p className={`text-sm ${isDark ? "text-white/60" : "text-gray-700"}`}>
               Внедрите программу лояльности для увеличения частоты визитов
               постоянных клиентов
             </p>
           </div>
+        </div>
+
+        <div className={`mt-4 p-4 rounded-xl ${
+          isDark ? "bg-amber-500/10 border border-amber-500/20" : "bg-amber-50 border border-amber-200"
+        }`}>
+          <div className="flex items-center gap-2 mb-2">
+            <Info className={`w-5 h-5 ${isDark ? "text-amber-400" : "text-amber-600"}`} />
+            <h4 className={`font-semibold ${isDark ? "text-amber-400" : "text-amber-900"}`}>
+              Ключевой инсайт
+            </h4>
+          </div>
+          <p className={`text-sm ${isDark ? "text-white/60" : "text-gray-700"}`}>
+            Уровень удержания клиентов составляет {data.clients.retentionRate.toFixed(1)}%. 
+            {data.clients.retentionRate > 50 
+              ? " Отличный показатель! Продолжайте развивать программу лояльности." 
+              : " Рекомендуется улучшить программу лояльности для повышения retention rate."}
+          </p>
         </div>
       </motion.div>
     </div>

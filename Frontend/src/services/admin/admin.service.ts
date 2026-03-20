@@ -2,6 +2,7 @@ import { axiosWithAuth } from "@/api/interceptors";
 
 export interface AdminCounts {
   appointments: number;
+  activeAppointments: number;
   category: number;
   services: number;
   masters: number;

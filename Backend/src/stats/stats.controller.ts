@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { CategoryService } from 'src/category/category.service';
-import { ServiceService } from 'src/service/service.service';
+import { ServicePriceService } from 'src/service-price/service-price.service';
 import { MasterScheduleService } from 'src/master-schedule/master-schedule.service';
 import { MasterService } from 'src/master/master.service';
 import { AppointmentService } from 'src/appointment/appointment.service';
@@ -11,7 +11,7 @@ import { AppointmentHistoryService } from 'src/appointment-history/appointment-h
 export class StatsController {
   constructor(
     private readonly categoryService: CategoryService,
-    private readonly serviceService: ServiceService,
+    private readonly servicePrice: ServicePriceService,
     private readonly scheduleService: MasterScheduleService,
     private readonly masterService: MasterService,
     private readonly appointmentService: AppointmentService,
@@ -21,14 +21,37 @@ export class StatsController {
 
   @Get('counts')
   async getCounts() {
+    // Execute all counts in parallel for better performance
+    const [
+      categoryCount,
+      servicesCount,
+      scheduleCount,
+      mastersCount,
+      appointmentsCount,
+      usersCount,
+      historyCount,
+      activeAppointmentsCount
+    ] = await Promise.all([
+      this.categoryService.count(),
+      this.servicePrice.count(),
+      this.scheduleService.count(),
+      this.masterService.count(),
+      this.appointmentService.count(),
+      this.userService.count(),
+      this.appointmentHistoryService.count(),
+      this.appointmentService.countActive(), // Fetch active count here
+    ]);
+
     return {
-      category: await this.categoryService.count(),
-      services: await this.serviceService.count(),
-      schedule: await this.scheduleService.count(),
-      masters: await this.masterService.count(),
-      appointments: await this.appointmentService.count(),
-      users: await this.userService.count(),
-      history: await this.appointmentHistoryService.count(),
+      category: categoryCount,
+      services: servicesCount,
+      schedule: scheduleCount,
+      masters: mastersCount,
+      appointments: appointmentsCount,
+      users: usersCount,
+      history: historyCount,
+      activeAppointments: activeAppointmentsCount, // Include it in the main response
     };
   }
+  
 }
