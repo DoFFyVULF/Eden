@@ -109,12 +109,15 @@ export class AppointmentService {
       const masterId = dto.masterId ?? existing.masterID;
       const appointmentTime = dto.appointmentTime ?? existing.appointmentTime.toISOString();
       
-      // Проверяем, если это не та же самая запись
+      // Проверяем конфликты, исключая текущую запись и игнорируя отмененные/завершенные
       const conflictingAppointment = await this.prisma.appointment.findFirst({
         where: {
           masterID: masterId,
           appointmentTime: new Date(appointmentTime),
-          id: { not: id }
+          id: { not: id },
+          status: {
+            notIn: [AppointmentStatus.Отменен, AppointmentStatus.Завершен]
+          }
         }
       });
 
@@ -162,6 +165,16 @@ export class AppointmentService {
     return this.prisma.appointment.count();
   }
 
+  async countActive() :Promise<number> {
+    return this.prisma.appointment.count({
+      where: {
+        status: {
+          in: [AppointmentStatus.Новый, AppointmentStatus.Подтвержден]
+        }
+      }
+    })
+  }
+
   private async ensureMasterExists(masterId: number) {
     const master = await this.prisma.master.findUnique({ where: { id: masterId } });
     if (!master) {
@@ -179,17 +192,18 @@ export class AppointmentService {
   }
 
   private async ensureTimeNotTaken(masterId: number, time: string) {
-    const existing = await this.prisma.appointment.findUnique({
+    const existing = await this.prisma.appointment.findFirst({
       where: {
-        masterID_appointmentTime: {
-          masterID: masterId,
-          appointmentTime: new Date(time)
+        masterID: masterId,
+        appointmentTime: new Date(time),
+        status: {
+          notIn: [AppointmentStatus.Отменен, AppointmentStatus.Завершен]
         }
       }
     });
 
     if (existing) {
-      throw new BadRequestException(`На ${time} мастер уже занят`);
+      throw new BadRequestException(`На ${time} мастер уже занят активной записью`);
     }
   }
 }

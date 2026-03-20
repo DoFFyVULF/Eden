@@ -10,6 +10,7 @@ import {
   RefreshCw,
   ArrowLeft,
   ChevronDown,
+  ChevronUp,
   Activity,
   BarChart3,
   LineChart as LineChartIcon,
@@ -27,6 +28,7 @@ import {
   Zap,
   Award,
   CheckCircle2,
+  SlidersHorizontal,
 } from "lucide-react";
 import {
   LineChart,
@@ -73,20 +75,39 @@ export default function ComparisonAnalyticsPage() {
     null
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
     "overview" | "periods" | "categories" | "trends"
   >("overview");
+  const [isDark, setIsDark] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const { formatCurrency, formatPercent, formatNumber, getPeriodDisplayName } =
     useAnalytics();
 
   useEffect(() => {
+    const checkDarkMode = () =>
+      setIsDark(document.documentElement.classList.contains("dark"));
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     loadComparisonData();
   }, [selectedPeriod]);
 
-  const loadComparisonData = async () => {
-    setIsLoading(true);
+  const loadComparisonData = async (showLoading = true) => {
+    if (showLoading) {
+      setIsLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     setError(null);
     try {
       // Загружаем данные текущего периода
@@ -130,6 +151,7 @@ export default function ComparisonAnalyticsPage() {
       console.error("Ошибка загрузки:", err);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -151,6 +173,11 @@ export default function ComparisonAnalyticsPage() {
     }
   };
 
+  // Стили
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1] shadow-[0_4px_24px_rgba(0,0,0,0.2)]"
+    : "bg-white border border-gray-200/70 shadow-sm";
+
   const tabs = [
     { id: "overview", label: "Обзор", icon: BarChart3 },
     { id: "periods", label: "Период к периоду", icon: Calendar },
@@ -158,58 +185,102 @@ export default function ComparisonAnalyticsPage() {
     { id: "trends", label: "Тренды", icon: LineChartIcon },
   ];
 
-  if ((!currentData || !previousData) && !isLoading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-500">Загрузка данных...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
-      {/* Декоративный фон */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-[100px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-indigo-500/5 rounded-full blur-[80px]" />
-      </div>
-
-      <div className="relative z-10 p-4 md:p-8 max-w-[1800px] mx-auto">
-        {/* Хедер */}
+    <div className="min-h-screen p-4 md:p-6 lg:p-8">
+      <div className="max-w-9xl mx-auto">
+        {/* HEADER with back button */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center gap-4 mb-4">
             <motion.a
               href={ADMIN_ROUTES.ANALYTICS.DASHBOARD}
-              whileHover={{ scale: 1.05, x: -4 }}
+              whileHover={{ scale: 1.05, x: -2 }}
               whileTap={{ scale: 0.95 }}
-              className="p-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl transition-all shadow-sm"
+              className={`p-2.5 rounded-xl transition-all duration-200 ${
+                isDark
+                  ? "bg-white/[0.07] border border-white/[0.1] text-white/60 hover:text-white/80 hover:bg-white/[0.1]"
+                  : "bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
+              }`}
             >
-              <ArrowLeft className="w-5 h-5 text-gray-700" />
+              <ArrowLeft size={18} />
             </motion.a>
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
-                  <BarChart3 className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-sm font-medium text-gray-500 uppercase tracking-wider">
-                  Сравнительная аналитика
-                </span>
-              </div>
-              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">
-                Сравнение показателей 📊
-              </h1>
+              <p
+                className={`text-xs font-semibold tracking-widest uppercase ${
+                  isDark ? "text-white/30" : "text-gray-400"
+                }`}
+              >
+                Сравнительная аналитика
+              </p>
             </div>
           </div>
 
-          {/* Управление */}
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <h1
+                className={`text-4xl md:text-5xl font-black leading-none tracking-tight ${
+                  isDark ? "text-white" : "text-gray-900"
+                }`}
+              >
+                Сравнение показателей 📊
+              </h1>
+              <p
+                className={`mt-2 text-sm ${
+                  isDark ? "text-white/40" : "text-gray-400"
+                }`}
+              >
+                Анализ изменений и динамики показателей
+              </p>
+            </div>
+
+            <div className="flex gap-2.5 flex-wrap">
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => loadComparisonData(false)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.1] text-white/60 hover:text-white/80 hover:bg-white/[0.1]"
+                    : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
+                }`}
+              >
+                <RefreshCw
+                  size={15}
+                  className={isRefreshing ? "animate-spin" : ""}
+                />
+                Обновить
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={handleExport}
+                disabled={isLoading || isRefreshing}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 shadow-lg ${
+                  isDark
+                    ? "bg-gradient-to-r from-blue-500 to-cyan-600 text-white shadow-blue-500/25 hover:shadow-blue-500/40"
+                    : "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-blue-500/20 hover:shadow-blue-500/35"
+                }`}
+              >
+                <Download size={17} />
+                Экспорт
+              </motion.button>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* TABS & FILTERS */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className={`rounded-2xl p-4 mb-6 transition-all duration-300 ${glassCls}`}
+        >
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+            {/* Tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2 lg:pb-0 no-scrollbar">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
@@ -224,117 +295,204 @@ export default function ComparisonAnalyticsPage() {
                       )
                     }
                     className={`
-                      flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all
+                      flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
                       ${
                         activeTab === tab.id
-                          ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/25"
-                          : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 shadow-sm"
+                          ? isDark
+                            ? "bg-blue-500/20 border border-blue-400/30 text-blue-300"
+                            : "bg-blue-50 border border-blue-300 text-blue-600"
+                          : isDark
+                            ? "bg-white/[0.07] border border-white/[0.1] text-white/60 hover:text-white/80"
+                            : "bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
                       }
                     `}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon size={16} />
                     <span className="whitespace-nowrap">{tab.label}</span>
                   </motion.button>
                 );
               })}
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <div className="relative group">
+            {/* Controls */}
+            <div className="flex gap-3">
+              {/* Period selector */}
+              <div className="relative">
+                <Calendar
+                  size={16}
+                  className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${
+                    isDark ? "text-white/30" : "text-gray-400"
+                  }`}
+                />
                 <select
                   value={selectedPeriod}
                   onChange={(e) =>
                     setSelectedPeriod(e.target.value as TimePeriod)
                   }
                   disabled={isLoading}
-                  className="pl-11 pr-10 py-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl text-gray-900 font-medium appearance-none cursor-pointer transition-all shadow-sm disabled:opacity-50 focus:ring-2 focus:ring-blue-500/50 focus:outline-none focus:border-blue-500"
+                  className={`h-11 pl-10 pr-8 rounded-xl text-sm border outline-none appearance-none cursor-pointer transition-all ${
+                    isDark
+                      ? "bg-white/[0.07] border-white/[0.1] text-white/90 focus:border-white/20"
+                      : "bg-gray-50 border-gray-200 text-gray-700 focus:border-blue-300 focus:bg-white"
+                  }`}
                 >
                   <option value={TimePeriod.WEEK}>За неделю</option>
                   <option value={TimePeriod.MONTH}>За месяц</option>
                   <option value={TimePeriod.QUARTER}>За квартал</option>
                   <option value={TimePeriod.YEAR}>За год</option>
                 </select>
-                <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                <ChevronDown
+                  size={14}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${
+                    isDark ? "text-white/30" : "text-gray-400"
+                  }`}
+                />
               </div>
 
+              {/* Filter toggle */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={loadComparisonData}
-                disabled={isLoading}
-                className="px-4 py-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-medium transition-all shadow-sm disabled:opacity-50"
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className={`h-11 flex items-center gap-2 px-4 rounded-xl text-sm font-semibold border transition-all duration-200 ${
+                  isFilterOpen
+                    ? isDark
+                      ? "bg-blue-500/20 border-blue-400/30 text-blue-300"
+                      : "bg-blue-50 border-blue-300 text-blue-600"
+                    : isDark
+                      ? "bg-white/[0.07] border-white/[0.1] text-white/60 hover:text-white/80"
+                      : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-white shadow-sm"
+                }`}
               >
-                <RefreshCw
-                  className={`w-5 h-5 text-gray-700 ${isLoading ? "animate-spin" : ""}`}
-                />
-              </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleExport}
-                disabled={isLoading}
-                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl font-semibold shadow-lg shadow-blue-500/25 transition-all disabled:opacity-50"
-              >
-                <Download className="w-5 h-5" />
-                <span className="hidden sm:inline">Экспорт</span>
+                <SlidersHorizontal size={15} />
+                Детализация
+                {isFilterOpen ? (
+                  <ChevronUp size={13} />
+                ) : (
+                  <ChevronDown size={13} />
+                )}
               </motion.button>
             </div>
           </div>
 
+          {/* Error display */}
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3"
+              className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-3"
             >
-              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-              <p className="text-red-700 text-sm">{error}</p>
+              <AlertCircle className="w-5 h-5 text-rose-500 flex-shrink-0" />
+              <p className="text-rose-700 text-sm">{error}</p>
             </motion.div>
           )}
+
+          {/* Expanded filters */}
+          <AnimatePresence>
+            {isFilterOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: "auto", marginTop: 12 }}
+                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                className="overflow-hidden"
+              >
+                <div
+                  className={`pt-3 border-t ${
+                    isDark ? "border-white/[0.07]" : "border-gray-100"
+                  }`}
+                >
+                  <p
+                    className={`text-xs font-semibold mb-2.5 ${
+                      isDark ? "text-white/30" : "text-gray-400"
+                    }`}
+                  >
+                    Детальная информация:
+                  </p>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
+                      <span className={isDark ? "text-white/60" : "text-gray-600"}>
+                        Текущий период
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gray-400" />
+                      <span className={isDark ? "text-white/60" : "text-gray-600"}>
+                        Предыдущий период
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-500 to-green-500" />
+                      <span className={isDark ? "text-white/60" : "text-gray-600"}>
+                        Положительная динамика
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
-        {/* Основной контент */}
-        {currentData && previousData && (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
+        {/* MAIN CONTENT */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-24">
+            <div
+              className={`w-10 h-10 rounded-full border-3 border-t-transparent animate-spin mb-4 ${
+                isDark ? "border-blue-400" : "border-blue-400"
+              }`}
+              style={{ borderWidth: 3 }}
+            />
+            <p
+              className={`text-sm ${
+                isDark ? "text-white/40" : "text-gray-400"
+              }`}
             >
-              {activeTab === "overview" && (
-                <OverviewTab
-                  currentData={currentData}
-                  previousData={previousData}
-                  isLoading={isLoading}
-                />
-              )}
-              {activeTab === "periods" && (
-                <PeriodsTab
-                  currentData={currentData}
-                  previousData={previousData}
-                  isLoading={isLoading}
-                />
-              )}
-              {activeTab === "categories" && (
-                <CategoriesTab
-                  currentData={currentData}
-                  previousData={previousData}
-                  isLoading={isLoading}
-                />
-              )}
-              {activeTab === "trends" && (
-                <TrendsTab
-                  currentData={currentData}
-                  previousData={previousData}
-                  isLoading={isLoading}
-                />
-              )}
-            </motion.div>
-          </AnimatePresence>
+              Загрузка данных для сравнения...
+            </p>
+          </div>
+        ) : (
+          currentData &&
+          previousData && (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                {activeTab === "overview" && (
+                  <OverviewTab
+                    currentData={currentData}
+                    previousData={previousData}
+                    isDark={isDark}
+                  />
+                )}
+                {activeTab === "periods" && (
+                  <PeriodsTab
+                    currentData={currentData}
+                    previousData={previousData}
+                    isDark={isDark}
+                  />
+                )}
+                {activeTab === "categories" && (
+                  <CategoriesTab
+                    currentData={currentData}
+                    previousData={previousData}
+                    isDark={isDark}
+                  />
+                )}
+                {activeTab === "trends" && (
+                  <TrendsTab
+                    currentData={currentData}
+                    previousData={previousData}
+                    isDark={isDark}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          )
         )}
       </div>
     </div>
@@ -348,18 +506,24 @@ function calculateGrowth(current: number, previous: number): number {
 }
 
 // Компонент индикатора роста
-function GrowthIndicator({ growth }: { growth: number }) {
+function GrowthIndicator({ growth, isDark }: { growth: number; isDark?: boolean }) {
   const isPositive = growth > 0;
   const isNeutral = growth === 0;
 
   return (
     <div
-      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg font-semibold ${
+      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg font-semibold text-sm ${
         isNeutral
-          ? "bg-gray-100 text-gray-700"
+          ? isDark
+            ? "bg-gray-500/20 text-gray-300"
+            : "bg-gray-100 text-gray-700"
           : isPositive
-            ? "bg-emerald-100 text-emerald-700"
-            : "bg-red-100 text-red-700"
+            ? isDark
+              ? "bg-emerald-500/20 text-emerald-400"
+              : "bg-emerald-100 text-emerald-700"
+            : isDark
+              ? "bg-red-500/20 text-red-400"
+              : "bg-red-100 text-red-700"
       }`}
     >
       {isNeutral ? (
@@ -378,13 +542,17 @@ function GrowthIndicator({ growth }: { growth: number }) {
 function OverviewTab({
   currentData,
   previousData,
-  isLoading,
+  isDark,
 }: {
   currentData: KeyMetricsResponse;
   previousData: KeyMetricsResponse;
-  isLoading: boolean;
+  isDark: boolean;
 }) {
   const { formatCurrency, formatPercent, formatNumber } = useAnalytics();
+
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1]"
+    : "bg-white border border-gray-200/70";
 
   const comparisons = [
     {
@@ -392,7 +560,7 @@ function OverviewTab({
       current: currentData.financial.totalRevenue,
       previous: previousData.financial.totalRevenue,
       icon: DollarSign,
-      color: "from-emerald-500 to-green-500",
+      gradient: "from-emerald-500 to-green-500",
       format: formatCurrency,
     },
     {
@@ -400,7 +568,7 @@ function OverviewTab({
       current: currentData.clients.totalClients,
       previous: previousData.clients.totalClients,
       icon: Users,
-      color: "from-blue-500 to-cyan-500",
+      gradient: "from-blue-500 to-cyan-500",
       format: formatNumber,
     },
     {
@@ -408,7 +576,7 @@ function OverviewTab({
       current: currentData.appointments.totalAppointments,
       previous: previousData.appointments.totalAppointments,
       icon: Calendar,
-      color: "from-purple-500 to-pink-500",
+      gradient: "from-purple-500 to-pink-500",
       format: formatNumber,
     },
     {
@@ -416,7 +584,7 @@ function OverviewTab({
       current: currentData.appointments.conversionRate,
       previous: previousData.appointments.conversionRate,
       icon: Target,
-      color: "from-amber-500 to-orange-500",
+      gradient: "from-amber-500 to-orange-500",
       format: (val: number) => formatPercent(val),
     },
   ];
@@ -434,36 +602,47 @@ function OverviewTab({
               key={index}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              whileHover={{ y: -4, scale: 1.02 }}
-              className="relative overflow-hidden rounded-2xl"
+              transition={{ delay: index * 0.06 }}
+              whileHover={{ y: -4 }}
+              className={`relative rounded-2xl p-5 overflow-hidden transition-all duration-300 ${
+                isDark
+                  ? `bg-white/[0.07] border border-white/[0.1] backdrop-blur-xl shadow-lg`
+                  : "bg-white border border-gray-200/70 shadow-sm hover:shadow-md"
+              }`}
             >
-              <div className="relative p-6 bg-white border border-gray-200 shadow-sm">
+              {/* Gradient accent */}
+              <div
+                className={`absolute -top-4 -right-4 w-20 h-20 rounded-full bg-gradient-to-br ${item.gradient} opacity-${isDark ? "15" : "8"} blur-xl`}
+              />
+
+              <div className="relative">
                 <div className="flex items-center justify-between mb-4">
-                  <div className={`p-3 bg-gradient-to-br ${item.color} rounded-xl`}>
-                    <Icon className="w-6 h-6 text-white" />
+                  <div className={`p-2 rounded-xl bg-gradient-to-br ${item.gradient}`}>
+                    <Icon className="w-5 h-5 text-white" />
                   </div>
-                  <GrowthIndicator growth={growth} />
+                  <GrowthIndicator growth={growth} isDark={isDark} />
                 </div>
 
                 <div className="space-y-3">
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">Текущий период</div>
-                    <div className="text-2xl font-bold text-gray-900">
+                    <div className={`text-xs ${isDark ? "text-white/40" : "text-gray-500"} mb-1`}>
+                      Текущий период
+                    </div>
+                    <div className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
                       {item.format(item.current)}
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">
+                    <div className={`text-xs ${isDark ? "text-white/40" : "text-gray-500"} mb-1`}>
                       Предыдущий период
                     </div>
-                    <div className="text-lg text-gray-600">
+                    <div className={`text-lg ${isDark ? "text-white/70" : "text-gray-600"}`}>
                       {item.format(item.previous)}
                     </div>
                   </div>
                 </div>
 
-                <div className="text-sm font-medium text-gray-900 mt-4">
+                <div className={`text-sm font-medium ${isDark ? "text-white/70" : "text-gray-700"} mt-4`}>
                   {item.title}
                 </div>
               </div>
@@ -478,24 +657,30 @@ function OverviewTab({
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
-          className="p-6 bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-2xl"
+          className={`rounded-2xl p-6 transition-all duration-300 bg-gradient-to-br from-blue-500/20 via-cyan-500/20 to-blue-500/10 border ${
+            isDark ? "border-blue-500/30" : "border-blue-200"
+          }`}
         >
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-blue-500 rounded-lg">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
               <Award className="w-5 h-5 text-white" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900">
+            <h3 className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
               Лучшие показатели
             </h3>
           </div>
 
           <div className="space-y-3">
-            <div className="p-4 bg-white rounded-xl">
-              <div className="text-sm text-gray-600 mb-1">Лучший мастер</div>
-              <div className="font-semibold text-gray-900">
+            <div className={`p-4 rounded-xl ${
+              isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-white border border-gray-200/50"
+            }`}>
+              <div className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"} mb-1`}>
+                Лучший мастер
+              </div>
+              <div className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
                 {currentData.masters.topMasters[0]?.masterName || "Нет данных"}
               </div>
-              <div className="text-xs text-gray-500 mt-1">
+              <div className={`text-xs ${isDark ? "text-white/30" : "text-gray-500"} mt-1`}>
                 {formatCurrency(
                   currentData.masters.topMasters[0]?.totalRevenue || 0
                 )}{" "}
@@ -503,24 +688,32 @@ function OverviewTab({
               </div>
             </div>
 
-            <div className="p-4 bg-white rounded-xl">
-              <div className="text-sm text-gray-600 mb-1">Популярная услуга</div>
-              <div className="font-semibold text-gray-900">
+            <div className={`p-4 rounded-xl ${
+              isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-white border border-gray-200/50"
+            }`}>
+              <div className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"} mb-1`}>
+                Популярная услуга
+              </div>
+              <div className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
                 {currentData.services.popularServices[0]?.serviceName ||
                   "Нет данных"}
               </div>
-              <div className="text-xs text-gray-500 mt-1">
+              <div className={`text-xs ${isDark ? "text-white/30" : "text-gray-500"} mt-1`}>
                 {currentData.services.popularServices[0]?.appointmentsCount || 0}{" "}
                 записей
               </div>
             </div>
 
-            <div className="p-4 bg-white rounded-xl">
-              <div className="text-sm text-gray-600 mb-1">Конверсия</div>
-              <div className="font-semibold text-gray-900">
+            <div className={`p-4 rounded-xl ${
+              isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-white border border-gray-200/50"
+            }`}>
+              <div className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"} mb-1`}>
+                Конверсия
+              </div>
+              <div className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
                 {formatPercent(currentData.appointments.conversionRate)}
               </div>
-              <div className="text-xs text-gray-500 mt-1">
+              <div className={`text-xs ${isDark ? "text-white/30" : "text-gray-500"} mt-1`}>
                 {currentData.appointments.completedAppointments} завершённых
               </div>
             </div>
@@ -531,13 +724,17 @@ function OverviewTab({
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
-          className="p-6 bg-white border border-gray-200 rounded-2xl"
+          className={`rounded-2xl p-6 transition-all duration-300 ${
+            isDark
+              ? "bg-white/[0.07] border border-white/[0.1] backdrop-blur-xl"
+              : "bg-white border border-gray-200/70"
+          }`}
         >
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-emerald-500 rounded-lg">
+            <div className="p-2 bg-gradient-to-br from-emerald-500 to-green-500 rounded-lg">
               <CheckCircle2 className="w-5 h-5 text-white" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900">
+            <h3 className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
               Изменения месяц к месяцу
             </h3>
           </div>
@@ -575,12 +772,14 @@ function OverviewTab({
             ].map((metric, idx) => (
               <div
                 key={idx}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                className={`flex items-center justify-between p-3 rounded-lg ${
+                  isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-gray-50 border border-gray-100"
+                }`}
               >
-                <span className="text-sm font-medium text-gray-700">
+                <span className={`text-sm font-medium ${isDark ? "text-white/70" : "text-gray-700"}`}>
                   {metric.label}
                 </span>
-                <GrowthIndicator growth={metric.growth} />
+                <GrowthIndicator growth={metric.growth} isDark={isDark} />
               </div>
             ))}
           </div>
@@ -594,13 +793,17 @@ function OverviewTab({
 function PeriodsTab({
   currentData,
   previousData,
-  isLoading,
+  isDark,
 }: {
   currentData: KeyMetricsResponse;
   previousData: KeyMetricsResponse;
-  isLoading: boolean;
+  isDark: boolean;
 }) {
   const { formatCurrency, formatNumber } = useAnalytics();
+
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1]"
+    : "bg-white border border-gray-200/70";
 
   // Подготовка данных для графика сравнения по месяцам
   const comparisonData = currentData.financial.revenueByMonth.map(
@@ -617,47 +820,57 @@ function PeriodsTab({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-2xl"
+        className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
       >
-        <div className="relative p-6 bg-white border border-gray-200 shadow-sm">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">
-            Сравнение выручки по месяцам
-          </h3>
-          <ResponsiveContainer width="100%" height={400}>
-            <ComposedChart data={comparisonData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis dataKey="month" stroke="#9CA3AF" tick={{ fill: "#6B7280" }} />
-              <YAxis
-                stroke="#9CA3AF"
-                tick={{ fill: "#6B7280" }}
-                tickFormatter={(value) => `₽${(value / 1000).toFixed(0)}к`}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #E5E7EB",
-                  borderRadius: "12px",
-                  padding: "12px",
-                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                }}
-                formatter={(value: any) => formatCurrency(value)}
-              />
-              <Legend />
-              <Bar
-                dataKey="current"
-                fill={COLORS.current}
-                name="Текущий период"
-                radius={[8, 8, 0, 0]}
-              />
-              <Bar
-                dataKey="previous"
-                fill={COLORS.previous}
-                name="Предыдущий период"
-                radius={[8, 8, 0, 0]}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
+        <h3 className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-6`}>
+          Сравнение выручки по месяцам
+        </h3>
+        <ResponsiveContainer width="100%" height={400}>
+          <ComposedChart data={comparisonData}>
+            <CartesianGrid 
+              strokeDasharray="3 3" 
+              stroke={isDark ? "#ffffff10" : "#E5E7EB"} 
+            />
+            <XAxis
+              dataKey="month"
+              stroke={isDark ? "#ffffff30" : "#9CA3AF"}
+              tick={{ fill: isDark ? "#ffffff60" : "#6B7280" }}
+            />
+            <YAxis
+              stroke={isDark ? "#ffffff30" : "#9CA3AF"}
+              tick={{ fill: isDark ? "#ffffff60" : "#6B7280" }}
+              tickFormatter={(value) => `₽${(value / 1000).toFixed(0)}к`}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: isDark ? "#1F2937" : "white",
+                border: isDark ? "1px solid #ffffff20" : "1px solid #E5E7EB",
+                borderRadius: "12px",
+                padding: "12px",
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+              }}
+              formatter={(value: any) => formatCurrency(value)}
+              labelStyle={{ color: isDark ? "#ffffff80" : "#374151" }}
+            />
+            <Legend
+              wrapperStyle={{
+                color: isDark ? "#fff" : "#374151",
+              }}
+            />
+            <Bar
+              dataKey="current"
+              fill={COLORS.current}
+              name="Текущий период"
+              radius={[8, 8, 0, 0]}
+            />
+            <Bar
+              dataKey="previous"
+              fill={COLORS.previous}
+              name="Предыдущий период"
+              radius={[8, 8, 0, 0]}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
       </motion.div>
 
       {/* Таблица детального сравнения */}
@@ -665,96 +878,94 @@ function PeriodsTab({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="relative overflow-hidden rounded-2xl"
+        className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
       >
-        <div className="relative p-6 bg-white border border-gray-200 shadow-sm">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">
-            Детальное сравнение показателей
-          </h3>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">
-                    Показатель
-                  </th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">
-                    Текущий период
-                  </th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">
-                    Предыдущий период
-                  </th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">
-                    Изменение
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  {
-                    name: "Общая выручка",
-                    current: currentData.financial.totalRevenue,
-                    previous: previousData.financial.totalRevenue,
-                    format: formatCurrency,
-                  },
-                  {
-                    name: "Средний чек",
-                    current: currentData.financial.averageCheck,
-                    previous: previousData.financial.averageCheck,
-                    format: formatCurrency,
-                  },
-                  {
-                    name: "Всего клиентов",
-                    current: currentData.clients.totalClients,
-                    previous: previousData.clients.totalClients,
-                    format: formatNumber,
-                  },
-                  {
-                    name: "Новых клиентов",
-                    current: currentData.clients.newClients,
-                    previous: previousData.clients.newClients,
-                    format: formatNumber,
-                  },
-                  {
-                    name: "Всего записей",
-                    current: currentData.appointments.totalAppointments,
-                    previous: previousData.appointments.totalAppointments,
-                    format: formatNumber,
-                  },
-                  {
-                    name: "Завершённых записей",
-                    current: currentData.appointments.completedAppointments,
-                    previous: previousData.appointments.completedAppointments,
-                    format: formatNumber,
-                  },
-                ].map((row, idx) => {
-                  const growth = calculateGrowth(row.current, row.previous);
+        <h3 className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-6`}>
+          Детальное сравнение показателей
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className={`border-b ${isDark ? "border-white/[0.07]" : "border-gray-200"}`}>
+                <th className={`text-left py-3 px-4 text-sm font-semibold ${isDark ? "text-white/60" : "text-gray-600"}`}>
+                  Показатель
+                </th>
+                <th className={`text-right py-3 px-4 text-sm font-semibold ${isDark ? "text-white/60" : "text-gray-600"}`}>
+                  Текущий период
+                </th>
+                <th className={`text-right py-3 px-4 text-sm font-semibold ${isDark ? "text-white/60" : "text-gray-600"}`}>
+                  Предыдущий период
+                </th>
+                <th className={`text-right py-3 px-4 text-sm font-semibold ${isDark ? "text-white/60" : "text-gray-600"}`}>
+                  Изменение
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                {
+                  name: "Общая выручка",
+                  current: currentData.financial.totalRevenue,
+                  previous: previousData.financial.totalRevenue,
+                  format: formatCurrency,
+                },
+                {
+                  name: "Средний чек",
+                  current: currentData.financial.averageCheck,
+                  previous: previousData.financial.averageCheck,
+                  format: formatCurrency,
+                },
+                {
+                  name: "Всего клиентов",
+                  current: currentData.clients.totalClients,
+                  previous: previousData.clients.totalClients,
+                  format: formatNumber,
+                },
+                {
+                  name: "Новых клиентов",
+                  current: currentData.clients.newClients,
+                  previous: previousData.clients.newClients,
+                  format: formatNumber,
+                },
+                {
+                  name: "Всего записей",
+                  current: currentData.appointments.totalAppointments,
+                  previous: previousData.appointments.totalAppointments,
+                  format: formatNumber,
+                },
+                {
+                  name: "Завершённых записей",
+                  current: currentData.appointments.completedAppointments,
+                  previous: previousData.appointments.completedAppointments,
+                  format: formatNumber,
+                },
+              ].map((row, idx) => {
+                const growth = calculateGrowth(row.current, row.previous);
 
-                  return (
-                    <tr
-                      key={idx}
-                      className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="py-4 px-4 font-medium text-gray-900">
-                        {row.name}
-                      </td>
-                      <td className="py-4 px-4 text-right font-semibold text-gray-900">
-                        {row.format(row.current)}
-                      </td>
-                      <td className="py-4 px-4 text-right text-gray-600">
-                        {row.format(row.previous)}
-                      </td>
-                      <td className="py-4 px-4 text-right">
-                        <div className="flex items-center justify-end">
-                          <GrowthIndicator growth={growth} />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                return (
+                  <tr
+                    key={idx}
+                    className={`border-b ${isDark ? "border-white/[0.07] hover:bg-white/[0.03]" : "border-gray-100 hover:bg-gray-50"} transition-colors`}
+                  >
+                    <td className={`py-4 px-4 font-medium ${isDark ? "text-white" : "text-gray-900"}`}>
+                      {row.name}
+                    </td>
+                    <td className={`py-4 px-4 text-right font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+                      {row.format(row.current)}
+                    </td>
+                    <td className={`py-4 px-4 text-right ${isDark ? "text-white/70" : "text-gray-600"}`}>
+                      {row.format(row.previous)}
+                    </td>
+                    <td className="py-4 px-4 text-right">
+                      <div className="flex items-center justify-end">
+                        <GrowthIndicator growth={growth} isDark={isDark} />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </motion.div>
     </div>
@@ -765,13 +976,17 @@ function PeriodsTab({
 function CategoriesTab({
   currentData,
   previousData,
-  isLoading,
+  isDark,
 }: {
   currentData: KeyMetricsResponse;
   previousData: KeyMetricsResponse;
-  isLoading: boolean;
+  isDark: boolean;
 }) {
   const { formatCurrency, formatNumber } = useAnalytics();
+
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1]"
+    : "bg-white border border-gray-200/70";
 
   // Радарная диаграмма для сравнения категорий
   const radarData = [
@@ -803,48 +1018,56 @@ function CategoriesTab({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-2xl"
+        className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
       >
-        <div className="relative p-6 bg-white border border-gray-200 shadow-sm">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">
-            Сравнительный анализ по категориям
-          </h3>
-          <ResponsiveContainer width="100%" height={400}>
-            <RadarChart data={radarData}>
-              <PolarGrid stroke="#E5E7EB" />
-              <PolarAngleAxis
-                dataKey="category"
-                stroke="#6B7280"
-                tick={{ fill: "#6B7280" }}
-              />
-              <PolarRadiusAxis stroke="#9CA3AF" tick={{ fill: "#6B7280" }} />
-              <Radar
-                name="Текущий период"
-                dataKey="current"
-                stroke={COLORS.current}
-                fill={COLORS.current}
-                fillOpacity={0.6}
-              />
-              <Radar
-                name="Предыдущий период"
-                dataKey="previous"
-                stroke={COLORS.previous}
-                fill={COLORS.previous}
-                fillOpacity={0.3}
-              />
-              <Legend />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #E5E7EB",
-                  borderRadius: "12px",
-                  padding: "12px",
-                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                }}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
-        </div>
+        <h3 className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-6`}>
+          Сравнительный анализ по категориям
+        </h3>
+        <ResponsiveContainer width="100%" height={400}>
+          <RadarChart data={radarData}>
+            <PolarGrid 
+              stroke={isDark ? "#ffffff20" : "#E5E7EB"} 
+            />
+            <PolarAngleAxis
+              dataKey="category"
+              stroke={isDark ? "#ffffff40" : "#6B7280"}
+              tick={{ fill: isDark ? "#ffffff60" : "#6B7280" }}
+            />
+            <PolarRadiusAxis 
+              stroke={isDark ? "#ffffff30" : "#9CA3AF"} 
+              tick={{ fill: isDark ? "#ffffff40" : "#6B7280" }}
+            />
+            <Radar
+              name="Текущий период"
+              dataKey="current"
+              stroke={COLORS.current}
+              fill={COLORS.current}
+              fillOpacity={0.4}
+            />
+            <Radar
+              name="Предыдущий период"
+              dataKey="previous"
+              stroke={COLORS.previous}
+              fill={COLORS.previous}
+              fillOpacity={0.2}
+            />
+            <Legend
+              wrapperStyle={{
+                color: isDark ? "#fff" : "#374151",
+              }}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: isDark ? "#1F2937" : "white",
+                border: isDark ? "1px solid #ffffff20" : "1px solid #E5E7EB",
+                borderRadius: "12px",
+                padding: "12px",
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+              }}
+              labelStyle={{ color: isDark ? "#ffffff80" : "#374151" }}
+            />
+          </RadarChart>
+        </ResponsiveContainer>
       </motion.div>
 
       {/* Сравнение по категориям */}
@@ -853,7 +1076,7 @@ function CategoriesTab({
           {
             title: "Финансы",
             icon: DollarSign,
-            color: "from-emerald-500 to-green-500",
+            gradient: "from-emerald-500 to-green-500",
             metrics: [
               {
                 label: "Выручка",
@@ -872,7 +1095,7 @@ function CategoriesTab({
           {
             title: "Клиенты",
             icon: Users,
-            color: "from-blue-500 to-cyan-500",
+            gradient: "from-blue-500 to-cyan-500",
             metrics: [
               {
                 label: "Всего",
@@ -891,7 +1114,7 @@ function CategoriesTab({
           {
             title: "Записи",
             icon: Calendar,
-            color: "from-purple-500 to-pink-500",
+            gradient: "from-purple-500 to-pink-500",
             metrics: [
               {
                 label: "Всего",
@@ -916,15 +1139,21 @@ function CategoriesTab({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
-              className="p-6 bg-white border border-gray-200 rounded-xl"
+              className={`rounded-2xl p-6 transition-all duration-300 ${
+                isDark
+                  ? "bg-white/[0.07] border border-white/[0.1] backdrop-blur-xl"
+                  : "bg-white border border-gray-200/70"
+              }`}
             >
               <div className="flex items-center gap-3 mb-4">
                 <div
-                  className={`p-2 bg-gradient-to-br ${category.color} rounded-lg`}
+                  className={`p-2 rounded-lg bg-gradient-to-br ${category.gradient}`}
                 >
                   <Icon className="w-5 h-5 text-white" />
                 </div>
-                <h4 className="font-bold text-gray-900">{category.title}</h4>
+                <h4 className={`font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+                  {category.title}
+                </h4>
               </div>
 
               <div className="space-y-3">
@@ -932,17 +1161,22 @@ function CategoriesTab({
                   const growth = calculateGrowth(metric.current, metric.previous);
 
                   return (
-                    <div key={midx} className="p-3 bg-gray-50 rounded-lg">
+                    <div
+                      key={midx}
+                      className={`p-3 rounded-lg ${
+                        isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-gray-50 border border-gray-100"
+                      }`}
+                    >
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">
+                        <span className={`text-sm ${isDark ? "text-white/40" : "text-gray-600"}`}>
                           {metric.label}
                         </span>
-                        <GrowthIndicator growth={growth} />
+                        <GrowthIndicator growth={growth} isDark={isDark} />
                       </div>
-                      <div className="text-lg font-bold text-gray-900">
+                      <div className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
                         {metric.format(metric.current)}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className={`text-xs ${isDark ? "text-white/30" : "text-gray-500"}`}>
                         Было: {metric.format(metric.previous)}
                       </div>
                     </div>
@@ -961,13 +1195,17 @@ function CategoriesTab({
 function TrendsTab({
   currentData,
   previousData,
-  isLoading,
+  isDark,
 }: {
   currentData: KeyMetricsResponse;
   previousData: KeyMetricsResponse;
-  isLoading: boolean;
+  isDark: boolean;
 }) {
   const { formatCurrency } = useAnalytics();
+
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1]"
+    : "bg-white border border-gray-200/70";
 
   // Данные трендов
   const trendData = currentData.financial.revenueByMonth.map((month, idx) => ({
@@ -982,69 +1220,79 @@ function TrendsTab({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-2xl"
+        className={`rounded-2xl p-6 transition-all duration-300 ${glassCls}`}
       >
-        <div className="relative p-6 bg-white border border-gray-200 shadow-sm">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">
-            Тренды выручки
-          </h3>
-          <ResponsiveContainer width="100%" height={400}>
-            <AreaChart data={trendData}>
-              <defs>
-                <linearGradient id="currentGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={COLORS.current} stopOpacity={0.4} />
-                  <stop offset="100%" stopColor={COLORS.current} stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="previousGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="0%"
-                    stopColor={COLORS.previous}
-                    stopOpacity={0.4}
-                  />
-                  <stop
-                    offset="100%"
-                    stopColor={COLORS.previous}
-                    stopOpacity={0}
-                  />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis dataKey="month" stroke="#9CA3AF" tick={{ fill: "#6B7280" }} />
-              <YAxis
-                stroke="#9CA3AF"
-                tick={{ fill: "#6B7280" }}
-                tickFormatter={(value) => `₽${(value / 1000).toFixed(0)}к`}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #E5E7EB",
-                  borderRadius: "12px",
-                  padding: "12px",
-                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                }}
-                formatter={(value: any) => formatCurrency(value)}
-              />
-              <Legend />
-              <Area
-                type="monotone"
-                dataKey="revenue"
-                stroke={COLORS.current}
-                strokeWidth={2}
-                fill="url(#currentGradient)"
-                name="Текущий период"
-              />
-              <Area
-                type="monotone"
-                dataKey="prevRevenue"
-                stroke={COLORS.previous}
-                strokeWidth={2}
-                fill="url(#previousGradient)"
-                name="Предыдущий период"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+        <h3 className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"} mb-6`}>
+          Тренды выручки
+        </h3>
+        <ResponsiveContainer width="100%" height={400}>
+          <AreaChart data={trendData}>
+            <defs>
+              <linearGradient id="currentGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={COLORS.current} stopOpacity={0.4} />
+                <stop offset="100%" stopColor={COLORS.current} stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="previousGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop
+                  offset="0%"
+                  stopColor={COLORS.previous}
+                  stopOpacity={0.4}
+                />
+                <stop
+                  offset="100%"
+                  stopColor={COLORS.previous}
+                  stopOpacity={0}
+                />
+              </linearGradient>
+            </defs>
+            <CartesianGrid 
+              strokeDasharray="3 3" 
+              stroke={isDark ? "#ffffff10" : "#E5E7EB"} 
+            />
+            <XAxis
+              dataKey="month"
+              stroke={isDark ? "#ffffff30" : "#9CA3AF"}
+              tick={{ fill: isDark ? "#ffffff60" : "#6B7280" }}
+            />
+            <YAxis
+              stroke={isDark ? "#ffffff30" : "#9CA3AF"}
+              tick={{ fill: isDark ? "#ffffff60" : "#6B7280" }}
+              tickFormatter={(value) => `₽${(value / 1000).toFixed(0)}к`}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: isDark ? "#1F2937" : "white",
+                border: isDark ? "1px solid #ffffff20" : "1px solid #E5E7EB",
+                borderRadius: "12px",
+                padding: "12px",
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+              }}
+              formatter={(value: any) => formatCurrency(value)}
+              labelStyle={{ color: isDark ? "#ffffff80" : "#374151" }}
+            />
+            <Legend
+              wrapperStyle={{
+                color: isDark ? "#fff" : "#374151",
+              }}
+            />
+            <Area
+              type="monotone"
+              dataKey="revenue"
+              stroke={COLORS.current}
+              strokeWidth={2}
+              fill="url(#currentGradient)"
+              name="Текущий период"
+            />
+            <Area
+              type="monotone"
+              dataKey="prevRevenue"
+              stroke={COLORS.previous}
+              strokeWidth={2}
+              fill="url(#previousGradient)"
+              name="Предыдущий период"
+            />
+          </AreaChart>
+        </ResponsiveContainer>
       </motion.div>
 
       {/* Инсайты */}
@@ -1052,22 +1300,30 @@ function TrendsTab({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="p-6 bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-2xl"
+        className={`rounded-2xl p-6 transition-all duration-300 bg-gradient-to-br from-blue-500/10 via-cyan-500/10 to-blue-500/5 border ${
+          isDark ? "border-blue-500/20" : "border-blue-200"
+        }`}
       >
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-blue-500 rounded-lg">
+          <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl">
             <Zap className="w-5 h-5 text-white" />
           </div>
-          <h3 className="text-xl font-bold text-gray-900">Ключевые инсайты</h3>
+          <h3 className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+            Ключевые инсайты
+          </h3>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="p-4 bg-white rounded-xl border border-blue-200">
+          <div className={`p-4 rounded-xl ${
+            isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-white border border-gray-200/50"
+          }`}>
             <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="w-5 h-5 text-emerald-600" />
-              <h4 className="font-semibold text-emerald-900">Рост выручки</h4>
+              <TrendingUp className={`w-5 h-5 ${isDark ? "text-emerald-400" : "text-emerald-600"}`} />
+              <h4 className={`font-semibold ${isDark ? "text-emerald-400" : "text-emerald-900"}`}>
+                Рост выручки
+              </h4>
             </div>
-            <p className="text-sm text-gray-700">
+            <p className={`text-sm ${isDark ? "text-white/60" : "text-gray-700"}`}>
               Выручка выросла на{" "}
               {calculateGrowth(
                 currentData.financial.totalRevenue,
@@ -1077,12 +1333,16 @@ function TrendsTab({
             </p>
           </div>
 
-          <div className="p-4 bg-white rounded-xl border border-cyan-200">
+          <div className={`p-4 rounded-xl ${
+            isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-white border border-gray-200/50"
+          }`}>
             <div className="flex items-center gap-2 mb-2">
-              <Users className="w-5 h-5 text-blue-600" />
-              <h4 className="font-semibold text-blue-900">Новые клиенты</h4>
+              <Users className={`w-5 h-5 ${isDark ? "text-blue-400" : "text-blue-600"}`} />
+              <h4 className={`font-semibold ${isDark ? "text-blue-400" : "text-blue-900"}`}>
+                Новые клиенты
+              </h4>
             </div>
-            <p className="text-sm text-gray-700">
+            <p className={`text-sm ${isDark ? "text-white/60" : "text-gray-700"}`}>
               Привлечено {currentData.clients.newClients} новых клиентов (
               {calculateGrowth(
                 currentData.clients.newClients,
@@ -1092,12 +1352,16 @@ function TrendsTab({
             </p>
           </div>
 
-          <div className="p-4 bg-white rounded-xl border border-indigo-200">
+          <div className={`p-4 rounded-xl ${
+            isDark ? "bg-white/[0.04] border border-white/[0.05]" : "bg-white border border-gray-200/50"
+          }`}>
             <div className="flex items-center gap-2 mb-2">
-              <Target className="w-5 h-5 text-indigo-600" />
-              <h4 className="font-semibold text-indigo-900">Конверсия</h4>
+              <Target className={`w-5 h-5 ${isDark ? "text-indigo-400" : "text-indigo-600"}`} />
+              <h4 className={`font-semibold ${isDark ? "text-indigo-400" : "text-indigo-900"}`}>
+                Конверсия
+              </h4>
             </div>
-            <p className="text-sm text-gray-700">
+            <p className={`text-sm ${isDark ? "text-white/60" : "text-gray-700"}`}>
               Уровень конверсии составляет{" "}
               {currentData.appointments.conversionRate.toFixed(1)}% (
               {calculateGrowth(
@@ -1107,6 +1371,25 @@ function TrendsTab({
               %)
             </p>
           </div>
+        </div>
+
+        <div className={`mt-4 p-4 rounded-xl ${
+          isDark ? "bg-amber-500/10 border border-amber-500/20" : "bg-amber-50 border border-amber-200"
+        }`}>
+          <div className="flex items-center gap-2 mb-2">
+            <Info className={`w-5 h-5 ${isDark ? "text-amber-400" : "text-amber-600"}`} />
+            <h4 className={`font-semibold ${isDark ? "text-amber-400" : "text-amber-900"}`}>
+              Общая динамика
+            </h4>
+          </div>
+          <p className={`text-sm ${isDark ? "text-white/60" : "text-gray-700"}`}>
+            {calculateGrowth(
+              currentData.financial.totalRevenue,
+              previousData.financial.totalRevenue
+            ) > 0
+              ? "Наблюдается положительная динамика по основным показателям. Продолжайте в том же духе!"
+              : "Наблюдается снижение показателей. Рекомендуется проанализировать причины и принять меры."}
+          </p>
         </div>
       </motion.div>
     </div>

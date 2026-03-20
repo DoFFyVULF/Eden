@@ -500,7 +500,7 @@ function MasterCard({
       exit={{ opacity: 0, scale: 0.96 }}
       whileHover={{ y: -3 }}
       transition={{ duration: 0.25 }}
-      className={`relative rounded-2xl p-5 transition-all duration-300 overflow-hidden ${cardCls}`}
+      className={`relative rounded-2xl p-5 transition-all duration-300 ${cardCls}`}
     >
       {/* Gradient accent top line */}
       <div

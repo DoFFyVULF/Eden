@@ -200,7 +200,6 @@ export default function AdminAppointments() {
     }
   };
   const handleCancel = async (id: string) => {
-    if (!window.confirm("Отменить запись?")) return;
     try {
       await appointmentService.update(Number(id), {
         status: AppointmentStatus.Отменен,
@@ -220,7 +219,6 @@ export default function AdminAppointments() {
     }
   };
   const handleDelete = async (id: string) => {
-    if (!window.confirm("Удалить запись?")) return;
     try {
       await appointmentService.delete(Number(id));
       await loadAppointments();

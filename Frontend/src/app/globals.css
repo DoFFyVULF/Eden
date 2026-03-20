@@ -29,6 +29,11 @@
   --text-secondary: #9ca3af;
 }
 
+.roundedCustom{
+  background-color: #581c87;
+}
+
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

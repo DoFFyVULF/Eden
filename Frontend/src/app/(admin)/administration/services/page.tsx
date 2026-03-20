@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { serviceService } from "@/services/service/service.service";
@@ -7,7 +8,6 @@ import { ICategory } from "@/types/category.types";
 import { categoryService } from "@/services/category/category.service";
 import {
   Search,
-  Filter,
   Plus,
   Tag,
   Clock,
@@ -15,27 +15,32 @@ import {
   Trash2,
   RefreshCw,
   ChevronDown,
+  ChevronUp,
   Shield,
-  Zap,
-  Sparkles,
   TrendingUp,
-  Calendar,
-  Award,
-  Users,
   Eye,
   EyeOff,
-  CheckCircle,
   X,
   Loader2,
-  Star,
-  BarChart3,
   Package,
-  TrendingDown,
+  Activity,
+  SlidersHorizontal,
   AlertCircle,
 } from "lucide-react";
 
 type SortField = "title" | "duration" | "category" | "status";
 type SortOrder = "asc" | "desc";
+
+const CAT_GRADS = [
+  "from-blue-500 to-indigo-600",
+  "from-emerald-500 to-teal-600",
+  "from-purple-500 to-pink-600",
+  "from-amber-500 to-orange-500",
+  "from-rose-500 to-red-600",
+  "from-indigo-500 to-blue-600",
+  "from-violet-500 to-purple-600",
+  "from-cyan-500 to-blue-500",
+];
 
 export default function Services() {
   const [services, setServices] = useState<IService[]>([]);
@@ -44,13 +49,16 @@ export default function Services() {
   const [editingService, setEditingService] = useState<IService | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [isDark, setIsDark] = useState(false);
+
   const [sortField, setSortField] = useState<SortField>("title");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [statusFilter, setStatusFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [formData, setFormData] = useState({
+  const [search, setSearch] = useState("");
+
+  const [form, setForm] = useState({
     title: "",
     description: "",
     duration: 0,
@@ -58,898 +66,1170 @@ export default function Services() {
     isActive: true,
   });
 
-  const loadServices = async (showLoading = true) => {
-    if (showLoading) {
-      setIsLoading(true);
-    } else {
-      setIsRefreshing(true);
-    }
+  useEffect(() => {
+    const check = () =>
+      setIsDark(document.documentElement.classList.contains("dark"));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => obs.disconnect();
+  }, []);
+
+  const loadServices = async (showLoader = true) => {
+    showLoader ? setIsLoading(true) : setIsRefreshing(true);
     try {
-      const data = await serviceService.getAll();
-      setServices(data);
+      setServices(await serviceService.getAll());
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   };
 
-  const loadCategories = async () => {
-    const data = await categoryService.getAll();
-    setCategories(data);
-  };
-
   useEffect(() => {
-    loadCategories();
+    categoryService.getAll().then(setCategories);
     loadServices();
   }, []);
 
-  const categoryMap = useMemo(() => {
-    return new Map<number, string>(categories.map((c) => [c.id, c.title]));
-  }, [categories]);
+  const catMap = useMemo(
+    () => new Map(categories.map((c) => [c.id, c.title])),
+    [categories],
+  );
+  const catName = (id: number) => catMap.get(id) ?? "Не указана";
+  const catGrad = (id: number) => CAT_GRADS[id % CAT_GRADS.length];
 
-  const getCategoryName = (categoryId: number) =>
-    categoryMap.get(categoryId) ?? "Не указана";
-
-  const getCategoryColor = (categoryId: number) => {
-    const colors = [
-      "from-blue-500 to-cyan-500",
-      "from-emerald-500 to-green-500",
-      "from-purple-500 to-pink-500",
-      "from-amber-500 to-orange-500",
-      "from-rose-500 to-red-500",
-      "from-indigo-500 to-blue-500",
-      "from-violet-500 to-purple-500",
-      "from-teal-500 to-cyan-500",
-    ];
-    const index = categoryId % colors.length;
-    return colors[index];
-  };
-
-  const sortServices = (list: IService[]) => {
-    return [...list].sort((a, b) => {
-      let aVal: string | number = "";
-      let bVal: string | number = "";
+  const sortList = (list: IService[]) =>
+    [...list].sort((a, b) => {
+      let av: string | number = "",
+        bv: string | number = "";
       switch (sortField) {
         case "title":
-          aVal = a.title;
-          bVal = b.title;
+          av = a.title;
+          bv = b.title;
           break;
         case "duration":
-          aVal = a.duration;
-          bVal = b.duration;
+          av = a.duration;
+          bv = b.duration;
           break;
         case "category":
-          aVal = getCategoryName(a.categoryId);
-          bVal = getCategoryName(b.categoryId);
+          av = catName(a.categoryId);
+          bv = catName(b.categoryId);
           break;
         case "status":
-          aVal = a.isActive ? 1 : 0;
-          bVal = b.isActive ? 1 : 0;
+          av = a.isActive ? 1 : 0;
+          bv = b.isActive ? 1 : 0;
           break;
       }
-      if (typeof aVal === "string") {
+      if (typeof av === "string")
         return sortOrder === "asc"
-          ? aVal.localeCompare(bVal as string)
-          : (bVal as string).localeCompare(aVal);
-      }
+          ? av.localeCompare(bv as string)
+          : (bv as string).localeCompare(av);
       return sortOrder === "asc"
-        ? (aVal as number) - (bVal as number)
-        : (bVal as number) - (aVal as number);
+        ? (av as number) - (bv as number)
+        : (bv as number) - (av as number);
     });
-  };
 
-  const filteredAndSortedServices = useMemo(() => {
-    let filtered = services;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(
+  const filtered = useMemo(() => {
+    let list = services;
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(
         (s) =>
           s.title.toLowerCase().includes(q) ||
           s.description?.toLowerCase().includes(q) ||
-          getCategoryName(s.categoryId).toLowerCase().includes(q)
+          catName(s.categoryId).toLowerCase().includes(q),
       );
     }
-    if (statusFilter) {
-      filtered = filtered.filter((s) =>
-        statusFilter === "active" ? s.isActive : !s.isActive
+    if (statusFilter)
+      list = list.filter((s) =>
+        statusFilter === "active" ? s.isActive : !s.isActive,
       );
-    }
-    if (categoryFilter) {
-      filtered = filtered.filter(
-        (s) => s.categoryId === Number(categoryFilter)
-      );
-    }
-    return sortServices(filtered);
+    if (categoryFilter)
+      list = list.filter((s) => s.categoryId === Number(categoryFilter));
+    return sortList(list);
   }, [
     services,
-    searchQuery,
+    search,
     statusFilter,
     categoryFilter,
     sortField,
     sortOrder,
-    categoryMap,
+    catMap,
   ]);
 
-  const openModalForAdd = () => {
+  const stats = useMemo(
+    () => ({
+      total: services.length,
+      active: services.filter((s) => s.isActive).length,
+      inactive: services.filter((s) => !s.isActive).length,
+      avg:
+        services.length > 0
+          ? Math.round(
+              services.reduce((a, s) => a + s.duration, 0) / services.length,
+            )
+          : 0,
+      cats: categories.length,
+    }),
+    [services, categories],
+  );
+
+  const openAdd = () => {
     setEditingService(null);
-    setFormData({
+    setForm({
       title: "",
       description: "",
       duration: 0,
-      categoryId: categories.length > 0 ? categories[0].id : 0,
+      categoryId: categories[0]?.id ?? 0,
       isActive: true,
     });
     setIsModalOpen(true);
   };
-
-  const openModalForEdit = (service: IService) => {
-    setEditingService(service);
-    setFormData({
-      title: service.title,
-      description: service.description || "",
-      duration: service.duration,
-      categoryId: service.categoryId,
-      isActive: service.isActive,
+  const openEdit = (s: IService) => {
+    setEditingService(s);
+    setForm({
+      title: s.title,
+      description: s.description || "",
+      duration: s.duration,
+      categoryId: s.categoryId,
+      isActive: s.isActive,
     });
     setIsModalOpen(true);
   };
-
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingService(null);
   };
 
-  const handleInputChange = (
+  const handleInput = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    >,
   ) => {
     const { name, value, type } = e.target;
-    if (type === "checkbox") {
-      const checked = (e.target as HTMLInputElement).checked;
-      setFormData((prev) => ({ ...prev, [name]: checked }));
-    } else if (type === "number") {
-      setFormData((prev) => ({ ...prev, [name]: parseInt(value) || 0 }));
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-    }
+    if (type === "checkbox")
+      setForm((p) => ({
+        ...p,
+        [name]: (e.target as HTMLInputElement).checked,
+      }));
+    else if (type === "number")
+      setForm((p) => ({ ...p, [name]: parseInt(value) || 0 }));
+    else setForm((p) => ({ ...p, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      !formData.title.trim() ||
-      formData.duration <= 0 ||
-      formData.categoryId === 0
-    ) {
-      alert("Пожалуйста, заполните название, продолжительность и выберите категорию");
+    if (!form.title.trim() || form.duration <= 0 || form.categoryId === 0) {
+      alert("Заполните название, продолжительность и выберите категорию");
       return;
     }
-
     setIsLoading(true);
     try {
-      // Подготовка данных: описание всегда строка (пустая или нет)
       const payload = {
-        title: formData.title.trim(),
-        description: formData.description?.trim() || "",
-        duration: formData.duration,
-        isActive: formData.isActive,
-        categoryId: formData.categoryId,
+        title: form.title.trim(),
+        description: form.description?.trim() || "",
+        duration: form.duration,
+        isActive: form.isActive,
+        categoryId: form.categoryId,
       };
-
-      if (editingService) {
-        await serviceService.update(editingService.id, {
-          title: payload.title,
-          description: payload.description,
-          duration: payload.duration,
-          isActive: payload.isActive,
-        });
-        
-        // Полная перезагрузка списка после обновления для гарантии актуальности
-        await loadServices(false);
-      } else {
-        await serviceService.create(payload);
-        
-        // Полная перезагрузка списка после создания. 
-        // Это решает проблему с отсутствием categoryId или других полей в ответе сервера.
-        await loadServices(false);
-      }
-      
+      if (editingService)
+        await serviceService.update(editingService.id, payload);
+      else await serviceService.create(payload);
+      await loadServices(false);
       closeModal();
-    } catch (error) {
-      console.error("Ошибка сохранения:", error);
-      alert("Не удалось сохранить услугу. Проверьте ввод и попробуйте снова.");
+    } catch {
+      alert("Не удалось сохранить услугу");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const deleteService = async (serviceId: number) => {
-    if (!confirm("Вы уверены, что хотите удалить эту услугу?")) return;
+  const deleteService = async (id: number) => {
+    if (!confirm("Удалить эту услугу?")) return;
     try {
-      await serviceService.delete(serviceId);
-      setServices((prev) => prev.filter((s) => s.id !== serviceId));
-    } catch (error) {
-      console.error("Ошибка удаления:", error);
+      await serviceService.delete(id);
+      setServices((p) => p.filter((s) => s.id !== id));
+    } catch {
       alert("Не удалось удалить услугу");
     }
   };
 
-  const handleSortChange = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
+  const handleSort = (field: SortField) => {
+    if (sortField === field)
+      setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
+    else {
       setSortField(field);
       setSortOrder("asc");
     }
   };
 
-  const clearFilters = () => {
-    setStatusFilter("");
-    setCategoryFilter("");
-    setSearchQuery("");
-  };
+  // ── design tokens ─────────────────────────────────────────────────────────
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1] shadow-lg"
+    : "bg-white border border-gray-200/70 shadow-sm";
 
-  const activeServicesCount = useMemo(
-    () => services.filter((s) => s.isActive).length,
-    [services]
-  );
+  const cardCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1] hover:bg-white/[0.1] hover:border-white/[0.15] shadow-lg hover:shadow-xl"
+    : "bg-white border border-gray-200/70 hover:border-gray-300/80 shadow-sm hover:shadow-lg";
 
-  const inactiveServicesCount = useMemo(
-    () => services.filter((s) => !s.isActive).length,
-    [services]
-  );
+  const modalCls = isDark
+    ? "bg-slate-900/88 backdrop-blur-3xl border border-white/[0.1] shadow-[0_32px_80px_rgba(0,0,0,0.7)]"
+    : "bg-white/96 backdrop-blur-xl border border-gray-200/70 shadow-2xl";
 
-  const totalDuration = useMemo(
-    () => services.reduce((acc, s) => acc + s.duration, 0),
-    [services]
-  );
+  const inputCls = `w-full h-11 px-4 rounded-xl text-sm border outline-none transition-all ${
+    isDark
+      ? "bg-white/[0.07] border-white/[0.09] text-white/90 placeholder-white/25 focus:border-indigo-400/50 focus:ring-1 focus:ring-indigo-400/20"
+      : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 focus:bg-white"
+  }`;
 
-  const avgDuration = useMemo(
-    () => (services.length > 0 ? Math.round(totalDuration / services.length) : 0),
-    [services, totalDuration]
-  );
+  const sectionCls = `rounded-2xl p-4 border ${
+    isDark
+      ? "bg-white/[0.04] border-white/[0.07]"
+      : "bg-gray-50/60 border-gray-200/60"
+  }`;
 
-  const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return null;
-    return sortOrder === "asc" ? "↑" : "↓";
-  };
+  const SORT_OPTS: { f: SortField; l: string }[] = [
+    { f: "title", l: "Название" },
+    { f: "duration", l: "Длительность" },
+    { f: "category", l: "Категория" },
+    { f: "status", l: "Статус" },
+  ];
+
+  const STAT_CARDS = [
+    {
+      num: stats.total,
+      label: "Всего услуг",
+      sub: "в системе",
+      grad: "from-blue-500 to-indigo-600",
+      glow: "shadow-blue-500/15",
+    },
+    {
+      num: stats.active,
+      label: "Активных",
+      sub: "доступны клиентам",
+      grad: "from-emerald-500 to-teal-600",
+      glow: "shadow-emerald-500/15",
+    },
+    {
+      num: stats.avg,
+      label: "Среднее время",
+      sub: "минут на услугу",
+      grad: "from-amber-500 to-orange-500",
+      glow: "shadow-amber-500/15",
+    },
+    {
+      num: stats.cats,
+      label: "Категорий",
+      sub: "доступно",
+      grad: "from-purple-500 to-pink-600",
+      glow: "shadow-purple-500/15",
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
-      <div className="max-w-9xl mx-auto">
-        {/* Заголовок и управление */}
-        <div className="mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+    <div className="min-h-screen p-4 md:p-6 lg:p-8">
+      <div className="max-w-9xl mx-auto space-y-6">
+        {/* ── HEADER ── */}
+        <motion.div
+          initial={{ opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-3 mb-2"
-              >
-                <div className="p-2.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl">
-                  <Package className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-2 mb-2.5">
+                <div
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border ${
+                    isDark
+                      ? "bg-white/[0.06] border-white/[0.09] text-white/40"
+                      : "bg-gray-100 border-gray-200 text-gray-400"
+                  }`}
+                >
+                  <Activity size={11} />
+                  Каталог
                 </div>
-                <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-                  Управление услугами
-                </h1>
-              </motion.div>
-              <p className="text-gray-600">
-                Всего услуг:{" "}
-                <span className="font-semibold text-gray-800">{services.length}</span>
-                {filteredAndSortedServices.length !== services.length && (
-                  <span className="ml-2">
-                    (показано {filteredAndSortedServices.length})
-                  </span>
-                )}
+              </div>
+              <h1
+                className={`text-4xl md:text-5xl font-black leading-none tracking-tight ${isDark ? "text-white" : "text-gray-900"}`}
+              >
+                Услуги
+              </h1>
+              <p
+                className={`mt-2 text-sm ${isDark ? "text-white/35" : "text-gray-400"}`}
+              >
+                {stats.total} услуг · {stats.active} активных
+                {filtered.length !== services.length &&
+                  ` · показано ${filtered.length}`}
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3">
+
+            <div className="flex gap-2.5 flex-wrap">
               <motion.button
                 whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-medium hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
-              >
-                <Filter className="w-4 h-4" />
-                Фильтры
-                {isFilterOpen ? (
-                  <ChevronDown className="w-4 h-4 rotate-180" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => loadServices(false)}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-medium hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.1] text-white/60 hover:text-white/80 hover:bg-white/[0.1]"
+                    : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
+                }`}
               >
                 <RefreshCw
-                  className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+                  size={14}
+                  className={isRefreshing ? "animate-spin" : ""}
                 />
                 Обновить
               </motion.button>
+
               <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={openModalForAdd}
-                className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:from-purple-700 hover:to-pink-700"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={openAdd}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all ${
+                  isDark
+                    ? "bg-gradient-to-r from-indigo-500 to-purple-600 shadow-purple-500/25 hover:shadow-purple-500/40"
+                    : "bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/20 hover:shadow-blue-500/35"
+                }`}
               >
-                <Plus className="w-5 h-5" />
+                <Plus size={16} />
                 Добавить услугу
               </motion.button>
             </div>
           </div>
+        </motion.div>
 
-          {/* Расширенные фильтры */}
+        {/* ── STAT CARDS ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {STAT_CARDS.map((s, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.06 }}
+              whileHover={{ y: -3, scale: 1.02 }}
+              className={`relative rounded-2xl p-5 overflow-hidden transition-all duration-300 ${
+                isDark
+                  ? `bg-white/[0.07] backdrop-blur-xl border border-white/[0.1] shadow-lg hover:shadow-xl ${s.glow}`
+                  : `bg-white border border-gray-200/70 shadow-sm hover:shadow-md`
+              }`}
+            >
+              <div
+                className={`absolute -top-5 -right-5 w-16 h-16 bg-gradient-to-br ${s.grad} opacity-[0.12] rounded-xl rotate-12 blur-sm`}
+              />
+              <div className="relative">
+                <div
+                  className={`w-9 h-9 rounded-xl bg-gradient-to-br ${s.grad} flex items-center justify-center shadow-md mb-3`}
+                >
+                  <Package size={17} className="text-white" />
+                </div>
+                <div
+                  className={`text-3xl font-black leading-none mb-1 ${isDark ? "text-white" : "text-gray-900"}`}
+                >
+                  {s.num}
+                </div>
+                <div
+                  className={`text-sm font-semibold ${isDark ? "text-white/70" : "text-gray-700"}`}
+                >
+                  {s.label}
+                </div>
+                <div
+                  className={`text-xs mt-0.5 ${isDark ? "text-white/30" : "text-gray-400"}`}
+                >
+                  {s.sub}
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* ── FILTER BAR ── */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className={`rounded-2xl p-4 ${glassCls}`}
+        >
+          <div className="flex gap-3 flex-wrap">
+            {/* Search */}
+            <div className="flex-1 min-w-[180px] relative">
+              <Search
+                size={15}
+                className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`}
+              />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Поиск по названию, описанию, категории..."
+                className={`w-full h-11 pl-10 pr-9 rounded-xl text-sm border outline-none transition-all ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.08] text-white/90 placeholder-white/25 focus:border-indigo-400/40"
+                    : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-300 focus:bg-white"
+                }`}
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDark ? "text-white/30 hover:text-white/60" : "text-gray-400"}`}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Category select */}
+            <div className="relative">
+              <Tag
+                size={14}
+                className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`}
+              />
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className={`h-11 pl-9 pr-8 rounded-xl text-sm border outline-none appearance-none transition-all ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.09] text-white/90 focus:border-indigo-400/40"
+                    : "bg-gray-50 border-gray-200 text-gray-800 focus:border-blue-300"
+                }`}
+              >
+                <option value="">Все категории</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={13}
+                className={`absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`}
+              />
+            </div>
+
+            {/* Filter toggle */}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setFilterOpen(!filterOpen)}
+              className={`h-11 flex items-center gap-2 px-4 rounded-xl text-sm font-semibold border transition-all ${
+                filterOpen
+                  ? isDark
+                    ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300"
+                    : "bg-blue-50 border-blue-300 text-blue-600"
+                  : isDark
+                    ? "bg-white/[0.07] border-white/[0.09] text-white/55 hover:bg-white/[0.1]"
+                    : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-white shadow-sm"
+              }`}
+            >
+              <SlidersHorizontal size={15} />
+              Сортировка
+              {filterOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </motion.button>
+
+            {/* Clear */}
+            {(search || statusFilter || categoryFilter) && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("");
+                  setCategoryFilter("");
+                }}
+                className={`h-11 px-4 rounded-xl text-sm font-semibold border transition-all ${
+                  isDark
+                    ? "bg-rose-500/10 border-rose-400/20 text-rose-400"
+                    : "bg-rose-50 border-rose-200 text-rose-500"
+                }`}
+              >
+                <X size={15} />
+              </motion.button>
+            )}
+          </div>
+
+          {/* Sort + status pills */}
           <AnimatePresence>
-            {isFilterOpen && (
+            {filterOpen && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: "auto", marginTop: 12 }}
+                exit={{ opacity: 0, height: 0, marginTop: 0 }}
                 className="overflow-hidden"
               >
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 mb-6">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {/* Поиск */}
-                    <div className="md:col-span-2">
-                      <div className="relative">
-                        <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="text"
-                          placeholder="Поиск по названию, описанию..."
-                          className="w-full pl-10 pr-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 text-gray-900 placeholder-gray-500 transition-all duration-300"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    {/* Фильтр по статусу */}
-                    <select
-                      className="w-full px-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 text-gray-900 transition-all duration-300"
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
+                <div
+                  className={`pt-3 border-t space-y-3 ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}
+                >
+                  {/* Status */}
+                  <div>
+                    <p
+                      className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? "text-white/25" : "text-gray-400"}`}
                     >
-                      <option value="">Все статусы</option>
-                      <option value="active">Активные</option>
-                      <option value="inactive">Неактивные</option>
-                    </select>
-                    {/* Фильтр по категории */}
-                    <select
-                      className="w-full px-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-2xl focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 text-gray-900 transition-all duration-300"
-                      value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
-                    >
-                      <option value="">Все категории</option>
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {/* Сортировка */}
-                  <div className="mt-4 pt-4 border-t border-gray-200/50">
-                    <div className="text-sm font-medium text-gray-700 mb-2">
-                      Сортировка:
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {(
-                        [
-                          "title",
-                          "duration",
-                          "category",
-                          "status",
-                        ] as SortField[]
-                      ).map((field) => (
+                      Статус
+                    </p>
+                    <div className="flex gap-2">
+                      {[
+                        { v: "", l: "Все" },
+                        { v: "active", l: "Активные" },
+                        { v: "inactive", l: "Неактивные" },
+                      ].map((o) => (
                         <motion.button
-                          key={field}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => handleSortChange(field)}
-                          className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-all duration-300 border ${
-                            sortField === field
-                              ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md border-transparent"
-                              : "bg-white/80 text-gray-700 border-gray-300/50 hover:bg-gray-50/80"
+                          key={o.v}
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
+                          onClick={() => setStatusFilter(o.v)}
+                          className={`h-7 px-3 rounded-full text-xs font-semibold border transition-all ${
+                            statusFilter === o.v
+                              ? isDark
+                                ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300"
+                                : "bg-blue-100 border-blue-300 text-blue-700"
+                              : isDark
+                                ? "bg-white/[0.05] border-white/[0.07] text-white/45"
+                                : "bg-gray-50 border-gray-200 text-gray-500"
                           }`}
                         >
-                          {field === "title" && "Название"}
-                          {field === "duration" && "Продолжительность"}
-                          {field === "category" && "Категория"}
-                          {field === "status" && "Статус"}
-                          {getSortIcon(field)}
+                          {o.l}
                         </motion.button>
                       ))}
                     </div>
                   </div>
-                  {(statusFilter || categoryFilter || searchQuery) && (
-                    <motion.button
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      onClick={clearFilters}
-                      className="mt-4 flex items-center gap-2 px-4 py-2 text-red-600 hover:text-red-700 bg-red-50/50 hover:bg-red-50 rounded-xl border border-red-200/50 transition-all duration-300 text-sm font-medium"
+                  {/* Sort */}
+                  <div>
+                    <p
+                      className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? "text-white/25" : "text-gray-400"}`}
                     >
-                      <X className="w-4 h-4" />
-                      Сбросить фильтры
-                    </motion.button>
-                  )}
+                      Сортировка
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {SORT_OPTS.map((o) => (
+                        <motion.button
+                          key={o.f}
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
+                          onClick={() => handleSort(o.f)}
+                          className={`h-7 px-3 rounded-full text-xs font-semibold border transition-all flex items-center gap-1 ${
+                            sortField === o.f
+                              ? isDark
+                                ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300"
+                                : "bg-blue-100 border-blue-300 text-blue-700"
+                              : isDark
+                                ? "bg-white/[0.05] border-white/[0.07] text-white/45"
+                                : "bg-gray-50 border-gray-200 text-gray-500"
+                          }`}
+                        >
+                          {o.l}
+                          {sortField === o.f && (
+                            <span className="text-[10px]">
+                              {sortOrder === "asc" ? "↑" : "↓"}
+                            </span>
+                          )}
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </motion.div>
 
-        {/* Статистика */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
+        {/* ── RESULT LABEL ── */}
+        {!isLoading && (
+          <div
+            className={`px-1 text-xs ${isDark ? "text-white/25" : "text-gray-400"}`}
           >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <Package className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">{services.length}</div>
-              <div className="text-blue-100 font-medium">Всего услуг</div>
-              <div className="text-sm text-blue-200/80 mt-2">
-                Зарегистрировано в системе
-              </div>
-            </div>
-          </motion.div>
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-gradient-to-br from-emerald-500 to-green-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <Zap className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">
-                {activeServicesCount}
-              </div>
-              <div className="text-emerald-100 font-medium">Активные</div>
-              <div className="text-sm text-emerald-200/80 mt-2">
-                Доступны для записи
-              </div>
-            </div>
-          </motion.div>
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <Clock className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">{avgDuration}</div>
-              <div className="text-amber-100 font-medium">Среднее время</div>
-              <div className="text-sm text-amber-200/80 mt-2">
-                Минут на услугу
-              </div>
-            </div>
-          </motion.div>
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <Tag className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">{categories.length}</div>
-              <div className="text-purple-100 font-medium">Категорий</div>
-              <div className="text-sm text-purple-200/80 mt-2">
-                Активных категорий
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Карточки услуг */}
-        {isLoading ? (
-          <div className="text-center py-20">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
-            <p className="mt-4 text-gray-500 font-medium">Загрузка услуг...</p>
+            {filtered.length === services.length
+              ? `${filtered.length} услуг`
+              : `${filtered.length} из ${services.length}`}
           </div>
-        ) : filteredAndSortedServices.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="col-span-full bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-gray-200/50"
-          >
-            <div className="w-20 h-20 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Package className="w-10 h-10 text-gray-400" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">
-              Услуги не найдены
-            </h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              {searchQuery || statusFilter || categoryFilter
-                ? "Попробуйте изменить параметры поиска"
-                : "Создайте первую услугу для вашего бизнеса"}
-            </p>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={openModalForAdd}
-              className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 inline-flex items-center gap-2"
+        )}
+
+        {/* ── SERVICE GRID ── */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-24">
+            <div
+              className={`w-10 h-10 rounded-full border-t-transparent animate-spin mb-4 ${isDark ? "border-purple-400" : "border-blue-400"}`}
+              style={{ borderWidth: 3, borderStyle: "solid" }}
+            />
+            <p
+              className={`text-sm ${isDark ? "text-white/35" : "text-gray-400"}`}
             >
-              <Plus className="w-5 h-5" />
-              Создать услугу
-            </motion.button>
-          </motion.div>
+              Загрузка услуг...
+            </p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className={`rounded-2xl p-16 text-center ${glassCls}`}>
+            <div
+              className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center ${isDark ? "bg-white/[0.06]" : "bg-gray-100"}`}
+            >
+              <Package
+                size={26}
+                className={isDark ? "text-white/20" : "text-gray-300"}
+              />
+            </div>
+            <p
+              className={`text-lg font-bold mb-1 ${isDark ? "text-white/50" : "text-gray-500"}`}
+            >
+              {services.length === 0 ? "Нет услуг" : "Ничего не найдено"}
+            </p>
+            <p
+              className={`text-sm mb-5 ${isDark ? "text-white/25" : "text-gray-400"}`}
+            >
+              {search || statusFilter || categoryFilter
+                ? "Попробуйте изменить параметры поиска"
+                : "Создайте первую услугу"}
+            </p>
+            {search || statusFilter || categoryFilter ? (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("");
+                  setCategoryFilter("");
+                }}
+                className={`px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all ${isDark ? "border-white/[0.1] text-white/50 hover:bg-white/[0.07]" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}
+              >
+                Сбросить фильтры
+              </motion.button>
+            ) : (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                onClick={openAdd}
+                className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg ${isDark ? "bg-gradient-to-r from-indigo-500 to-purple-600" : "bg-gradient-to-r from-blue-500 to-purple-600"}`}
+              >
+                + Создать услугу
+              </motion.button>
+            )}
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-            <AnimatePresence>
-              {filteredAndSortedServices.map((service, index) => (
-                <motion.div
-                  key={service.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  whileHover={{ scale: 1.01, y: -2 }}
-                  className="bg-gradient-to-br from-white to-gray-50/50 rounded-3xl border border-gray-200/50 p-5 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm group"
-                >
-                  {/* Верхняя часть с заголовком и статусом */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1">
-                        {service.title}
-                      </h3>
-                      <p className="text-sm text-gray-600 line-clamp-2">
-                        {service.description || "Описание отсутствует"}
-                      </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <AnimatePresence mode="popLayout">
+              {filtered.map((svc, i) => {
+                const grad = catGrad(svc.categoryId);
+                return (
+                  <motion.div
+                    key={svc.id}
+                    layout
+                    initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
+                    transition={{ delay: i * 0.03, duration: 0.25 }}
+                    whileHover={{ y: -3 }}
+                    className={`relative rounded-2xl p-5 transition-all duration-300 overflow-hidden flex flex-col ${cardCls}`}
+                  >
+                    {/* Accent top line */}
+                    <div
+                      className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r ${grad} opacity-60`}
+                    />
+
+                    {/* Status badge top-right */}
+                    <div className="absolute top-4 right-4">
+                      <span
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
+                          svc.isActive
+                            ? isDark
+                              ? "bg-emerald-500/10 border-emerald-400/15 text-emerald-400"
+                              : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                            : isDark
+                              ? "bg-rose-500/10 border-rose-400/15 text-rose-400"
+                              : "bg-rose-50 border-rose-200 text-rose-600"
+                        }`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${svc.isActive ? "bg-emerald-400" : "bg-rose-400"}`}
+                        />
+                        {svc.isActive ? "Активна" : "Скрыта"}
+                      </span>
                     </div>
-                    <span
-                      className={`px-3 py-1 text-xs font-bold rounded-full ${
-                        service.isActive
-                          ? "bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700"
-                          : "bg-gradient-to-r from-rose-100 to-red-100 text-rose-700"
+
+                    {/* Service icon + title */}
+                    <div className="flex items-start gap-3 mb-3 pr-20">
+                      <div
+                        className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${grad} flex items-center justify-center shadow-lg flex-shrink-0`}
+                      >
+                        <Package size={20} className="text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1 pt-0.5">
+                        <h3
+                          className={`font-bold text-base leading-tight ${isDark ? "text-white/95" : "text-gray-900"}`}
+                        >
+                          {svc.title}
+                        </h3>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <p
+                      className={`text-xs leading-relaxed mb-4 line-clamp-2 flex-shrink-0 ${
+                        svc.description
+                          ? isDark
+                            ? "text-white/45"
+                            : "text-gray-500"
+                          : isDark
+                            ? "text-white/20"
+                            : "text-gray-300"
                       }`}
                     >
-                      {service.isActive ? "Активна" : "Неактивна"}
-                    </span>
-                  </div>
-                  {/* Категория */}
-                  <div className="flex items-center gap-2 mb-4">
+                      {svc.description || "Без описания"}
+                    </p>
+
+                    {/* Info pills */}
+                    <div className="flex flex-wrap gap-2 flex-1">
+                      {/* Category */}
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border ${
+                          isDark
+                            ? "bg-white/[0.06] border-white/[0.08] text-white/60"
+                            : "bg-gray-50 border-gray-200 text-gray-600"
+                        }`}
+                      >
+                        <div
+                          className={`w-3.5 h-3.5 rounded-md bg-gradient-to-br ${grad}`}
+                        />
+                        {catName(svc.categoryId)}
+                      </span>
+                      {/* Duration */}
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border ${
+                          isDark
+                            ? "bg-amber-500/8 border-amber-400/15 text-amber-400"
+                            : "bg-amber-50 border-amber-200 text-amber-700"
+                        }`}
+                      >
+                        <Clock size={11} />
+                        {svc.duration} мин
+                      </span>
+                    </div>
+
+                    {/* Footer */}
                     <div
-                      className={`w-8 h-8 rounded-xl bg-gradient-to-br ${getCategoryColor(service.categoryId)} flex items-center justify-center`}
+                      className={`flex items-center justify-between mt-4 pt-4 border-t ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}
                     >
-                      <Tag className="w-3.5 h-3.5 text-white" />
-                    </div>
-                    <span className="text-sm font-medium text-gray-900">
-                      {getCategoryName(service.categoryId)}
-                    </span>
-                  </div>
-                  {/* Длительность */}
-                  <div className="flex items-center gap-2 mb-6">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
-                      <Clock className="w-3.5 h-3.5 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-gray-900">
-                        {service.duration} мин.
+                      <div className="flex gap-1.5">
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => openEdit(svc)}
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
+                            isDark
+                              ? "bg-blue-500/10 border-blue-400/15 text-blue-400 hover:bg-blue-500/20"
+                              : "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
+                          }`}
+                        >
+                          <Edit size={14} />
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => deleteService(svc.id)}
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
+                            isDark
+                              ? "bg-rose-500/10 border-rose-400/15 text-rose-400 hover:bg-rose-500/20"
+                              : "bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100"
+                          }`}
+                        >
+                          <Trash2 size={14} />
+                        </motion.button>
                       </div>
-                      <div className="text-xs text-gray-600">
-                        Продолжительность
-                      </div>
-                    </div>
-                  </div>
-                  {/* Действия */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-200/50">
-                    <div className="flex gap-2">
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => openModalForEdit(service)}
-                        className="p-2 bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-600 hover:text-blue-700 rounded-xl border border-blue-200/50 transition-all duration-300"
+                      <span
+                        className={`text-xs font-mono ${isDark ? "text-white/20" : "text-gray-300"}`}
                       >
-                        <Edit className="w-4 h-4" />
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => deleteService(service.id)}
-                        className="p-2 bg-gradient-to-r from-rose-50 to-red-50 text-rose-600 hover:text-rose-700 rounded-xl border border-rose-200/50 transition-all duration-300"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </motion.button>
+                        #{svc.id}
+                      </span>
                     </div>
-                    <div className="text-xs text-gray-500">
-                      ID: {service.id}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
           </div>
         )}
 
-        {/* Информация внизу */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 text-sm text-gray-500">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-500 to-green-500"></div>
-              <span>Активные</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-rose-500 to-red-500"></div>
-              <span>Неактивные</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <span>Загружено: {services.length} услуг</span>
-            <span className="text-purple-600 font-medium flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              {activeServicesCount} сейчас доступно
-            </span>
-          </div>
-        </div>
-
-        {/* Модальное окно */}
-        <AnimatePresence>
-          {isModalOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4"
-              onClick={closeModal}
-            >
-              <motion.div
-                initial={{ opacity: 0, y: 30, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 30, scale: 0.95 }}
-                onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-md bg-gradient-to-br from-white to-gray-50/50 rounded-3xl shadow-2xl border border-gray-200/50 backdrop-blur-xl overflow-hidden max-h-[90vh] flex flex-col"
-              >
-                {/* Градиентный заголовок */}
-                <div className="relative px-6 py-5 bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600">
-                  <div className="absolute top-0 right-0 p-4 opacity-20">
-                    <Sparkles className="w-12 h-12" />
-                  </div>
-                  <div className="relative z-10 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-                        <Package className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-bold text-white">
-                          {editingService
-                            ? "Редактирование услуги"
-                            : "Новая услуга"}
-                        </h2>
-                        <p className="text-white/80 text-xs mt-1">
-                          {editingService
-                            ? "Измените параметры услуги"
-                            : "Создайте новую услугу"}
-                        </p>
-                      </div>
-                    </div>
-                    <motion.button
-                      whileHover={{ scale: 1.1, rotate: 90 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={closeModal}
-                      className="p-1.5 text-white/80 hover:text-white rounded-full hover:bg-white/10 transition-all duration-300"
-                    >
-                      <X className="w-5 h-5" />
-                    </motion.button>
-                  </div>
+        {/* ── FOOTER ── */}
+        {!isLoading && services.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className={`flex flex-wrap items-center justify-between gap-3 pt-5 border-t text-xs ${
+              isDark
+                ? "border-white/[0.06] text-white/20"
+                : "border-gray-100 text-gray-400"
+            }`}
+          >
+            <div className="flex flex-wrap gap-4">
+              {[
+                { c: "bg-emerald-400", l: "Активные" },
+                { c: "bg-rose-400", l: "Неактивные" },
+              ].map((x) => (
+                <div key={x.l} className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${x.c}`} />
+                  {x.l}
                 </div>
-                {/* Основной контент */}
-                <div className="flex-1 overflow-y-auto p-6">
-                  <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Название */}
-                    <div className="bg-gradient-to-br from-purple-50/30 to-pink-50/30 rounded-2xl p-4 border border-purple-200/30">
-                      <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <Tag className="w-4 h-4 text-purple-500" />
-                        Название услуги *
-                      </div>
-                      <input
-                        type="text"
-                        name="title"
-                        value={formData.title}
-                        onChange={handleInputChange}
-                        placeholder="Например: Стрижка мужская"
-                        className="w-full px-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 text-gray-900 placeholder-gray-500 transition-all duration-300"
-                        required
-                      />
+              ))}
+            </div>
+            <span className="flex items-center gap-1.5">
+              <TrendingUp size={12} />
+              {stats.active} из {stats.total} доступно
+            </span>
+          </motion.div>
+        )}
+      </div>
+
+      {/* ── MODAL ── */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={(e) => e.target === e.currentTarget && closeModal()}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+            style={{
+              background: isDark ? "rgba(0,0,0,0.78)" : "rgba(15,23,42,0.42)",
+              backdropFilter: "blur(16px)",
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 24 }}
+              transition={{ type: "spring", damping: 28, stiffness: 340 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`relative w-full max-w-lg rounded-3xl overflow-hidden my-4 flex flex-col max-h-[90vh] ${modalCls}`}
+            >
+              {/* Header */}
+              <div
+                className={`relative px-7 py-6 overflow-hidden flex-shrink-0 ${
+                  editingService
+                    ? "bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500"
+                    : "bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"
+                }`}
+              >
+                <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full" />
+                <div className="absolute bottom-0 left-0 right-0 h-px bg-white/15" />
+                <div className="relative flex items-center justify-between">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                      {editingService ? (
+                        <Edit size={20} className="text-white" />
+                      ) : (
+                        <Package size={20} className="text-white" />
+                      )}
                     </div>
-                    {/* Описание */}
-                    <div className="bg-gradient-to-br from-blue-50/30 to-cyan-50/30 rounded-2xl p-4 border border-blue-200/30">
-                      <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <Edit className="w-4 h-4 text-blue-500" />
-                        Описание услуги
-                      </div>
-                      <textarea
-                        name="description"
-                        value={formData.description}
-                        onChange={handleInputChange}
-                        placeholder="Краткое описание услуги..."
-                        rows={3}
-                        className="w-full px-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 placeholder-gray-500 transition-all duration-300 resize-none"
-                      />
+                    <div>
+                      <h2 className="text-xl font-black text-white">
+                        {editingService
+                          ? "Редактировать услугу"
+                          : "Новая услуга"}
+                      </h2>
+                      <p className="text-white/65 text-xs mt-0.5">
+                        {editingService
+                          ? "Измените параметры"
+                          : "Создайте новую услугу"}
+                      </p>
                     </div>
-                    {/* Продолжительность и категория */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-gradient-to-br from-amber-50/30 to-orange-50/30 rounded-2xl p-4 border border-amber-200/30">
-                        <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-amber-500" />
-                          Продолжительность *
-                        </div>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            name="duration"
-                            value={formData.duration}
-                            onChange={handleInputChange}
-                            min="5"
-                            step="5"
-                            className="w-full pl-10 pr-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 text-gray-900 transition-all duration-300"
-                            required
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
-                            мин.
-                          </span>
-                        </div>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                    transition={{ duration: 0.18 }}
+                    onClick={closeModal}
+                    className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white hover:bg-white/25 transition-colors"
+                  >
+                    <X size={17} />
+                  </motion.button>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto">
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                  {/* Title */}
+                  <div className={sectionCls}>
+                    <label
+                      className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${isDark ? "text-white/35" : "text-gray-400"}`}
+                    >
+                      Название *
+                    </label>
+                    <input
+                      type="text"
+                      name="title"
+                      value={form.title}
+                      onChange={handleInput}
+                      placeholder="Например: Стрижка мужская"
+                      required
+                      className={inputCls}
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div className={sectionCls}>
+                    <label
+                      className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${isDark ? "text-white/35" : "text-gray-400"}`}
+                    >
+                      Описание{" "}
+                      <span
+                        className={`normal-case font-normal ${isDark ? "text-white/20" : "text-gray-300"}`}
+                      >
+                        (необязательно)
+                      </span>
+                    </label>
+                    <textarea
+                      name="description"
+                      value={form.description}
+                      onChange={handleInput}
+                      placeholder="Краткое описание услуги..."
+                      rows={3}
+                      className={`${inputCls} h-auto py-3 resize-none`}
+                    />
+                  </div>
+
+                  {/* Duration + Category */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className={sectionCls}>
+                      <label
+                        className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${isDark ? "text-white/35" : "text-gray-400"}`}
+                      >
+                        Длительность *
+                      </label>
+                      <div className="relative">
+                        <Clock
+                          size={14}
+                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`}
+                        />
+                        <input
+                          type="number"
+                          name="duration"
+                          value={form.duration}
+                          onChange={handleInput}
+                          min="5"
+                          step="5"
+                          required
+                          placeholder="0"
+                          className={`${inputCls} pl-10 pr-10`}
+                        />
+                        <span
+                          className={`absolute right-3.5 top-1/2 -translate-y-1/2 text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}
+                        >
+                          мин
+                        </span>
                       </div>
-                      <div className="bg-gradient-to-br from-emerald-50/30 to-green-50/30 rounded-2xl p-4 border border-emerald-200/30">
-                        <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                          <Tag className="w-4 h-4 text-emerald-500" />
-                          Категория *
-                        </div>
+                    </div>
+
+                    <div className={sectionCls}>
+                      <label
+                        className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${isDark ? "text-white/35" : "text-gray-400"}`}
+                      >
+                        Категория *
+                      </label>
+                      <div className="relative">
+                        <Tag
+                          size={14}
+                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`}
+                        />
                         <select
                           name="categoryId"
-                          value={formData.categoryId}
-                          onChange={handleInputChange}
-                          className="w-full px-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-gray-900 transition-all duration-300"
+                          value={form.categoryId}
+                          onChange={handleInput}
                           required
+                          className={`${inputCls} pl-10 pr-8 appearance-none`}
                         >
-                          <option value={0}>Выберите категорию</option>
-                          {categories.map((category) => (
-                            <option key={category.id} value={category.id}>
-                              {category.title}
+                          <option value={0}>Выберите</option>
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.title}
                             </option>
                           ))}
                         </select>
+                        <ChevronDown
+                          size={13}
+                          className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`}
+                        />
                       </div>
                     </div>
-                    {/* Статус */}
-                    <div className="bg-gradient-to-br from-gray-50/30 to-white/30 rounded-2xl p-4 border border-gray-200/30">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`p-2 rounded-xl ${formData.isActive ? "bg-gradient-to-r from-emerald-500 to-green-500" : "bg-gradient-to-r from-rose-500 to-red-500"}`}
-                          >
-                            {formData.isActive ? (
-                              <Eye className="w-4 h-4 text-white" />
-                            ) : (
-                              <EyeOff className="w-4 h-4 text-white" />
-                            )}
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold text-gray-900">
-                              Статус услуги
-                            </div>
-                            <div className="text-xs text-gray-600">
-                              {formData.isActive
-                                ? "Видна клиентам"
-                                : "Скрыта от клиентов"}
-                            </div>
-                          </div>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            name="isActive"
-                            checked={formData.isActive}
-                            onChange={handleInputChange}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r from-emerald-500 to-green-500"></div>
-                        </label>
+                  </div>
+
+                  {/* Status toggle */}
+                  <div className={sectionCls}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p
+                          className={`text-sm font-bold ${isDark ? "text-white/85" : "text-gray-800"}`}
+                        >
+                          Статус услуги
+                        </p>
+                        <p
+                          className={`text-xs mt-0.5 ${isDark ? "text-white/35" : "text-gray-400"}`}
+                        >
+                          {form.isActive
+                            ? "Видна клиентам"
+                            : "Скрыта от клиентов"}
+                        </p>
                       </div>
-                    </div>
-                    {/* Сводная информация */}
-                    {formData.title && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="p-4 bg-gradient-to-r from-gray-50/50 to-white/30 border border-gray-200/30 rounded-2xl backdrop-blur-sm"
-                      >
-                        <div className="text-xs text-gray-600 mb-2">
-                          Сводная информация
-                        </div>
-                        <div className="text-sm font-medium text-gray-900 mb-1">
-                          {formData.title}
-                        </div>
-                        {formData.categoryId > 0 && (
-                          <div className="text-xs text-gray-600">
-                            Категория:{" "}
-                            {
-                              categories.find(
-                                (c) => c.id === formData.categoryId
-                              )?.title
-                            }
-                          </div>
-                        )}
-                        {formData.duration > 0 && (
-                          <div className="text-xs text-gray-600">
-                            Продолжительность: {formData.duration} минут
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
-                    {/* Кнопки */}
-                    <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200/50">
                       <motion.button
                         type="button"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={closeModal}
-                        className="flex-1 px-4 py-3.5 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-semibold hover:bg-gray-50/80 transition-all duration-300 shadow-sm text-sm"
+                        onClick={() =>
+                          setForm((p) => ({ ...p, isActive: !p.isActive }))
+                        }
+                        whileTap={{ scale: 0.95 }}
+                        className={`relative inline-flex h-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                          form.isActive
+                            ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                            : isDark
+                              ? "bg-white/[0.1]"
+                              : "bg-gray-200"
+                        }`}
+                        style={{ width: 52 }}
+                        aria-pressed={form.isActive}
                       >
-                        Отмена
-                      </motion.button>
-                      <motion.button
-                        type="submit"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        disabled={isLoading}
-                        className="flex-1 px-4 py-3.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 text-white rounded-xl font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 text-sm"
-                      >
-                        {isLoading ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Сохранение...
-                          </>
-                        ) : (
-                          <>
-                            {editingService ? (
-                              <Edit className="w-4 h-4" />
-                            ) : (
-                              <Plus className="w-4 h-4" />
-                            )}
-                            {editingService
-                              ? "Сохранить изменения"
-                              : "Создать услугу"}
-                          </>
-                        )}
+                        <motion.span
+                          layout
+                          className="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg mt-0.5"
+                          animate={{ x: form.isActive ? 26 : 2 }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 500,
+                            damping: 30,
+                          }}
+                        />
                       </motion.button>
                     </div>
-                  </form>
-                </div>
-                {/* Футер */}
-                <div className="px-6 py-3 border-t border-gray-200/50 bg-gradient-to-r from-gray-50/50 to-white/30">
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <div className="flex items-center gap-2">
-                      <Shield className="w-2.5 h-2.5" />
-                      <span>Данные защищены</span>
+                    <div
+                      className={`flex items-center gap-1.5 mt-2.5 text-xs font-semibold ${
+                        form.isActive
+                          ? isDark
+                            ? "text-emerald-400"
+                            : "text-emerald-700"
+                          : isDark
+                            ? "text-amber-400"
+                            : "text-amber-700"
+                      }`}
+                    >
+                      {form.isActive ? <Eye size={12} /> : <EyeOff size={12} />}
+                      {form.isActive ? "Услуга активна" : "Услуга скрыта"}
                     </div>
-                    <span>
-                      ID: {editingService ? editingService.id : "Новый"}
-                    </span>
                   </div>
-                </div>
-              </motion.div>
+
+                  {/* Summary */}
+                  <AnimatePresence>
+                    {form.title && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className={`flex items-start justify-between p-3.5 rounded-2xl border ${
+                          isDark
+                            ? "bg-white/[0.05] border-white/[0.07]"
+                            : "bg-gray-50/80 border-gray-200/60"
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className={`text-xs mb-0.5 ${isDark ? "text-white/30" : "text-gray-400"}`}
+                          >
+                            Сводка
+                          </p>
+                          <p
+                            className={`text-sm font-bold truncate ${isDark ? "text-white/85" : "text-gray-800"}`}
+                          >
+                            {form.title}
+                          </p>
+                          {form.categoryId > 0 && (
+                            <p
+                              className={`text-xs mt-0.5 ${isDark ? "text-white/30" : "text-gray-400"}`}
+                            >
+                              {catName(form.categoryId)} ·{" "}
+                              {form.duration > 0 ? `${form.duration} мин` : "—"}
+                            </p>
+                          )}
+                        </div>
+                        <div
+                          className={`ml-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border flex-shrink-0 ${
+                            form.isActive
+                              ? isDark
+                                ? "bg-emerald-500/10 border-emerald-400/15 text-emerald-400"
+                                : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                              : isDark
+                                ? "bg-rose-500/10 border-rose-400/15 text-rose-400"
+                                : "bg-rose-50 border-rose-200 text-rose-600"
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${form.isActive ? "bg-emerald-400" : "bg-rose-400"}`}
+                          />
+                          {form.isActive ? "Активна" : "Скрыта"}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Buttons */}
+                  <div
+                    className={`flex flex-col sm:flex-row gap-3 pt-5 border-t ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}
+                  >
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={closeModal}
+                      disabled={isLoading}
+                      className={`flex-1 h-12 rounded-2xl text-sm font-semibold border transition-all ${
+                        isDark
+                          ? "bg-white/[0.06] border-white/[0.1] text-white/60 hover:bg-white/[0.09]"
+                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm"
+                      }`}
+                    >
+                      Отмена
+                    </motion.button>
+                    <motion.button
+                      type="submit"
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.98 }}
+                      disabled={isLoading}
+                      className={`flex-1 h-12 rounded-2xl text-sm font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 ${
+                        editingService
+                          ? "bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500"
+                          : "bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"
+                      }`}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Сохранение...
+                        </>
+                      ) : editingService ? (
+                        <>
+                          <Edit size={16} />
+                          Сохранить изменения
+                        </>
+                      ) : (
+                        <>
+                          <Package size={16} />
+                          Создать услугу
+                        </>
+                      )}
+                    </motion.button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Footer */}
+              <div
+                className={`px-7 py-3 border-t flex items-center justify-between text-xs flex-shrink-0 ${
+                  isDark
+                    ? "border-white/[0.06] text-white/20 bg-white/[0.02]"
+                    : "border-gray-100 text-gray-400 bg-gray-50/50"
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <Shield size={11} />
+                  Данные защищены
+                </span>
+                <span>ID: {editingService ? editingService.id : "Новый"}</span>
+              </div>
             </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
