@@ -47,6 +47,9 @@ type MenuItem = {
   count?: string | number;
 };
 
+const THEME_STORAGE_KEY = "app-theme";
+const ROUNDED_STORAGE_KEY = "app-rounded";
+
 export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
   const [counts, setCounts] = useState<any>(null);
   const [user, setUser] = useState<IUser | null>(null);
@@ -66,7 +69,8 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
     };
 
     const checkIsRounded = () => {
-      const rounded = document.documentElement.classList.contains("roundedCustom");
+      const rounded =
+        document.documentElement.classList.contains("roundedCustom");
       setIsRounded(rounded);
     };
 
@@ -222,31 +226,38 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
     if (theme === "light") {
       document.documentElement.classList.remove("dark");
       setIsDark(false);
+      localStorage.setItem(THEME_STORAGE_KEY, "light");
     } else if (theme === "dark") {
       document.documentElement.classList.add("dark");
       setIsDark(true);
+      localStorage.setItem(THEME_STORAGE_KEY, "dark");
     } else if (theme === "system") {
-      const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const systemDark = window.matchMedia(
+        "(prefers-color-scheme: dark)",
+      ).matches;
       if (systemDark) {
         document.documentElement.classList.add("dark");
         setIsDark(true);
+        localStorage.setItem(THEME_STORAGE_KEY, "dark");
       } else {
         document.documentElement.classList.remove("dark");
         setIsDark(false);
+        localStorage.setItem(THEME_STORAGE_KEY, "light");
       }
     }
   };
 
-  const handleNavbarSizeChange = (size: "compact" | "default" | "comfortable") => {
+  const handleNavbarSizeChange = (
+    size: "compact" | "default" | "comfortable",
+  ) => {
     if (size === "compact") {
       document.documentElement.classList.add("roundedCustom");
       setIsRounded(true);
-    } else if (size === "default") {
+      localStorage.setItem(ROUNDED_STORAGE_KEY, "true");
+    } else if (size === "default" || size === "comfortable") {
       document.documentElement.classList.remove("roundedCustom");
       setIsRounded(false);
-    } else if (size === "comfortable") {
-      document.documentElement.classList.remove("roundedCustom");
-      setIsRounded(false);
+      localStorage.setItem(ROUNDED_STORAGE_KEY, "false");
     }
   };
 
@@ -903,15 +914,19 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className={`text-base font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+                      <h3
+                        className={`text-base font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
+                      >
                         Тема оформления
                       </h3>
-                      <p className={`text-sm mt-1 ${isDark ? "text-white/40" : "text-gray-400"}`}>
+                      <p
+                        className={`text-sm mt-1 ${isDark ? "text-white/40" : "text-gray-400"}`}
+                      >
                         Выберите цветовую схему интерфейса
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-3 gap-3">
                     {/* Light Theme Option */}
                     <button
@@ -925,10 +940,14 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
                       }`}
                     >
                       <div className="flex flex-col items-center gap-2">
-                        <div className={`p-2 rounded-lg ${!isDark ? "bg-blue-500 text-white" : isDark ? "bg-white/10 text-white/60" : "bg-gray-200 text-gray-500"}`}>
+                        <div
+                          className={`p-2 rounded-lg ${!isDark ? "bg-blue-500 text-white" : isDark ? "bg-white/10 text-white/60" : "bg-gray-200 text-gray-500"}`}
+                        >
                           <Sun size={20} />
                         </div>
-                        <span className={`text-sm font-medium ${!isDark ? "text-blue-600" : isDark ? "text-white/80" : "text-gray-700"}`}>
+                        <span
+                          className={`text-sm font-medium ${!isDark ? "text-blue-600" : isDark ? "text-white/80" : "text-gray-700"}`}
+                        >
                           Светлая
                         </span>
                       </div>
@@ -944,7 +963,9 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
                     <button
                       onClick={() => handleThemeChange("dark")}
                       className={`group relative p-4 rounded-xl transition-all duration-200 ${
-                        isDark && !document.documentElement.classList.contains("dark") === false
+                        isDark &&
+                        !document.documentElement.classList.contains("dark") ===
+                          false
                           ? "ring-2 ring-purple-500 bg-purple-500/10"
                           : isDark
                             ? "bg-white/5 hover:bg-white/10 border border-white/10"
@@ -952,10 +973,14 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
                       }`}
                     >
                       <div className="flex flex-col items-center gap-2">
-                        <div className={`p-2 rounded-lg ${isDark ? "bg-purple-500 text-white" : "bg-gray-200 text-gray-500"}`}>
+                        <div
+                          className={`p-2 rounded-lg ${isDark ? "bg-purple-500 text-white" : "bg-gray-200 text-gray-500"}`}
+                        >
                           <Moon size={20} />
                         </div>
-                        <span className={`text-sm font-medium ${isDark ? "text-purple-400" : "text-gray-700"}`}>
+                        <span
+                          className={`text-sm font-medium ${isDark ? "text-purple-400" : "text-gray-700"}`}
+                        >
                           Тёмная
                         </span>
                       </div>
@@ -977,10 +1002,14 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
                       }`}
                     >
                       <div className="flex flex-col items-center gap-2">
-                        <div className={`p-2 rounded-lg ${isDark ? "bg-white/10 text-white/60" : "bg-gray-200 text-gray-500"}`}>
+                        <div
+                          className={`p-2 rounded-lg ${isDark ? "bg-white/10 text-white/60" : "bg-gray-200 text-gray-500"}`}
+                        >
                           <Monitor size={20} />
                         </div>
-                        <span className={`text-sm font-medium ${isDark ? "text-white/80" : "text-gray-700"}`}>
+                        <span
+                          className={`text-sm font-medium ${isDark ? "text-white/80" : "text-gray-700"}`}
+                        >
                           Системная
                         </span>
                       </div>
@@ -992,15 +1021,19 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className={`text-base font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+                      <h3
+                        className={`text-base font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
+                      >
                         Размер навбара
                       </h3>
-                      <p className={`text-sm mt-1 ${isDark ? "text-white/40" : "text-gray-400"}`}>
+                      <p
+                        className={`text-sm mt-1 ${isDark ? "text-white/40" : "text-gray-400"}`}
+                      >
                         Настройте ширину и отображение панели навигации
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-3">
                     {/* Compact Size Option */}
                     <button
@@ -1014,13 +1047,19 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
                       }`}
                     >
                       <div className="flex flex-col items-center gap-2">
-                        <div className={`p-2 rounded-lg ${isRounded ? "bg-purple-500 text-white" : isDark ? "bg-white/10 text-white/60" : "bg-gray-200 text-gray-500"}`}>
+                        <div
+                          className={`p-2 rounded-lg ${isRounded ? "bg-purple-500 text-white" : isDark ? "bg-white/10 text-white/60" : "bg-gray-200 text-gray-500"}`}
+                        >
                           <Minimize2 size={20} />
                         </div>
-                        <span className={`text-sm font-medium ${isRounded ? "text-purple-400" : isDark ? "text-white/80" : "text-gray-700"}`}>
+                        <span
+                          className={`text-sm font-medium ${isRounded ? "text-purple-400" : isDark ? "text-white/80" : "text-gray-700"}`}
+                        >
                           Компактный
                         </span>
-                        <p className={`text-xs text-center mt-1 ${isDark ? "text-white/30" : "text-gray-400"}`}>
+                        <p
+                          className={`text-xs text-center mt-1 ${isDark ? "text-white/30" : "text-gray-400"}`}
+                        >
                           Суженный, плавающий
                         </p>
                       </div>
@@ -1037,20 +1076,26 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
                       onClick={() => handleNavbarSizeChange("default")}
                       className={`group relative p-4 rounded-xl transition-all duration-200 ${
                         !isRounded
-                          ? "ring-2 ring-blue-500 bg-blue-50/80"
+                          ? "ring-2 ring-blue-500 bg-blue-500/50"
                           : isDark
                             ? "bg-white/5 hover:bg-white/10 border border-white/10"
                             : "bg-gray-50 hover:bg-gray-100 border border-gray-200"
                       }`}
                     >
                       <div className="flex flex-col items-center gap-2">
-                        <div className={`p-2 rounded-lg ${!isRounded ? "bg-blue-500 text-white" : isDark ? "bg-white/10 text-white/60" : "bg-gray-200 text-gray-500"}`}>
+                        <div
+                          className={`p-2 rounded-lg ${!isRounded ? "bg-blue-500 text-white" : isDark ? "bg-white/10 text-white/60" : "bg-gray-200 text-gray-500"}`}
+                        >
                           <Maximize2 size={20} className="rotate-90" />
                         </div>
-                        <span className={`text-sm font-medium ${!isRounded ? "text-blue-600" : isDark ? "text-white/80" : "text-gray-700"}`}>
+                        <span
+                          className={`text-sm font-medium ${!isRounded ? "text-white" : isDark ? "text-white/80" : "text-gray-700"}`}
+                        >
                           Стандартный
                         </span>
-                        <p className={`text-xs text-center mt-1 ${isDark ? "text-white/30" : "text-gray-400"}`}>
+                        <p
+                          className={`text-xs text-center mt-1 ${isDark ? "text-white/30" : "text-gray-400"}`}
+                        >
                           Полная ширина
                         </p>
                       </div>
@@ -1060,7 +1105,7 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
                           className="absolute bottom-2 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-blue-500"
                         />
                       )}
-                    </button>      
+                    </button>
                   </div>
                 </div>
               </div>

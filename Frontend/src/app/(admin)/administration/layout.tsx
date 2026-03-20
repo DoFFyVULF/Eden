@@ -15,6 +15,9 @@ const pangolin = Pangolin({
   display: "swap",
 });
 
+const THEME_STORAGE_KEY = "app-theme";
+const ROUNDED_STORAGE_KEY = "app-rounded";
+
 export default function AdminRootLayout({
   children,
 }: {
@@ -27,6 +30,33 @@ export default function AdminRootLayout({
   // Принудительно включаем темную тему для теста
   const [isDark, setIsDark] = useState(true);
   const [isRounded, setIsRounded] = useState(true);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+
+    if (savedTheme !== null) {
+      setIsDark(savedTheme === "dark");
+    } else {
+      const systemDark = window.matchMedia(
+        "(prefers-color-scheme: dark)",
+      ).matches;
+      setIsDark(systemDark);
+    }
+
+    const savedRounded = localStorage.getItem(ROUNDED_STORAGE_KEY);
+    if (savedRounded !== null) {
+      setIsRounded(savedRounded === "true");
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(THEME_STORAGE_KEY, isDark ? 'dark' : '');
+  }, [isDark]);
+
+  useEffect(() => {
+    localStorage.setItem(ROUNDED_STORAGE_KEY, isRounded.toString());
+  }, [isRounded]);
+
 
   useThemeSettings(isDark, isRounded);
 
