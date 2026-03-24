@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { TimePeriod, AnalyticsRequestDto } from './dto/analytics-request.dto';
-import { 
-  KeyMetricsResponseDto, 
+import {
+  KeyMetricsResponseDto,
   AnalyticsSummaryResponseDto,
   RevenueByMonthDto,
   RevenueByMasterDto,
@@ -10,15 +10,15 @@ import {
   MasterPerformanceDto,
   PopularServiceDto
 } from './dto/analytics-response.dto';
-import { 
-  startOfDay, 
-  endOfDay, 
-  startOfMonth, 
-  endOfMonth, 
-  startOfWeek, 
-  endOfWeek, 
+import {
+  startOfDay,
+  endOfDay,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
   subMonths,
-  format 
+  format
 } from 'date-fns';
 import { AppointmentStatus } from 'generated/prisma/enums';
 
@@ -29,10 +29,12 @@ export class AnalyticsService {
   // Константа для удобства
   private readonly COMPLETED_STATUS = [AppointmentStatus.Завершен];
 
-  async getKeyMetrics(dto: AnalyticsRequestDto): Promise<KeyMetricsResponseDto> {
+  async getKeyMetrics(
+    dto: AnalyticsRequestDto
+  ): Promise<KeyMetricsResponseDto> {
     const period = dto.period || TimePeriod.MONTH;
     const dateRange = this.getDateRange(period, dto.startDate, dto.endDate);
-    
+
     const [
       financial,
       clients,
@@ -50,9 +52,12 @@ export class AnalyticsService {
     ]);
 
     // Расчет роста
-    const revenueGrowth = previousPeriodData.totalRevenue > 0 
-      ? ((financial.totalRevenue - previousPeriodData.totalRevenue) / previousPeriodData.totalRevenue) * 100
-      : 0;
+    const revenueGrowth =
+      previousPeriodData.totalRevenue > 0
+        ? ((financial.totalRevenue - previousPeriodData.totalRevenue) /
+            previousPeriodData.totalRevenue) *
+          100
+        : 0;
 
     // Создаем объект ответа с правильными типами
     const response: KeyMetricsResponseDto = {
@@ -98,9 +103,9 @@ export class AnalyticsService {
   async getDashboardSummary(): Promise<AnalyticsSummaryResponseDto> {
     const now = new Date();
     const currentMonth = { start: startOfMonth(now), end: now };
-    const previousMonth = { 
-      start: subMonths(startOfMonth(now), 1), 
-      end: subMonths(endOfMonth(now), 1) 
+    const previousMonth = {
+      start: subMonths(startOfMonth(now), 1),
+      end: subMonths(endOfMonth(now), 1)
     };
 
     const [
@@ -125,9 +130,12 @@ export class AnalyticsService {
       totalAppointments: appointmentMetrics.totalAppointments,
       mastersCount,
       servicesCount,
-      revenueGrowth: previousMetrics.totalRevenue > 0 
-        ? ((currentMetrics.totalRevenue - previousMetrics.totalRevenue) / previousMetrics.totalRevenue) * 100
-        : 0,
+      revenueGrowth:
+        previousMetrics.totalRevenue > 0
+          ? ((currentMetrics.totalRevenue - previousMetrics.totalRevenue) /
+              previousMetrics.totalRevenue) *
+            100
+          : 0,
       clientGrowth: 15,
       appointmentGrowth: 12
     };
@@ -136,15 +144,17 @@ export class AnalyticsService {
   async getFinancialReport(dto: AnalyticsRequestDto) {
     const period = dto.period || TimePeriod.MONTH;
     const dateRange = this.getDateRange(period, dto.startDate, dto.endDate);
-    
+
     const appointments = await this.prisma.appointment.findMany({
       where: {
         appointmentTime: {
           gte: dateRange.start,
           lte: dateRange.end
         },
-        ...(dto.masterIds && dto.masterIds.length > 0 && { masterID: { in: dto.masterIds } }),
-        ...(dto.serviceIds && dto.serviceIds.length > 0 && { serviceId: { in: dto.serviceIds } }),
+        ...(dto.masterIds &&
+          dto.masterIds.length > 0 && { masterID: { in: dto.masterIds } }),
+        ...(dto.serviceIds &&
+          dto.serviceIds.length > 0 && { serviceId: { in: dto.serviceIds } }),
         status: { in: this.COMPLETED_STATUS } // Только завершенные записи
       },
       include: {
@@ -154,42 +164,59 @@ export class AnalyticsService {
       orderBy: { appointmentTime: 'desc' }
     });
 
-    const revenueByDay = appointments.reduce((acc: Record<string, number>, appointment) => {
-      const day = format(appointment.appointmentTime, 'yyyy-MM-dd');
-      if (!acc[day]) acc[day] = 0;
-      acc[day] += Number(appointment.price);
-      return acc;
-    }, {});
+    const revenueByDay = appointments.reduce(
+      (acc: Record<string, number>, appointment) => {
+        const day = format(appointment.appointmentTime, 'yyyy-MM-dd');
+        if (!acc[day]) acc[day] = 0;
+        acc[day] += Number(appointment.price);
+        return acc;
+      },
+      {}
+    );
 
-    const revenueByMaster = appointments.reduce((acc: Record<number, {
-      masterName: string;
-      revenue: number;
-      appointments: number;
-    }>, appointment) => {
-      const masterId = appointment.masterID;
-      if (!acc[masterId]) {
-        acc[masterId] = {
-          masterName: `${appointment.master.surname} ${appointment.master.name}`,
-          revenue: 0,
-          appointments: 0
-        };
-      }
-      acc[masterId].revenue += Number(appointment.price);
-      acc[masterId].appointments += 1;
-      return acc;
-    }, {});
+    const revenueByMaster = appointments.reduce(
+      (
+        acc: Record<
+          number,
+          {
+            masterName: string;
+            revenue: number;
+            appointments: number;
+          }
+        >,
+        appointment
+      ) => {
+        const masterId = appointment.masterID;
+        if (!acc[masterId]) {
+          acc[masterId] = {
+            masterName: `${appointment.master.surname} ${appointment.master.name}`,
+            revenue: 0,
+            appointments: 0
+          };
+        }
+        acc[masterId].revenue += Number(appointment.price);
+        acc[masterId].appointments += 1;
+        return acc;
+      },
+      {}
+    );
 
     return {
       appointments,
       summary: {
         totalRevenue: appointments.reduce((sum, a) => sum + Number(a.price), 0),
         totalAppointments: appointments.length,
-        averageCheck: appointments.length > 0 
-          ? appointments.reduce((sum, a) => sum + Number(a.price), 0) / appointments.length
-          : 0
+        averageCheck:
+          appointments.length > 0
+            ? appointments.reduce((sum, a) => sum + Number(a.price), 0) /
+              appointments.length
+            : 0
       },
       breakdown: {
-        byDay: Object.entries(revenueByDay).map(([date, revenue]) => ({ date, revenue })),
+        byDay: Object.entries(revenueByDay).map(([date, revenue]) => ({
+          date,
+          revenue
+        })),
         byMaster: Object.values(revenueByMaster)
       }
     };
@@ -224,9 +251,8 @@ export class AnalyticsService {
         masterName: master ? `${master.surname} ${master.name}` : 'Unknown',
         totalRevenue: Number(app._sum.price || 0),
         appointmentsCount: app._count.id,
-        averageRevenuePerAppointment: app._count.id > 0 
-          ? Number(app._sum.price || 0) / app._count.id 
-          : 0
+        averageRevenuePerAppointment:
+          app._count.id > 0 ? Number(app._sum.price || 0) / app._count.id : 0
       };
     });
 
@@ -264,9 +290,8 @@ export class AnalyticsService {
         serviceName: service ? service.title : 'Unknown',
         appointmentsCount: app._count.id,
         totalRevenue: Number(app._sum.price || 0),
-        averagePrice: app._count.id > 0 
-          ? Number(app._sum.price || 0) / app._count.id 
-          : 0
+        averagePrice:
+          app._count.id > 0 ? Number(app._sum.price || 0) / app._count.id : 0
       };
     });
 
@@ -290,16 +315,17 @@ export class AnalyticsService {
       appointmentTime: { gte: dateRange.start, lte: dateRange.end },
       status: { in: this.COMPLETED_STATUS }, // Только завершенные записи
       ...(masterIds && masterIds.length > 0 && { masterID: { in: masterIds } }),
-      ...(serviceIds && serviceIds.length > 0 && { serviceId: { in: serviceIds } })
+      ...(serviceIds &&
+        serviceIds.length > 0 && { serviceId: { in: serviceIds } })
     };
 
     const [appointments, byMonthRaw] = await Promise.all([
       this.prisma.appointment.findMany({
         where: whereClause,
-        select: { 
-          price: true, 
-          appointmentTime: true, 
-          masterID: true, 
+        select: {
+          price: true,
+          appointmentTime: true,
+          masterID: true,
           master: {
             select: {
               surname: true,
@@ -308,9 +334,7 @@ export class AnalyticsService {
           }
         }
       }),
-      this.prisma.$queryRaw<
-        Array<{ month: string; revenue: string }>
-      >`
+      this.prisma.$queryRaw<Array<{ month: string; revenue: string }>>`
         SELECT 
           TO_CHAR("appointment_time", 'YYYY-MM') as month,
           SUM(price)::text as revenue
@@ -333,7 +357,7 @@ export class AnalyticsService {
     appointments.forEach(app => {
       const masterId = app.masterID;
       const existing = revenueByMasterMap.get(masterId);
-      
+
       if (existing) {
         existing.revenue += Number(app.price);
       } else {
@@ -347,18 +371,21 @@ export class AnalyticsService {
 
     const revenueByMaster = Array.from(revenueByMasterMap.values());
 
-    const totalRevenue = appointments.reduce((sum, a) => sum + Number(a.price), 0);
+    const totalRevenue = appointments.reduce(
+      (sum, a) => sum + Number(a.price),
+      0
+    );
     const currentMonth = format(dateRange.start, 'yyyy-MM');
-    const monthlyIncome = byMonth.find(m => m.month === currentMonth)?.revenue || 0;
+    const monthlyIncome =
+      byMonth.find(m => m.month === currentMonth)?.revenue || 0;
 
     return {
       totalRevenue,
       monthlyIncome,
       revenueByMonth: byMonth,
       revenueByMaster,
-      averageCheck: appointments.length > 0 
-        ? totalRevenue / appointments.length 
-        : 0
+      averageCheck:
+        appointments.length > 0 ? totalRevenue / appointments.length : 0
     };
   }
 
@@ -369,7 +396,8 @@ export class AnalyticsService {
     retentionRate: number;
     clientsByMonth: ClientGrowthDto[];
   }> {
-    const uniqueClients = await this.prisma.appointment.groupBy({
+    // Получаем всех уникальных клиентов за текущий период
+    const currentPeriodClients = await this.prisma.appointment.groupBy({
       by: ['clientPhone'],
       where: {
         appointmentTime: { gte: dateRange.start, lte: dateRange.end }
@@ -377,26 +405,53 @@ export class AnalyticsService {
       _count: { id: true }
     });
 
-    const returningClients = await this.prisma.appointment.groupBy({
-      by: ['clientPhone'],
+    const currentClientPhones = currentPeriodClients.map(c => c.clientPhone);
+
+    if (currentClientPhones.length === 0) {
+      return {
+        totalClients: 0,
+        newClients: 0,
+        returningClients: 0,
+        retentionRate: 0,
+        clientsByMonth: []
+      };
+    }
+
+    // Находим клиентов, которые были ДО текущего периода
+    const previousClients = await this.prisma.appointment.findMany({
       where: {
         appointmentTime: { lt: dateRange.start },
-        clientPhone: { in: uniqueClients.map(c => c.clientPhone) }
-      }
+        clientPhone: { in: currentClientPhones }
+      },
+      select: {
+        clientPhone: true
+      },
+      distinct: ['clientPhone']
     });
 
+    const returningClientPhones = new Set(
+      previousClients.map(c => c.clientPhone)
+    );
+
+    // Возвращающиеся клиенты - те, кто есть в текущем периоде И были ДО
+    const returningClientsCount = returningClientPhones.size;
+
+    // Новые клиенты - те, кто есть в текущем периоде, но НЕ было ДО
+    const newClientsCount = currentClientPhones.length - returningClientsCount;
+
+    // Получаем данные по месяцам
     const clientsByMonthRaw = await this.prisma.$queryRaw<
       Array<{ month: string; clients: string }>
     >`
-      SELECT 
-        TO_CHAR("appointment_time", 'YYYY-MM') as month,
-        COUNT(DISTINCT "client_phone")::text as clients
-      FROM appointment
-      WHERE "appointment_time" >= ${dateRange.start}
-        AND "appointment_time" <= ${dateRange.end}
-      GROUP BY TO_CHAR("appointment_time", 'YYYY-MM')
-      ORDER BY month
-    `;
+    SELECT 
+      TO_CHAR(DATE_TRUNC('month', "appointment_time"), 'YYYY-MM') as month,
+      COUNT(DISTINCT "client_phone")::text as clients
+    FROM appointment
+    WHERE "appointment_time" >= ${dateRange.start}
+      AND "appointment_time" <= ${dateRange.end}
+    GROUP BY DATE_TRUNC('month', "appointment_time")
+    ORDER BY month
+  `;
 
     const clientsByMonth: ClientGrowthDto[] = clientsByMonthRaw.map(item => ({
       month: item.month,
@@ -404,12 +459,13 @@ export class AnalyticsService {
     }));
 
     return {
-      totalClients: uniqueClients.length,
-      newClients: uniqueClients.length - returningClients.length,
-      returningClients: returningClients.length,
-      retentionRate: uniqueClients.length > 0 
-        ? (returningClients.length / uniqueClients.length) * 100 
-        : 0,
+      totalClients: currentClientPhones.length,
+      newClients: newClientsCount,
+      returningClients: returningClientsCount,
+      retentionRate:
+        currentClientPhones.length > 0
+          ? (returningClientsCount / currentClientPhones.length) * 100
+          : 0,
       clientsByMonth
     };
   }
@@ -429,7 +485,8 @@ export class AnalyticsService {
     const whereClause = {
       appointmentTime: { gte: dateRange.start, lte: dateRange.end },
       ...(masterIds && masterIds.length > 0 && { masterID: { in: masterIds } }),
-      ...(serviceIds && serviceIds.length > 0 && { serviceId: { in: serviceIds } })
+      ...(serviceIds &&
+        serviceIds.length > 0 && { serviceId: { in: serviceIds } })
     };
 
     const appointments = await this.prisma.appointment.groupBy({
@@ -443,7 +500,10 @@ export class AnalyticsService {
       statusMap.set(item.status, item._count.id);
     });
 
-    const totalAppointments = appointments.reduce((sum, item) => sum + item._count.id, 0);
+    const totalAppointments = appointments.reduce(
+      (sum, item) => sum + item._count.id,
+      0
+    );
     const newApps = await this.prisma.appointment.count({
       where: { ...whereClause, createdAt: { gte: dateRange.start } }
     });
@@ -454,9 +514,12 @@ export class AnalyticsService {
       confirmedAppointments: statusMap.get(AppointmentStatus.Подтвержден) || 0,
       cancelledAppointments: statusMap.get(AppointmentStatus.Отменен) || 0,
       completedAppointments: statusMap.get(AppointmentStatus.Завершен) || 0,
-      conversionRate: totalAppointments > 0 
-        ? ((statusMap.get(AppointmentStatus.Завершен) || 0) / totalAppointments) * 100 
-        : 0
+      conversionRate:
+        totalAppointments > 0
+          ? ((statusMap.get(AppointmentStatus.Завершен) || 0) /
+              totalAppointments) *
+            100
+          : 0
     };
   }
 
@@ -478,7 +541,7 @@ export class AnalyticsService {
       })
     ]);
 
-    const topMastersPromises = appointments.slice(0, 5).map(async (app) => {
+    const topMastersPromises = appointments.slice(0, 5).map(async app => {
       const master = await this.prisma.master.findUnique({
         where: { id: app.masterID }
       });
@@ -518,7 +581,7 @@ export class AnalyticsService {
       })
     ]);
 
-    const popularServicesPromises = popularServices.map(async (service) => {
+    const popularServicesPromises = popularServices.map(async service => {
       const serviceData = await this.prisma.service.findUnique({
         where: { id: service.serviceId }
       });
@@ -527,9 +590,10 @@ export class AnalyticsService {
         serviceName: serviceData?.title || 'Unknown',
         appointmentsCount: service._count.id,
         totalRevenue: Number(service._sum.price || 0),
-        averagePrice: service._count.id > 0 
-          ? Number(service._sum.price || 0) / service._count.id 
-          : 0
+        averagePrice:
+          service._count.id > 0
+            ? Number(service._sum.price || 0) / service._count.id
+            : 0
       } as PopularServiceDto;
     });
 
@@ -541,9 +605,10 @@ export class AnalyticsService {
     };
   }
 
-  private async getPreviousPeriodData(
-    currentRange: { start: Date; end: Date }
-  ): Promise<{ totalRevenue: number }> {
+  private async getPreviousPeriodData(currentRange: {
+    start: Date;
+    end: Date;
+  }): Promise<{ totalRevenue: number }> {
     const duration = currentRange.end.getTime() - currentRange.start.getTime();
     const previousStart = new Date(currentRange.start.getTime() - duration);
     const previousEnd = new Date(currentRange.start.getTime() - 1);
@@ -561,8 +626,8 @@ export class AnalyticsService {
   }
 
   private getDateRange(
-    period: TimePeriod, 
-    startDate?: string, 
+    period: TimePeriod,
+    startDate?: string,
     endDate?: string
   ): { start: Date; end: Date } {
     const now = new Date();
@@ -590,11 +655,12 @@ export class AnalyticsService {
         start = startOfMonth(now);
         end = endOfMonth(now);
         break;
-      case TimePeriod.QUARTER:
-        { const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
+      case TimePeriod.QUARTER: {
+        const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
         start = new Date(now.getFullYear(), quarterMonth, 1);
         end = new Date(now.getFullYear(), quarterMonth + 3, 0);
-        break; }
+        break;
+      }
       case TimePeriod.YEAR:
         start = new Date(now.getFullYear(), 0, 1);
         end = new Date(now.getFullYear(), 11, 31);
@@ -610,7 +676,7 @@ export class AnalyticsService {
   async getQuickStats() {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     const [revenue, clients, appointments] = await Promise.all([
       this.getFinancialMetrics({ start: monthStart, end: now }),
       this.getClientMetrics({ start: monthStart, end: now }),

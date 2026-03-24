@@ -17,6 +17,9 @@ import {
   Shield,
   Zap,
   Sparkles,
+  AlertTriangle,
+  CalendarDays,
+  Info,
 } from "lucide-react";
 import { masterService } from "@/services/master/master.service";
 import { serviceService } from "@/services/service/service.service";
@@ -32,7 +35,7 @@ import {
   AppointmentStatus,
   IUpdateAppointmentDto,
 } from "@/types/appointment.types";
-import type { IMasterSchedule } from "@/types/schedule.types";
+import type { IMasterSchedule, MasterStatusInfo } from "@/types/schedule.types";
 
 interface Props {
   isOpen: boolean;
@@ -58,6 +61,20 @@ const fmtPrice = (p: number) =>
     minimumFractionDigits: 0,
   }).format(p);
 
+const TIME_OFF_LABELS: Record<string, string> = {
+  vacation: "в отпуске",
+  sick_leave: "на больничном",
+  day_off: "на отгуле",
+  other: "недоступен",
+};
+
+const TIME_OFF_NAMES: Record<string, string> = {
+  vacation: "Отпуск",
+  sick_leave: "Больничный",
+  day_off: "Отгул",
+  other: "Недоступен",
+};
+
 export default function NewAppointmentsWindow({
   isOpen,
   onClose,
@@ -70,9 +87,14 @@ export default function NewAppointmentsWindow({
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [loadingTimes, setLoadingTimes] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedSP, setSelectedSP] = useState<IServicePrice | null>(null);
   const [isDark, setIsDark] = useState(false);
+  const [masterStatus, setMasterStatus] = useState<MasterStatusInfo | null>(null);
+  const [loadingStatus, setLoadingStatus] = useState(false);
+  const [showWarningConfirm, setShowWarningConfirm] = useState(false);
+
   const [form, setForm] = useState({
     clientSurname: "",
     clientName: "",
@@ -120,6 +142,9 @@ export default function NewAppointmentsWindow({
   useEffect(() => {
     if (!isOpen) return;
     setError(null);
+    setWarning(null);
+    setShowWarningConfirm(false);
+    setMasterStatus(null);
     Promise.all([masterService.getAll(), serviceService.getAll()])
       .then(([m]) => setMasters(m))
       .catch(() => setError("Не удалось загрузить мастеров"));
@@ -129,96 +154,151 @@ export default function NewAppointmentsWindow({
     if (!form.master) {
       setServicePrices([]);
       setSelectedSP(null);
+      setMasterStatus(null);
+      setWarning(null);
+      setShowWarningConfirm(false);
       return;
     }
-    servicePriceService
-      .getByMaster(Number(form.master))
-      .then((prices) => {
+
+    const masterId = Number(form.master);
+    setLoadingStatus(true);
+    Promise.all([
+      servicePriceService.getByMaster(masterId),
+      masterScheduleService.getMasterStatus(masterId),
+    ])
+      .then(([prices, status]) => {
         setServicePrices(prices);
         setSelectedSP(
           prices.find((sp) => sp.service?.id === Number(form.service)) || null,
         );
+        setMasterStatus(status);
+        
+        // Если мастер недоступен, показываем предупреждение, но не блокируем выбор даты
+        if (status?.isOnTimeOff && status.currentPeriod) {
+          const start = new Date(status.currentPeriod.startDate);
+          const end = new Date(status.currentPeriod.endDate);
+          const typeName = TIME_OFF_NAMES[status.currentPeriod.type] || "Недоступен";
+          const startStr = start.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+          const endStr = end.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+          
+          setWarning(
+            `${typeName} с ${startStr} по ${endStr}. Запись возможна только на даты вне этого периода.`
+          );
+        } else {
+          setWarning(null);
+          setShowWarningConfirm(false);
+        }
       })
-      .catch(() => setError("Не удалось загрузить услуги"));
-  }, [form.master, form.service]);
+      .catch(() => setError("Не удалось загрузить данные мастера"))
+      .finally(() => setLoadingStatus(false));
+  }, [form.master]);
+
+  useEffect(() => {
+    if (!form.service || !servicePrices.length) return;
+    setSelectedSP(
+      servicePrices.find((sp) => sp.service?.id === Number(form.service)) || null,
+    );
+  }, [form.service, servicePrices]);
+
+  // Проверка, попадает ли выбранная дата в период недоступности
+  const isDateInTimeOff = (dateStr: string, status: MasterStatusInfo | null): boolean => {
+    if (!status?.isOnTimeOff || !status.currentPeriod) return false;
+    const checkDate = new Date(dateStr);
+    const startDate = new Date(status.currentPeriod.startDate);
+    const endDate = new Date(status.currentPeriod.endDate);
+    
+    // Обнуляем время для сравнения только дат
+    checkDate.setHours(0, 0, 0, 0);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(0, 0, 0, 0);
+    
+    return checkDate >= startDate && checkDate <= endDate;
+  };
+
+  // Исправлено: isDateUnavailable всегда boolean
+  const isDateUnavailable: boolean = !!(masterStatus?.isOnTimeOff && form.date && isDateInTimeOff(form.date, masterStatus));
 
   useEffect(() => {
     const load = async () => {
-      // Если нет мастера или даты, очищаем время
-      if (!form.master || !form.date) { 
-        setAvailableTimes([]); 
-        return; 
+      if (!form.master || !form.date) {
+        setAvailableTimes([]);
+        return;
+      }
+
+      // Проверяем, попадает ли выбранная дата в период недоступности
+      if (isDateUnavailable) {
+        setAvailableTimes([]);
+        // Показываем предупреждение, что дата в периоде недоступности
+        if (masterStatus?.currentPeriod) {
+          const end = new Date(masterStatus.currentPeriod.endDate);
+          const endStr = end.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+          setWarning(`Выбранная дата попадает в период недоступности мастера (до ${endStr}). Пожалуйста, выберите другую дату.`);
+        }
+        return;
+      } else {
+        // Если дата вне периода недоступности, убираем предупреждение
+        if (warning?.includes("попадает в период недоступности")) {
+          setWarning(null);
+        }
       }
 
       setLoadingTimes(true);
       try {
         const mid = Number(form.master);
-        
-        // 1. Получаем расписание и записи
+
         const schedules: IMasterSchedule[] = await masterScheduleService.getByMaster(mid);
         const sch = schedules.find(s => s.dayOfWeek === getWeekdayIndex(form.date));
-        
-        if (!sch) { 
-          setAvailableTimes([]); 
-          return; 
+
+        if (!sch) {
+          setAvailableTimes([]);
+          return;
         }
 
         const appts = await appointmentService.getByDate(form.date, mid);
-        
-        // Парсим время начала и конца работы мастера
+
         const s = new Date(sch.startTime);
         const e = new Date(sch.endTime);
         const sm = s.getHours() * 60 + s.getMinutes();
         const em = e.getHours() * 60 + e.getMinutes();
 
-        // 2. Определяем текущее время, если выбрана СЕГОДНЯШНЯЯ дата
         const todayStr = new Date().toISOString().split("T")[0];
         const isToday = form.date === todayStr;
-        
-        let startLimit = sm; // По умолчанию начинаем с начала рабочего дня
-        
+
+        let startLimit = sm;
+
         if (isToday) {
           const now = new Date();
           const currentMinutes = now.getHours() * 60 + now.getMinutes();
-          
-          // Если текущее время больше начала рабочего дня, сдвигаем лимит
-          // Добавляем буфер (например, 30 мин), чтобы нельзя было записаться на время, которое уже идет
-          // Или просто округляем до следующего слота. Здесь мы просто отсекаем всё, что меньше текущего + длительность слота
           if (currentMinutes > sm) {
-            // Округляем текущее время вверх до ближайших 30 минут + небольшой запас, 
-            // чтобы избежать гонки времени при обновлении страницы
             startLimit = Math.ceil((currentMinutes + 5) / 30) * 30;
           }
         }
 
         const slots: string[] = [];
-        
-        // 3. Генерируем слоты с учетом нового лимита startLimit
+
         for (let m = startLimit; m + 30 <= em; m += 30) {
-          const timeString = `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
+          const timeString = `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
           slots.push(timeString);
         }
 
-        // Фильтруем уже занятые места
         const booked = appts
           .filter(a => a.status !== AppointmentStatus.Отменен)
-          .map(a => { 
-            const d = new Date(a.appointmentTime); 
-            return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; 
+          .map(a => {
+            const d = new Date(a.appointmentTime);
+            return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
           });
 
         setAvailableTimes(slots.filter(t => !booked.includes(t)));
-
-      } catch (err) { 
+      } catch (err) {
         console.error(err);
-        setError("Не удалось загрузить время"); 
-        setAvailableTimes([]); 
-      } finally { 
-        setLoadingTimes(false); 
+        setError("Не удалось загрузить время");
+        setAvailableTimes([]);
+      } finally {
+        setLoadingTimes(false);
       }
     };
     load();
-  }, [form.master, form.date]);
+  }, [form.master, form.date, masterStatus, isDateUnavailable, warning]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -228,7 +308,14 @@ export default function NewAppointmentsWindow({
       ...p,
       [name]: name === "clientPhone" ? formatPhoneNumber(value) : value,
       ...(name === "master" ? { service: "", time: "" } : {}),
+      ...(name === "date" ? { time: "" } : {}),
     }));
+    
+    // Если меняем дату, сбрасываем подтверждение предупреждения
+    if (name === "date") {
+      setShowWarningConfirm(false);
+    }
+    
     if (name === "service")
       setSelectedSP(
         servicePrices.find((sp) => sp.service?.id === Number(value)) || null,
@@ -237,6 +324,13 @@ export default function NewAppointmentsWindow({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Проверяем, если дата в периоде недоступности
+    if (isDateUnavailable) {
+      setError("Невозможно создать запись на дату, когда мастер недоступен");
+      return;
+    }
+    
     setIsSubmitting(true);
     setError(null);
     try {
@@ -248,11 +342,13 @@ export default function NewAppointmentsWindow({
       if (!form.service) throw new Error("Выберите услугу");
       if (!form.date) throw new Error("Укажите дату");
       if (!form.time) throw new Error("Укажите время");
+      
       const priceItem = servicePrices.find(
         (sp) => sp.service?.id === Number(form.service),
       );
       if (!priceItem) throw new Error("Не найдена цена услуги");
       const appointmentTime = `${form.date}T${form.time}:00`;
+      
       if (mode === "edit" && initialData?.id) {
         await appointmentService.update(initialData.id, {
           clientSurname: form.clientSurname.trim(),
@@ -419,6 +515,32 @@ export default function NewAppointmentsWindow({
                 )}
               </AnimatePresence>
 
+              {/* Warning about master unavailability */}
+              <AnimatePresence>
+                {warning && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    className={`mx-6 mt-5 px-5 py-4 rounded-2xl border flex items-start gap-3 ${
+                      isDark
+                        ? "bg-amber-500/10 border-amber-400/20"
+                        : "bg-amber-50/80 border-amber-200/70"
+                    }`}
+                  >
+                    <AlertTriangle size={18} className={isDark ? "text-amber-400 mt-0.5 flex-shrink-0" : "text-amber-500 mt-0.5 flex-shrink-0"} />
+                    <div>
+                      <p className={`text-sm font-bold ${isDark ? "text-amber-400" : "text-amber-700"}`}>
+                        Информация о мастере
+                      </p>
+                      <p className={`text-xs mt-0.5 ${isDark ? "text-amber-400/70" : "text-amber-600"}`}>
+                        {warning}
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Service price preview */}
               <AnimatePresence>
                 {selectedSP && (
@@ -516,6 +638,14 @@ export default function NewAppointmentsWindow({
                     icon={<Users size={14} />}
                     isDark={isDark}
                     select
+                    extra={
+                      loadingStatus && (
+                        <Loader2
+                          size={13}
+                          className={`animate-spin ${isDark ? "text-indigo-400" : "text-blue-400"}`}
+                        />
+                      )
+                    }
                   >
                     <select
                       name="master"
@@ -533,10 +663,12 @@ export default function NewAppointmentsWindow({
                           </option>
                         ))}
                     </select>
-                    <ChevronDown
-                      size={14}
-                      className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/30" : "text-gray-400"}`}
-                    />
+                    {!loadingStatus && (
+                      <ChevronDown
+                        size={14}
+                        className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/30" : "text-gray-400"}`}
+                      />
+                    )}
                   </FormField>
 
                   {/* Service */}
@@ -555,7 +687,9 @@ export default function NewAppointmentsWindow({
                       className={selectCls(!form.master)}
                     >
                       <option value="">
-                        {form.master ? "Выберите услугу" : "Сначала мастера"}
+                        {!form.master
+                          ? "Сначала выберите мастера"
+                          : "Выберите услугу"}
                       </option>
                       {servicePrices
                         .filter((sp) => sp.isActive && sp.service)
@@ -571,21 +705,34 @@ export default function NewAppointmentsWindow({
                     />
                   </FormField>
 
-                  {/* Date */}
+                  {/* Date - with visual indicator if in unavailable period */}
                   <FormField
                     label="Дата"
                     icon={<Calendar size={14} />}
                     isDark={isDark}
                   >
-                    <input
-                      type="date"
-                      name="date"
-                      value={form.date}
-                      onChange={handleChange}
-                      min={new Date().toISOString().split("T")[0]}
-                      required
-                      className={inputCls()}
-                    />
+                    <div className="relative">
+                      <input
+                        type="date"
+                        name="date"
+                        value={form.date}
+                        onChange={handleChange}
+                        min={new Date().toISOString().split("T")[0]}
+                        required
+                        className={`${inputCls()} ${isDateUnavailable ? (isDark ? "border-amber-500/50" : "border-amber-400") : ""}`}
+                      />
+                      {isDateUnavailable && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <AlertTriangle size={16} className={isDark ? "text-amber-400" : "text-amber-500"} />
+                        </div>
+                      )}
+                    </div>
+                    {isDateUnavailable && masterStatus?.currentPeriod && (
+                      <p className={`text-xs mt-1.5 flex items-center gap-1 ${isDark ? "text-amber-400/70" : "text-amber-600"}`}>
+                        <Info size={12} />
+                        Мастер {TIME_OFF_LABELS[masterStatus.currentPeriod.type] || "недоступен"} до {new Date(masterStatus.currentPeriod.endDate).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+                      </p>
+                    )}
                   </FormField>
 
                   {/* Time */}
@@ -607,20 +754,22 @@ export default function NewAppointmentsWindow({
                       name="time"
                       value={form.time}
                       onChange={handleChange}
-                      disabled={loadingTimes || !form.date}
+                      disabled={loadingTimes || !form.date || isDateUnavailable}
                       required
-                      className={selectCls(loadingTimes || !form.date)}
+                      className={selectCls(loadingTimes || !form.date || isDateUnavailable)}
                     >
                       <option value="">
-                        {loadingTimes
-                          ? "Загрузка..."
-                          : !form.date
-                            ? "Сначала дату"
-                            : availableTimes.length === 0
-                              ? "Нет слотов"
-                              : "Выберите время"}
+                        {isDateUnavailable
+                          ? "Дата недоступна"
+                          : loadingTimes
+                            ? "Загрузка..."
+                            : !form.date
+                              ? "Сначала выберите дату"
+                              : availableTimes.length === 0
+                                ? "Нет свободных слотов"
+                                : "Выберите время"}
                       </option>
-                      {availableTimes.map((t) => (
+                      {!isDateUnavailable && availableTimes.map((t) => (
                         <option key={t} value={t}>
                           {t}
                         </option>
@@ -637,7 +786,7 @@ export default function NewAppointmentsWindow({
 
                 {/* Summary */}
                 <AnimatePresence>
-                  {isComplete && (
+                  {isComplete && !isDateUnavailable && (
                     <motion.div
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -687,7 +836,7 @@ export default function NewAppointmentsWindow({
                     type="submit"
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.98 }}
-                    disabled={isSubmitting || loadingTimes}
+                    disabled={isSubmitting || loadingTimes || isDateUnavailable}
                     className={`flex-1 h-12 rounded-2xl text-sm font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed ${
                       isDark
                         ? "bg-gradient-to-r from-indigo-500 to-purple-600 shadow-purple-500/25 hover:shadow-purple-500/40"

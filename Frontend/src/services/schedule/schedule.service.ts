@@ -1,11 +1,21 @@
 import { axiosWithAuth } from "@/api/interceptors";
-import type { IMasterSchedule, IMasterTimeOff, MasterStatusInfo } from "@/types/schedule.types";
+import type {
+  IMasterSchedule,
+  IMasterTimeOff,
+  MasterStatusInfo,
+} from "@/types/schedule.types";
 
-// Тип для создания периода недоступности
 export type CreateTimeOffDto = {
   masterId: number;
-  startDate: string; // ISO строка: "2026-04-01T00:00:00.000Z"
-  endDate: string; // ISO строка
+  startDate: string;
+  endDate: string;
+  type?: "vacation" | "sick_leave" | "day_off" | "other";
+  comment?: string;
+};
+
+export type UpdateTimeOffDto = {
+  startDate?: string;
+  endDate?: string;
   type?: "vacation" | "sick_leave" | "day_off" | "other";
   comment?: string;
 };
@@ -20,10 +30,11 @@ export const masterScheduleService = {
   },
 
   async getByMaster(masterId: number): Promise<IMasterSchedule[]> {
-    const { data } = await axiosWithAuth.get<IMasterSchedule[]>(
-      `/master-schedule?masterId=${masterId}`,
+    const { data } =
+      await axiosWithAuth.get<IMasterSchedule[]>("/master-schedule");
+    return data.filter(
+      (s) => s.masterId === masterId || s.master?.id === masterId,
     );
-    return data;
   },
 
   async getById(id: number): Promise<IMasterSchedule> {
@@ -81,11 +92,27 @@ export const masterScheduleService = {
   },
 
   async createTimeOff(dto: CreateTimeOffDto): Promise<IMasterTimeOff> {
+    // Ensure dates are in proper ISO format
+    const startDate = new Date(dto.startDate);
+    const endDate = new Date(dto.endDate);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new Error("Invalid date format");
+    }
+
+    console.log("📤 [TimeOff] Sending to backend:", {
+      masterId: dto.masterId,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      type: dto.type,
+      comment: dto.comment,
+    });
+
     const { data } = await axiosWithAuth.post<IMasterTimeOff>(
       `/master-schedule/${dto.masterId}/time-off`,
       {
-        startDate: dto.startDate,
-        endDate: dto.endDate,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
         type: dto.type,
         comment: dto.comment,
       },
@@ -95,5 +122,40 @@ export const masterScheduleService = {
 
   async deleteTimeOff(id: number): Promise<void> {
     await axiosWithAuth.delete(`/master-schedule/time-off/${id}`);
+  },
+
+  async updateTimeOff(
+    id: number,
+    dto: UpdateTimeOffDto,
+  ): Promise<IMasterTimeOff> {
+    // Ensure dates are in proper ISO format if provided
+    const formattedDto: any = {};
+
+    if (dto.startDate) {
+      const startDate = new Date(dto.startDate);
+      if (isNaN(startDate.getTime())) {
+        throw new Error("Invalid start date format");
+      }
+      formattedDto.startDate = startDate.toISOString();
+    }
+
+    if (dto.endDate) {
+      const endDate = new Date(dto.endDate);
+      if (isNaN(endDate.getTime())) {
+        throw new Error("Invalid end date format");
+      }
+      formattedDto.endDate = endDate.toISOString();
+    }
+
+    if (dto.type) formattedDto.type = dto.type;
+    if (dto.comment !== undefined) formattedDto.comment = dto.comment;
+
+    console.log("📤 [TimeOff] Updating:", { id, dto: formattedDto });
+
+    const { data } = await axiosWithAuth.patch<IMasterTimeOff>(
+      `/master-schedule/time-off/${id}`,
+      formattedDto,
+    );
+    return data;
   },
 };

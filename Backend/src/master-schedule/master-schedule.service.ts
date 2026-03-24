@@ -32,7 +32,7 @@ export class MasterScheduleService {
     this.validateTime(dto.startTime, dto.endTime);
 
     return this.prisma.masterSchedule.create({
-      data: { // ✅ ИСПРАВЛЕНО: добавлено data:
+      data: {
         master: { connect: { id: dto.masterId } },
         dayOfWeek: dto.dayOfWeek ?? null,
         startTime: new Date(dto.startTime),
@@ -74,7 +74,7 @@ export class MasterScheduleService {
 
     return this.prisma.masterSchedule.update({
       where: { id },
-      data: { // ✅ ИСПРАВЛЕНО: добавлено data:
+      data: {
         master: dto.masterId ? { connect: { id: dto.masterId } } : undefined,
         dayOfWeek: dto.dayOfWeek ?? null,
         startTime: dto.startTime ? new Date(dto.startTime) : undefined,
@@ -97,24 +97,43 @@ export class MasterScheduleService {
 
   async createTimeOff(masterId: number, dto: MasterTimeOffDto) {
     console.log('📥 [TimeOff] Запрос:', { masterId, dto });
-
-    await this.ensureMasterExists(masterId);
-    this.validateTimeOffDates(dto.startDate, dto.endDate);
-    await this.checkOverlappingTimeOff(masterId, dto.startDate, dto.endDate);
-
-    const result = await this.prisma.masterTimeOff.create({
-      data: { // ✅ ИСПРАВЛЕНО: добавлено data:
-        master: { connect: { id: masterId } },
-        startDate: new Date(dto.startDate),
-        endDate: new Date(dto.endDate),
-        type: dto.type || TimeOffType.VACATION,
-        comment: dto.comment
-      },
-      include: { master: true }
+    console.log('📥 [TimeOff] Dates received:', {
+      startDate: dto.startDate,
+      endDate: dto.endDate,
+      startType: typeof dto.startDate,
+      endType: typeof dto.endDate
     });
 
-    console.log('✅ [TimeOff] Создано ID:', result.id);
-    return result;
+    await this.ensureMasterExists(masterId);
+    
+    // Validate dates before processing
+    try {
+      this.validateTimeOffDates(dto.startDate, dto.endDate);
+    } catch (error) {
+      console.error('❌ [TimeOff] Date validation failed:', error);
+      throw error;
+    }
+    
+    await this.checkOverlappingTimeOff(masterId, dto.startDate, dto.endDate);
+
+    try {
+      const result = await this.prisma.masterTimeOff.create({
+        data: {
+          master: { connect: { id: masterId } },
+          startDate: new Date(dto.startDate),
+          endDate: new Date(dto.endDate),
+          type: dto.type || TimeOffType.VACATION,
+          comment: dto.comment
+        },
+        include: { master: true }
+      });
+
+      console.log('✅ [TimeOff] Создано ID:', result.id);
+      return result;
+    } catch (error) {
+      console.error('❌ [TimeOff] Database error:', error);
+      throw new BadRequestException('Failed to create time-off period');
+    }
   }
 
   getTimeOffForMaster(masterId: number) {
@@ -128,7 +147,7 @@ export class MasterScheduleService {
     const timeOff = await this.prisma.masterTimeOff.findUnique({
       where: { id }
     });
-    
+
     if (!timeOff) {
       throw new NotFoundException(`Период недоступности с ID ${id} не найден`);
     }
@@ -139,7 +158,7 @@ export class MasterScheduleService {
   // === Новый метод: получение текущего статуса мастера ===
   async getMasterCurrentStatus(masterId: number): Promise<MasterStatusInfo> {
     const now = new Date();
-    
+
     const currentPeriod = await this.prisma.masterTimeOff.findFirst({
       where: {
         masterId,
@@ -166,6 +185,80 @@ export class MasterScheduleService {
       isOnTimeOff: false,
       currentPeriod: null
     };
+  }
+
+  async updateTimeOff(id: number, dto: MasterTimeOffDto) {
+    console.log('📥 [TimeOff] Update request:', { id, dto });
+
+    const timeOff = await this.prisma.masterTimeOff.findUnique({
+      where: { id }
+    });
+
+    if (!timeOff) {
+      throw new NotFoundException(`Период недоступности с ID ${id} не найден`);
+    }
+
+    // Если переданы обе даты — валидируем
+    let startDate: Date = timeOff.startDate;
+    let endDate: Date = timeOff.endDate;
+
+    if (dto.startDate) {
+      startDate = new Date(dto.startDate);
+      if (isNaN(startDate.getTime())) {
+        throw new BadRequestException('Некорректная дата начала');
+      }
+    }
+
+    if (dto.endDate) {
+      endDate = new Date(dto.endDate);
+      if (isNaN(endDate.getTime())) {
+        throw new BadRequestException('Некорректная дата окончания');
+      }
+    }
+
+    if (endDate <= startDate) {
+      throw new BadRequestException(
+        'Дата окончания должна быть позже даты начала'
+      );
+    }
+
+    // Проверяем на пересечения с другими периодами (исключая текущий)
+    const overlap = await this.prisma.masterTimeOff.findFirst({
+      where: {
+        masterId: timeOff.masterId,
+        id: { not: id },
+        OR: [
+          { startDate: { lte: startDate }, endDate: { gte: startDate } },
+          { startDate: { lte: endDate }, endDate: { gte: endDate } },
+          { startDate: { gte: startDate }, endDate: { lte: endDate } }
+        ]
+      }
+    });
+
+    if (overlap) {
+      throw new BadRequestException(
+        'Период пересекается с другим существующим периодом'
+      );
+    }
+
+    try {
+      const result = await this.prisma.masterTimeOff.update({
+        where: { id },
+        data: {
+          startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+          endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+          type: dto.type ?? undefined,
+          comment: dto.comment
+        },
+        include: { master: true }
+      });
+
+      console.log('✅ [TimeOff] Updated ID:', result.id);
+      return result;
+    } catch (error) {
+      console.error('❌ [TimeOff] Update error:', error);
+      throw new BadRequestException('Failed to update time-off period');
+    }
   }
 
   // === Приватные методы ===
@@ -197,14 +290,27 @@ export class MasterScheduleService {
   }
 
   private validateTimeOffDates(start: string, end: string) {
-    const s = new Date(start);
-    const e = new Date(end);
-    if (isNaN(s.getTime()) || isNaN(e.getTime())) {
-      throw new BadRequestException('Некорректные даты');
-    }
-    if (e <= s) {
+    try {
+      const s = new Date(start);
+      const e = new Date(end);
+      
+      console.log('Validating dates:', { start, end, s, e });
+      
+      if (isNaN(s.getTime()) || isNaN(e.getTime())) {
+        throw new BadRequestException(
+          `Некорректные даты: start=${start}, end=${end}`
+        );
+      }
+      
+      if (e <= s) {
+        throw new BadRequestException(
+          'Дата окончания должна быть позже даты начала'
+        );
+      }
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
       throw new BadRequestException(
-        'Дата окончания должна быть позже даты начала'
+        `Ошибка валидации дат: ${error.message}`
       );
     }
   }

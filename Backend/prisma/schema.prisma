@@ -77,20 +77,16 @@ model MasterSchedule {
 }
 
 model MasterTimeOff {
-  id       Int    @id @default(autoincrement())
-  master   Master @relation(fields: [masterId], references: [id], onDelete: Cascade)
-  masterId Int    @map("master_id")
+  id        Int      @id @default(autoincrement())
+  master    Master   @relation(fields: [masterId], references: [id])
+  masterId  Int
+  startDate DateTime
+  endDate   DateTime
+  type      String 
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  startDate DateTime @map("start_date") // 2026-04-01 00:00:00
-  endDate   DateTime @map("end_date") // 2026-04-14 23:59:59
-
-  type    TimeOffType @default(vacation)
-  comment String? // Необязательно: "Еду на море", "Больничный лист №123"
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([masterId, startDate, endDate])
-  @@index([masterId, type])
   @@map("master_time_off")
 }
 

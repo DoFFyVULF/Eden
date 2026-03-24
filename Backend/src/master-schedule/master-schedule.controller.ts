@@ -66,6 +66,15 @@ export class MasterScheduleController {
   }
 
   @HttpCode(200)
+  @Patch('time-off/:id')
+  updateTimeOff(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: MasterTimeOffDto
+  ) {
+    return this.masterScheduleService.updateTimeOff(id, dto);
+  }
+
+  @HttpCode(200)
   @Get(':masterId/time-off')
   getTimeOff(@Param('masterId', ParseIntPipe) masterId: number) {
     return this.masterScheduleService.getTimeOffForMaster(masterId);

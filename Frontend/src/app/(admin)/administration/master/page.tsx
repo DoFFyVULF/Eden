@@ -23,14 +23,16 @@ import {
   ChevronUp,
   Activity,
   SlidersHorizontal,
-  Crown,
-  Flame,
-  TrendingUp,
+  Eye,
+  Loader2,
+  CheckCircle,
+  CalendarDays,
+  Bell,
 } from "lucide-react";
 import EmployeesCard from "@/app/(admin)/administration/master/CreateMasterModal";
 import { masterService } from "@/services/master/master.service";
 import { masterScheduleService } from "@/services/schedule/schedule.service";
-import { MasterStatusInfo } from "@/types/schedule.types";
+import { MasterStatusInfo, IMasterTimeOff } from "@/types/schedule.types";
 import { IMaster } from "@/types/masters.type";
 import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber";
 
@@ -103,65 +105,6 @@ const specGrad = (s: string) =>
 const getInitials = (m: IMaster) =>
   `${(m.name[0] ?? "").toUpperCase()}${(m.surname[0] ?? "").toUpperCase()}`;
 
-// ── VacationBadge ─────────────────────────────────────────────────────────────
-function VacationBadge({
-  period,
-  isDark,
-}: {
-  period: NonNullable<MasterStatusInfo["currentPeriod"]>;
-  isDark: boolean;
-}) {
-  const [tip, setTip] = useState(false);
-  const cfg = VTYPE[period.type as VacationType] ?? VTYPE.other;
-  const end = new Date(period.endDate).toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "short",
-  });
-
-  return (
-    <div className="relative inline-block">
-      <motion.button
-        whileHover={{ scale: 1.03 }}
-        onMouseEnter={() => setTip(true)}
-        onMouseLeave={() => setTip(false)}
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border cursor-help ${isDark ? cfg.chipDark : cfg.chipLight}`}
-      >
-        <span>{cfg.emoji}</span>
-        <span>{cfg.label}</span>
-        <span className="opacity-50">·</span>
-        <span>до {end}</span>
-      </motion.button>
-      <AnimatePresence>
-        {tip && (
-          <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.95 }}
-            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 w-60 p-3.5 bg-gray-900/95 backdrop-blur-xl text-white text-xs rounded-2xl shadow-2xl border border-white/10 z-50 pointer-events-none"
-          >
-            <div className="font-bold mb-2 text-sm">{cfg.label}</div>
-            <div className="space-y-1 text-white/70">
-              <div>
-                📅 Начало:{" "}
-                {new Date(period.startDate).toLocaleDateString("ru-RU")}
-              </div>
-              <div>
-                🔚 Конец: {new Date(period.endDate).toLocaleDateString("ru-RU")}
-              </div>
-              {period.comment && (
-                <div className="pt-1.5 mt-1.5 border-t border-white/10">
-                  💬 {period.comment}
-                </div>
-              )}
-            </div>
-            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px w-2.5 h-2.5 bg-gray-900/95 rotate-45 border-r border-b border-white/10" />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 // ── VacationModal ─────────────────────────────────────────────────────────────
 function VacationModal({
   isOpen,
@@ -205,10 +148,20 @@ function VacationModal({
       setErr("Укажите даты начала и окончания");
       return;
     }
-    if (new Date(form.endDate) < new Date(form.startDate)) {
+
+    const startDateTime = new Date(form.startDate);
+    const endDateTime = new Date(form.endDate);
+
+    if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
+      setErr("Некорректный формат даты");
+      return;
+    }
+
+    if (endDateTime <= startDateTime) {
       setErr("Дата окончания не может быть раньше начала");
       return;
     }
+
     setSubmitting(true);
     setErr(null);
     try {
@@ -252,7 +205,6 @@ function VacationModal({
             onClick={(e) => e.stopPropagation()}
             className={`w-full max-w-md rounded-3xl overflow-hidden ${modalCls}`}
           >
-            {/* Header */}
             <div
               className={`relative px-6 py-5 bg-gradient-to-r ${isDark ? cfg.gradDark : cfg.gradLight} overflow-hidden`}
             >
@@ -284,7 +236,6 @@ function VacationModal({
             </div>
 
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
-              {/* Type selector */}
               <div>
                 <label
                   className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${isDark ? "text-white/35" : "text-gray-400"}`}
@@ -318,7 +269,6 @@ function VacationModal({
                 </div>
               </div>
 
-              {/* Dates */}
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: "Начало", key: "startDate" },
@@ -343,7 +293,6 @@ function VacationModal({
                 ))}
               </div>
 
-              {/* Comment */}
               <div>
                 <label
                   className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? "text-white/35" : "text-gray-400"}`}
@@ -427,26 +376,824 @@ function VacationModal({
   );
 }
 
-// ── Master card ────────────────────────────────────────────────────────────────
+// ── UpcomingTimeOffBadge ─────────────────────────────────────────────────────
+function UpcomingTimeOffBadge({
+  period,
+  isDark,
+  onClick,
+}: {
+  period: IMasterTimeOff;
+  isDark: boolean;
+  onClick?: () => void;
+}) {
+  const cfg = VTYPE[period.type as VacationType] ?? VTYPE.other;
+  const start = new Date(period.startDate).toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "short",
+  });
+
+  return (
+    <motion.button
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border cursor-pointer ${
+        isDark
+          ? "bg-purple-500/15 border-purple-400/20 text-purple-300"
+          : "bg-purple-50 border-purple-200 text-purple-700"
+      }`}
+    >
+      <Bell size={10} />
+      <span>{cfg.emoji}</span>
+      <span>{cfg.label}</span>
+      <span className="opacity-50">·</span>
+      <span>с {start}</span>
+      <Eye size={10} className="opacity-60 ml-0.5" />
+    </motion.button>
+  );
+}
+
+// ── CurrentVacationBadge ─────────────────────────────────────────────────────
+function CurrentVacationBadge({
+  period,
+  isDark,
+  onClick,
+}: {
+  period: NonNullable<MasterStatusInfo["currentPeriod"]>;
+  isDark: boolean;
+  onClick?: () => void;
+}) {
+  const cfg = VTYPE[period.type as VacationType] ?? VTYPE.other;
+  const end = new Date(period.endDate).toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "short",
+  });
+
+  return (
+    <motion.button
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border cursor-pointer ${isDark ? cfg.chipDark : cfg.chipLight}`}
+    >
+      <span>{cfg.emoji}</span>
+      <span>{cfg.label}</span>
+      <span className="opacity-50">·</span>
+      <span>до {end}</span>
+      <Eye size={10} className="opacity-60 ml-0.5" />
+    </motion.button>
+  );
+}
+
+// ── TimeOffDetailsModal (расширен для работы с будущими периодами) ───────────
+function TimeOffDetailsModal({
+  isOpen,
+  onClose,
+  master,
+  period,
+  onDeleted,
+  onUpdated,
+  isDark,
+  isUpcoming = false,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  master: IMaster | null;
+  period:
+    | (NonNullable<MasterStatusInfo["currentPeriod"]> | IMasterTimeOff)
+    | null;
+  onDeleted: () => void;
+  onUpdated: () => void;
+  isDark: boolean;
+  isUpcoming?: boolean;
+}) {
+  const [mode, setMode] = useState<"view" | "edit">("view");
+  const [deleting, setDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const [editForm, setEditForm] = useState<{
+    startDate: string;
+    endDate: string;
+    type: VacationType;
+    comment: string;
+  }>({ startDate: "", endDate: "", type: "vacation", comment: "" });
+
+  useEffect(() => {
+    if (isOpen && period) {
+      const toLocalInput = (iso: string) => {
+        const d = new Date(iso);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      };
+      setEditForm({
+        startDate: toLocalInput(period.startDate),
+        endDate: toLocalInput(period.endDate),
+        type: (period.type as VacationType) ?? "vacation",
+        comment: period.comment ?? "",
+      });
+      setMode("view");
+      setErr(null);
+      setConfirmDelete(false);
+    }
+  }, [isOpen, period]);
+
+  const handleDelete = async () => {
+    if (!period) return;
+    setDeleting(true);
+    setErr(null);
+    try {
+      await masterScheduleService.deleteTimeOff(period.id);
+      onDeleted();
+      onClose();
+    } catch (e: any) {
+      setErr(e.message || "Ошибка при удалении");
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!period) return;
+    if (!editForm.startDate || !editForm.endDate) {
+      setErr("Укажите даты начала и окончания");
+      return;
+    }
+
+    const startDateTime = new Date(editForm.startDate);
+    const endDateTime = new Date(editForm.endDate);
+
+    if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
+      setErr("Некорректный формат даты");
+      return;
+    }
+
+    if (endDateTime <= startDateTime) {
+      setErr("Дата окончания должна быть позже начала");
+      return;
+    }
+
+    setSaving(true);
+    setErr(null);
+    try {
+      await masterScheduleService.updateTimeOff(period.id, {
+        startDate: startDateTime.toISOString(),
+        endDate: endDateTime.toISOString(),
+        type: editForm.type,
+        comment: editForm.comment || undefined,
+      });
+      onUpdated();
+      onClose();
+    } catch (e: any) {
+      setErr(e.message || "Ошибка при сохранении");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cfg = period
+    ? (VTYPE[period.type as VacationType] ?? VTYPE.other)
+    : VTYPE.vacation;
+
+  const modalCls = isDark
+    ? "bg-slate-900/90 backdrop-blur-3xl border border-white/[0.1] shadow-[0_32px_80px_rgba(0,0,0,0.7)]"
+    : "bg-white/95 backdrop-blur-xl border border-gray-200/70 shadow-2xl";
+
+  const inputCls = isDark
+    ? "bg-white/[0.07] border-white/[0.1] text-white/90 focus:border-indigo-400/50 placeholder-white/25"
+    : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-400";
+
+  if (!period || !master) return null;
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={(e) => e.target === e.currentTarget && onClose()}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{
+            background: isDark ? "rgba(0,0,0,0.75)" : "rgba(15,23,42,0.4)",
+            backdropFilter: "blur(12px)",
+          }}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 20 }}
+            transition={{ type: "spring", damping: 28, stiffness: 340 }}
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-md rounded-3xl overflow-hidden ${modalCls}`}
+          >
+            {/* Header */}
+            <div
+              className={`relative px-6 py-5 bg-gradient-to-r ${isDark ? cfg.gradDark : cfg.gradLight} overflow-hidden`}
+            >
+              <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full" />
+              <div className="relative flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl">
+                    {cfg.emoji}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-white">
+                      {mode === "edit"
+                        ? "Редактирование периода"
+                        : isUpcoming
+                          ? "Будущий период недоступности"
+                          : "Текущий период недоступности"}
+                    </h3>
+                    <p className="text-white/70 text-xs mt-0.5">
+                      {master.surname} {master.name}
+                    </p>
+                  </div>
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.1, rotate: 90 }}
+                  whileTap={{ scale: 0.9 }}
+                  transition={{ duration: 0.18 }}
+                  onClick={onClose}
+                  className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center text-white hover:bg-white/25 transition-colors"
+                >
+                  <X size={16} />
+                </motion.button>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {mode === "view" ? (
+                // VIEW MODE
+                <>
+                  <div
+                    className={`flex items-center gap-3 p-4 rounded-2xl border ${
+                      isDark
+                        ? "bg-white/[0.04] border-white/[0.07]"
+                        : "bg-gray-50 border-gray-100"
+                    }`}
+                  >
+                    <div className="text-3xl">{cfg.emoji}</div>
+                    <div>
+                      <p
+                        className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-white/30" : "text-gray-400"}`}
+                      >
+                        Тип
+                      </p>
+                      <p
+                        className={`font-bold text-base ${isDark ? "text-white/90" : "text-gray-900"}`}
+                      >
+                        {cfg.label}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Начало", value: period.startDate },
+                      { label: "Окончание", value: period.endDate },
+                    ].map((f) => (
+                      <div
+                        key={f.label}
+                        className={`p-3.5 rounded-2xl border ${
+                          isDark
+                            ? "bg-white/[0.04] border-white/[0.07]"
+                            : "bg-gray-50 border-gray-100"
+                        }`}
+                      >
+                        <p
+                          className={`text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? "text-white/30" : "text-gray-400"}`}
+                        >
+                          {f.label}
+                        </p>
+                        <p
+                          className={`text-sm font-semibold ${isDark ? "text-white/80" : "text-gray-800"}`}
+                        >
+                          {new Date(f.value).toLocaleDateString("ru-RU", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })}
+                        </p>
+                        <p
+                          className={`text-xs mt-0.5 ${isDark ? "text-white/30" : "text-gray-400"}`}
+                        >
+                          {new Date(f.value).toLocaleTimeString("ru-RU", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {period.comment && (
+                    <div
+                      className={`p-3.5 rounded-2xl border ${
+                        isDark
+                          ? "bg-white/[0.04] border-white/[0.07]"
+                          : "bg-gray-50 border-gray-100"
+                      }`}
+                    >
+                      <p
+                        className={`text-xs font-bold uppercase tracking-wider mb-1.5 ${isDark ? "text-white/30" : "text-gray-400"}`}
+                      >
+                        Комментарий
+                      </p>
+                      <p
+                        className={`text-sm ${isDark ? "text-white/70" : "text-gray-600"}`}
+                      >
+                        {period.comment}
+                      </p>
+                    </div>
+                  )}
+
+                  <AnimatePresence>
+                    {confirmDelete && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className={`p-4 rounded-2xl border ${
+                          isDark
+                            ? "bg-rose-500/10 border-rose-400/20"
+                            : "bg-rose-50 border-rose-200"
+                        }`}
+                      >
+                        <p
+                          className={`text-sm font-semibold mb-3 ${isDark ? "text-rose-400" : "text-rose-600"}`}
+                        >
+                          Вы уверены? Период будет удалён и мастер снова станет
+                          доступен.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setConfirmDelete(false)}
+                            className={`flex-1 h-9 rounded-xl text-sm font-semibold border transition-all ${
+                              isDark
+                                ? "bg-white/[0.06] border-white/[0.1] text-white/60"
+                                : "bg-white border-gray-200 text-gray-600"
+                            }`}
+                          >
+                            Отмена
+                          </button>
+                          <button
+                            onClick={handleDelete}
+                            disabled={deleting}
+                            className="flex-1 h-9 rounded-xl text-sm font-bold text-white bg-rose-500 hover:bg-rose-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                          >
+                            {deleting ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin" />{" "}
+                                Удаление...
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 size={14} /> Удалить
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {!confirmDelete && (
+                    <div className="flex gap-2.5">
+                      <motion.button
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => setConfirmDelete(true)}
+                        className={`flex items-center justify-center gap-2 h-11 rounded-2xl text-sm font-semibold border transition-all px-4 ${
+                          isDark
+                            ? "bg-rose-500/10 border-rose-400/20 text-rose-400 hover:bg-rose-500/15"
+                            : "bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100"
+                        }`}
+                      >
+                        <Trash2 size={14} />
+                        Удалить
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => setMode("edit")}
+                        className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-2xl text-sm font-bold text-white shadow-lg transition-all bg-gradient-to-r ${
+                          isDark ? cfg.gradDark : cfg.gradLight
+                        }`}
+                      >
+                        <Edit size={14} />
+                        Редактировать
+                      </motion.button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                // EDIT MODE
+                <>
+                  <div>
+                    <label
+                      className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${isDark ? "text-white/35" : "text-gray-400"}`}
+                    >
+                      Тип периода
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(Object.keys(VTYPE) as VacationType[]).map((t) => {
+                        const tc = VTYPE[t];
+                        const active = editForm.type === t;
+                        return (
+                          <motion.button
+                            key={t}
+                            type="button"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.97 }}
+                            onClick={() =>
+                              setEditForm((p) => ({ ...p, type: t }))
+                            }
+                            className={`p-3 rounded-2xl border-2 text-left transition-all text-sm font-semibold ${
+                              active
+                                ? `border-transparent bg-gradient-to-r ${isDark ? tc.gradDark : tc.gradLight} text-white shadow-lg`
+                                : isDark
+                                  ? "border-white/[0.08] bg-white/[0.04] text-white/60 hover:bg-white/[0.07]"
+                                  : "border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100"
+                            }`}
+                          >
+                            <span className="mr-2">{tc.emoji}</span>
+                            {tc.label}
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Начало", key: "startDate" },
+                      { label: "Окончание", key: "endDate" },
+                    ].map((f) => (
+                      <div key={f.key}>
+                        <label
+                          className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? "text-white/35" : "text-gray-400"}`}
+                        >
+                          {f.label}
+                        </label>
+                        <input
+                          type="datetime-local"
+                          required
+                          value={editForm[f.key as "startDate" | "endDate"]}
+                          onChange={(e) =>
+                            setEditForm((p) => ({
+                              ...p,
+                              [f.key]: e.target.value,
+                            }))
+                          }
+                          className={`w-full h-11 px-3 rounded-xl text-sm border outline-none transition-all focus:ring-2 focus:ring-indigo-400/20 ${inputCls}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div>
+                    <label
+                      className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? "text-white/35" : "text-gray-400"}`}
+                    >
+                      Комментарий{" "}
+                      <span
+                        className={`normal-case font-normal ${isDark ? "text-white/20" : "text-gray-300"}`}
+                      >
+                        (необязательно)
+                      </span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={editForm.comment}
+                      onChange={(e) =>
+                        setEditForm((p) => ({ ...p, comment: e.target.value }))
+                      }
+                      placeholder="Ежегодный отпуск, больничный лист..."
+                      className={`w-full px-3 py-2.5 rounded-xl text-sm border outline-none resize-none transition-all focus:ring-2 focus:ring-indigo-400/20 ${inputCls}`}
+                    />
+                  </div>
+
+                  <AnimatePresence>
+                    {err && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className={`flex items-center gap-2.5 p-3 rounded-xl border text-sm ${
+                          isDark
+                            ? "bg-rose-500/10 border-rose-400/20 text-rose-400"
+                            : "bg-rose-50 border-rose-200 text-rose-600"
+                        }`}
+                      >
+                        <AlertCircle size={14} />
+                        {err}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div className="flex gap-3">
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => {
+                        setMode("view");
+                        setErr(null);
+                      }}
+                      className={`flex-1 h-11 rounded-2xl text-sm font-semibold border transition-all ${
+                        isDark
+                          ? "bg-white/[0.06] border-white/[0.1] text-white/60 hover:bg-white/[0.09]"
+                          : "bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      Назад
+                    </motion.button>
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={handleSave}
+                      disabled={saving}
+                      className={`flex-1 h-11 rounded-2xl text-sm font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 bg-gradient-to-r ${
+                        isDark ? cfg.gradDark : cfg.gradLight
+                      }`}
+                    >
+                      {saving ? (
+                        <>
+                          <Loader2 size={15} className="animate-spin" />{" "}
+                          Сохранение...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle size={15} /> Сохранить
+                        </>
+                      )}
+                    </motion.button>
+                  </div>
+                </>
+              )}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ── UpcomingTimeOffsModal (обновленная версия с автозакрытием) ──
+function UpcomingTimeOffsModal({
+  isOpen,
+  onClose,
+  master,
+  timeOffs,
+  onPeriodClick,
+  onDeleted,
+  onUpdated,
+  isDark,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  master: IMaster;
+  timeOffs: IMasterTimeOff[];
+  onPeriodClick: (period: IMasterTimeOff) => void;
+  onDeleted: () => void;
+  onUpdated: () => void;
+  isDark: boolean;
+}) {
+  const [selectedPeriod, setSelectedPeriod] = useState<IMasterTimeOff | null>(
+    null,
+  );
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [localTimeOffs, setLocalTimeOffs] =
+    useState<IMasterTimeOff[]>(timeOffs);
+
+  // Обновляем локальный список при изменении пропсов
+  useEffect(() => {
+    setLocalTimeOffs(timeOffs);
+  }, [timeOffs]);
+
+  const handlePeriodClick = (period: IMasterTimeOff) => {
+    setSelectedPeriod(period);
+    setShowDetailsModal(true);
+  };
+
+  const handlePeriodDeleted = async () => {
+    await onDeleted();
+    // Закрываем модал деталей
+    setShowDetailsModal(false);
+    setSelectedPeriod(null);
+
+    // Если после удаления не осталось периодов, закрываем основной модал
+    if (localTimeOffs.length <= 1) {
+      onClose();
+    }
+  };
+
+  const handlePeriodUpdated = async () => {
+    await onUpdated();
+    // Закрываем модал деталей
+    setShowDetailsModal(false);
+    setSelectedPeriod(null);
+  };
+
+  const modalCls = isDark
+    ? "bg-slate-900/90 backdrop-blur-3xl border border-white/[0.1] shadow-[0_32px_80px_rgba(0,0,0,0.7)]"
+    : "bg-white/95 backdrop-blur-xl border border-gray-200/70 shadow-2xl";
+
+  return (
+    <>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={(e) => e.target === e.currentTarget && onClose()}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{
+              background: isDark ? "rgba(0,0,0,0.75)" : "rgba(15,23,42,0.4)",
+              backdropFilter: "blur(12px)",
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 20 }}
+              transition={{ type: "spring", damping: 28, stiffness: 340 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-md rounded-3xl overflow-hidden ${modalCls}`}
+            >
+              <div
+                className={`relative px-6 py-5 bg-gradient-to-r from-purple-500 to-pink-500 overflow-hidden`}
+              >
+                <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full" />
+                <div className="relative flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl">
+                      <CalendarDays size={20} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-white">
+                        Будущие периоды
+                      </h3>
+                      <p className="text-white/70 text-xs mt-0.5">
+                        {master.surname} {master.name}
+                      </p>
+                    </div>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                    transition={{ duration: 0.18 }}
+                    onClick={onClose}
+                    className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center text-white hover:bg-white/25 transition-colors"
+                  >
+                    <X size={16} />
+                  </motion.button>
+                </div>
+              </div>
+
+              <div className="p-5">
+                {localTimeOffs.length === 0 ? (
+                  <div className="text-center py-8">
+                    <CalendarDays
+                      size={48}
+                      className={`mx-auto mb-3 ${isDark ? "text-white/20" : "text-gray-300"}`}
+                    />
+                    <p
+                      className={`text-sm ${isDark ? "text-white/40" : "text-gray-500"}`}
+                    >
+                      Нет запланированных периодов недоступности
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {localTimeOffs.map((period) => {
+                      const cfg =
+                        VTYPE[period.type as VacationType] ?? VTYPE.other;
+                      const start = new Date(
+                        period.startDate,
+                      ).toLocaleDateString("ru-RU", {
+                        day: "numeric",
+                        month: "long",
+                      });
+                      const end = new Date(period.endDate).toLocaleDateString(
+                        "ru-RU",
+                        {
+                          day: "numeric",
+                          month: "long",
+                        },
+                      );
+
+                      return (
+                        <motion.button
+                          key={period.id}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => handlePeriodClick(period)}
+                          className={`w-full p-4 rounded-2xl border text-left transition-all ${
+                            isDark
+                              ? "bg-white/[0.04] border-white/[0.07] hover:bg-white/[0.08]"
+                              : "bg-gray-50 border-gray-100 hover:bg-gray-100"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-2xl">{cfg.emoji}</span>
+                            <span
+                              className={`font-bold ${isDark ? "text-white/90" : "text-gray-900"}`}
+                            >
+                              {cfg.label}
+                            </span>
+                          </div>
+                          <div
+                            className={`text-xs ${isDark ? "text-white/50" : "text-gray-500"}`}
+                          >
+                            {start} — {end}
+                          </div>
+                          {period.comment && (
+                            <div
+                              className={`text-xs mt-2 ${isDark ? "text-white/30" : "text-gray-400"}`}
+                            >
+                              {period.comment}
+                            </div>
+                          )}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div
+                className={`px-6 py-3 border-t flex items-center justify-between text-xs ${
+                  isDark
+                    ? "border-white/[0.06] text-white/20"
+                    : "border-gray-100 text-gray-400"
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <Bell size={11} />
+                  {localTimeOffs.length} запланированных периодов
+                </span>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Детальный модал для выбранного периода */}
+      {selectedPeriod && (
+        <TimeOffDetailsModal
+          isOpen={showDetailsModal}
+          onClose={() => {
+            setShowDetailsModal(false);
+            setSelectedPeriod(null);
+          }}
+          master={master}
+          period={selectedPeriod}
+          onDeleted={() => {
+            handlePeriodDeleted();
+          }}
+          onUpdated={() => {
+            handlePeriodUpdated();
+          }}
+          isDark={isDark}
+          isUpcoming={true}
+        />
+      )}
+    </>
+  );
+}
+
+// ── Master card (обновлен с поддержкой будущих периодов) ─────────────────────
 function MasterCard({
   master,
   status,
+  upcomingTimeOffs,
   isDark,
   onEdit,
   onDelete,
   onToggle,
   onVacation,
+  onViewTimeOff,
+  onViewUpcoming,
 }: {
   master: IMaster;
   status?: MasterStatusInfo;
+  upcomingTimeOffs: IMasterTimeOff[];
   isDark: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onToggle: () => void;
   onVacation: () => void;
+  onViewTimeOff: () => void;
+  onViewUpcoming: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const isTimeOff = status?.isOnTimeOff && status.currentPeriod;
+  const isTimeOff = !!(status?.isOnTimeOff && status.currentPeriod);
+  const hasUpcoming = upcomingTimeOffs.length > 0;
   const grad = specGrad(master.specialization);
 
   const cardCls = isDark
@@ -458,14 +1205,35 @@ function MasterCard({
     : "bg-white border border-gray-200/70 shadow-2xl";
 
   const MENU_ITEMS = [
-    {
-      label: "Отправить в отпуск",
-      sub: "Добавить период недоступности",
-      icon: <Calendar size={14} />,
-      color: isDark ? "text-purple-400" : "text-purple-600",
-      hover: isDark ? "hover:bg-purple-500/10" : "hover:bg-purple-50",
-      onClick: onVacation,
-    },
+    ...(hasUpcoming
+      ? [
+          {
+            label: "Будущие периоды",
+            sub: `${upcomingTimeOffs.length} запланирован${upcomingTimeOffs.length === 1 ? "а" : "о"}`,
+            icon: <CalendarDays size={14} />,
+            color: isDark ? "text-purple-400" : "text-purple-600",
+            hover: isDark ? "hover:bg-purple-500/10" : "hover:bg-purple-50",
+            onClick: onViewUpcoming,
+          },
+        ]
+      : []),
+    isTimeOff
+      ? {
+          label: "Текущий период",
+          sub: "Просмотр текущей недоступности",
+          icon: <Eye size={14} />,
+          color: isDark ? "text-blue-400" : "text-blue-600",
+          hover: isDark ? "hover:bg-blue-500/10" : "hover:bg-blue-50",
+          onClick: onViewTimeOff,
+        }
+      : {
+          label: "Отправить в отпуск",
+          sub: "Добавить период недоступности",
+          icon: <Calendar size={14} />,
+          color: isDark ? "text-purple-400" : "text-purple-600",
+          hover: isDark ? "hover:bg-purple-500/10" : "hover:bg-purple-50",
+          onClick: onVacation,
+        },
     {
       label: master.isActive ? "Деактивировать" : "Активировать",
       sub: master.isActive ? "Сделать недоступным" : "Вернуть в работу",
@@ -502,15 +1270,12 @@ function MasterCard({
       transition={{ duration: 0.25 }}
       className={`relative rounded-2xl p-5 transition-all duration-300 ${cardCls}`}
     >
-      {/* Gradient accent top line */}
       <div
         className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r ${grad} opacity-50`}
       />
 
-      {/* Top row */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-start gap-3">
-          {/* Avatar */}
           <div className="relative flex-shrink-0">
             <div
               className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-lg shadow-lg overflow-hidden`}
@@ -525,7 +1290,6 @@ function MasterCard({
                 getInitials(master)
               )}
             </div>
-            {/* Status dot */}
             <div
               className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 ${
                 isTimeOff
@@ -554,7 +1318,6 @@ function MasterCard({
                 {master.middlename}
               </p>
             )}
-            {/* Specialization pill */}
             <span
               className={`inline-flex items-center gap-1 mt-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gradient-to-r ${grad} text-white shadow-sm`}
             >
@@ -564,7 +1327,6 @@ function MasterCard({
           </div>
         </div>
 
-        {/* Context menu */}
         <div className="relative flex-shrink-0">
           <motion.button
             whileHover={{ scale: 1.1 }}
@@ -629,7 +1391,6 @@ function MasterCard({
         </div>
       </div>
 
-      {/* Phone */}
       {master.phone && (
         <div
           className={`flex items-center gap-2 text-xs mb-4 ${isDark ? "text-white/40" : "text-gray-400"}`}
@@ -639,30 +1400,43 @@ function MasterCard({
         </div>
       )}
 
-      {/* Footer */}
       <div
         className={`flex items-center justify-between pt-4 border-t ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}
       >
-        {isTimeOff && status?.currentPeriod ? (
-          <VacationBadge period={status.currentPeriod} isDark={isDark} />
-        ) : (
-          <span
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
-              master.isActive
-                ? isDark
-                  ? "bg-emerald-500/10 border-emerald-400/15 text-emerald-400"
-                  : "bg-emerald-50 border-emerald-200 text-emerald-700"
-                : isDark
-                  ? "bg-rose-500/10 border-rose-400/15 text-rose-400"
-                  : "bg-rose-50 border-rose-200 text-rose-600"
-            }`}
-          >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${master.isActive ? "bg-emerald-400" : "bg-rose-400"}`}
+        <div className="flex gap-2">
+          {isTimeOff && status?.currentPeriod ? (
+            <CurrentVacationBadge
+              period={status.currentPeriod}
+              isDark={isDark}
+              onClick={onViewTimeOff}
             />
-            {master.isActive ? "Активен" : "Неактивен"}
-          </span>
-        )}
+          ) : (
+            <span
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                master.isActive
+                  ? isDark
+                    ? "bg-emerald-500/10 border-emerald-400/15 text-emerald-400"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                  : isDark
+                    ? "bg-rose-500/10 border-rose-400/15 text-rose-400"
+                    : "bg-rose-50 border-rose-200 text-rose-600"
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${master.isActive ? "bg-emerald-400" : "bg-rose-400"}`}
+              />
+              {master.isActive ? "Активен" : "Неактивен"}
+            </span>
+          )}
+
+          {hasUpcoming && !isTimeOff && (
+            <UpcomingTimeOffBadge
+              period={upcomingTimeOffs[0]}
+              isDark={isDark}
+              onClick={onViewUpcoming}
+            />
+          )}
+        </div>
 
         <div
           className={`flex items-center gap-1 text-xs font-bold ${isDark ? "text-amber-400" : "text-amber-500"}`}
@@ -686,6 +1460,9 @@ export default function Employees() {
   const [statuses, setStatuses] = useState<Record<number, MasterStatusInfo>>(
     {},
   );
+  const [upcomingTimeOffs, setUpcomingTimeOffs] = useState<
+    Record<number, IMasterTimeOff[]>
+  >({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isDark, setIsDark] = useState(false);
@@ -693,6 +1470,20 @@ export default function Employees() {
   const [specFilter, setSpecFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
+
+  const [isTimeOffDetailsOpen, setIsTimeOffDetailsOpen] = useState(false);
+  const [timeOffDetailsMaster, setTimeOffDetailsMaster] =
+    useState<IMaster | null>(null);
+  const [timeOffDetailsPeriod, setTimeOffDetailsPeriod] = useState<NonNullable<
+    MasterStatusInfo["currentPeriod"]
+  > | null>(null);
+
+  const [isUpcomingModalOpen, setIsUpcomingModalOpen] = useState(false);
+  const [upcomingModalMaster, setUpcomingModalMaster] =
+    useState<IMaster | null>(null);
+  const [upcomingModalPeriods, setUpcomingModalPeriods] = useState<
+    IMasterTimeOff[]
+  >([]);
 
   useEffect(() => {
     const check = () =>
@@ -712,17 +1503,34 @@ export default function Employees() {
       const data = await masterService.getAll();
       setMasters(data);
       const st: Record<number, MasterStatusInfo> = {};
+      const upcoming: Record<number, IMasterTimeOff[]> = {};
+
       await Promise.all(
         data.map(async (m) => {
-          if (m.id)
+          if (m.id) {
             try {
+              // Получаем текущий статус
               st[m.id] = await masterScheduleService.getMasterStatus(m.id);
+
+              // Получаем все периоды недоступности для мастера
+              const allTimeOffs =
+                await masterScheduleService.getTimeOffByMaster(m.id);
+              const now = new Date();
+
+              // Фильтруем будущие периоды (дата начала > текущей даты)
+              upcoming[m.id] = allTimeOffs.filter((t) => {
+                const startDate = new Date(t.startDate);
+                return startDate > now;
+              });
             } catch {
               st[m.id] = { isOnTimeOff: false, currentPeriod: null };
+              upcoming[m.id] = [];
             }
+          }
         }),
       );
       setStatuses(st);
+      setUpcomingTimeOffs(upcoming);
     } catch (e) {
       console.error(e);
     } finally {
@@ -765,8 +1573,12 @@ export default function Employees() {
         .length,
       inactive: masters.filter((m) => !m.isActive).length,
       onLeave: Object.values(statuses).filter((s) => s.isOnTimeOff).length,
+      upcoming: Object.values(upcomingTimeOffs).reduce(
+        (sum, arr) => sum + arr.length,
+        0,
+      ),
     }),
-    [masters, statuses],
+    [masters, statuses, upcomingTimeOffs],
   );
 
   const handleCreate = async (data: any) => {
@@ -777,6 +1589,7 @@ export default function Employees() {
     await loadMasters(false);
     setIsCreateOpen(false);
   };
+
   const handleUpdate = async (data: any) => {
     await masterService.update(editMaster!.id!, {
       ...data,
@@ -786,24 +1599,67 @@ export default function Employees() {
     setIsEditOpen(false);
     setEditMaster(null);
   };
+
   const handleVacation = async (d: VacationFormData) => {
+    const startDate = new Date(d.startDate);
+    const endDate = new Date(d.endDate);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new Error("Invalid date format");
+    }
+
     await masterScheduleService.createTimeOff({
       masterId: d.masterId,
-      startDate: new Date(d.startDate).toISOString(),
-      endDate: new Date(d.endDate).toISOString(),
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
       type: d.type,
       comment: d.comment || undefined,
     });
     await loadMasters(false);
   };
+
   const handleDelete = async (id: number) => {
     if (!window.confirm("Удалить сотрудника?")) return;
     await masterService.delete(id);
     await loadMasters(false);
   };
+
   const handleToggle = async (m: IMaster) => {
     await masterService.update(m.id!, { isActive: !m.isActive });
     await loadMasters(false);
+  };
+
+  const handleOpenTimeOffDetails = (master: IMaster) => {
+    const status = statuses[master.id!];
+    if (status?.currentPeriod) {
+      setTimeOffDetailsMaster(master);
+      setTimeOffDetailsPeriod(status.currentPeriod);
+      setIsTimeOffDetailsOpen(true);
+    }
+  };
+
+  const handleOpenUpcomingModal = (master: IMaster) => {
+    const upcoming = upcomingTimeOffs[master.id!] || [];
+    if (upcoming.length > 0) {
+      setUpcomingModalMaster(master);
+      setUpcomingModalPeriods(upcoming);
+      setIsUpcomingModalOpen(true);
+    }
+  };
+
+  const refreshAfterTimeOffChange = async () => {
+    await loadMasters(false);
+    // Обновляем данные в открытом модале, если он открыт
+    if (isUpcomingModalOpen && upcomingModalMaster) {
+      const updatedUpcoming = upcomingTimeOffs[upcomingModalMaster.id!] || [];
+      setUpcomingModalPeriods(updatedUpcoming);
+      // Если после обновления не осталось периодов, закрываем модал
+      if (updatedUpcoming.length === 0) {
+        setIsUpcomingModalOpen(false);
+        setUpcomingModalMaster(null);
+        setUpcomingModalPeriods([]);
+      }
+    }
   };
 
   const glassCls = isDark
@@ -842,18 +1698,17 @@ export default function Employees() {
       glow: "shadow-amber-500/20",
     },
     {
-      num: stats.inactive,
-      label: "Неактивных",
-      sub: "недоступны",
-      grad: "from-rose-500 to-pink-600",
-      glow: "shadow-rose-500/20",
+      num: stats.upcoming,
+      label: "Будущих",
+      sub: "запланированных",
+      grad: "from-purple-500 to-pink-600",
+      glow: "shadow-purple-500/20",
     },
   ];
 
   return (
     <div className="min-h-screen p-4 md:p-6 lg:p-8">
       <div className="max-w-9xl mx-auto space-y-6">
-        {/* ── HEADER ── */}
         <motion.div
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -882,6 +1737,7 @@ export default function Employees() {
               >
                 {stats.total} человек · {stats.active} активны
                 {stats.onLeave > 0 && ` · ${stats.onLeave} в отпуске`}
+                {stats.upcoming > 0 && ` · ${stats.upcoming} будущих`}
               </p>
             </div>
 
@@ -920,7 +1776,6 @@ export default function Employees() {
           </div>
         </motion.div>
 
-        {/* ── STAT CARDS ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {STAT_CARDS.map((s, i) => (
             <motion.div
@@ -942,7 +1797,11 @@ export default function Employees() {
                 <div
                   className={`w-9 h-9 rounded-xl bg-gradient-to-br ${s.grad} flex items-center justify-center shadow-md mb-3`}
                 >
-                  <Users size={17} className="text-white" />
+                  {i === 3 ? (
+                    <CalendarDays size={17} className="text-white" />
+                  ) : (
+                    <Users size={17} className="text-white" />
+                  )}
                 </div>
                 <div
                   className={`text-3xl font-black leading-none mb-1 ${isDark ? "text-white" : "text-gray-900"}`}
@@ -964,7 +1823,6 @@ export default function Employees() {
           ))}
         </div>
 
-        {/* ── SEARCH + FILTER ── */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -1117,7 +1975,6 @@ export default function Employees() {
           </AnimatePresence>
         </motion.div>
 
-        {/* ── RESULTS LABEL ── */}
         {!loading && (
           <div
             className={`px-1 text-xs ${isDark ? "text-white/25" : "text-gray-400"}`}
@@ -1128,7 +1985,6 @@ export default function Employees() {
           </div>
         )}
 
-        {/* ── GRID ── */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24">
             <div
@@ -1185,6 +2041,7 @@ export default function Employees() {
                   key={m.id}
                   master={m}
                   status={statuses[m.id!]}
+                  upcomingTimeOffs={upcomingTimeOffs[m.id!] || []}
                   isDark={isDark}
                   onEdit={() => {
                     setEditMaster(m);
@@ -1196,13 +2053,14 @@ export default function Employees() {
                     setVacMaster(m);
                     setIsVacOpen(true);
                   }}
+                  onViewTimeOff={() => handleOpenTimeOffDetails(m)}
+                  onViewUpcoming={() => handleOpenUpcomingModal(m)}
                 />
               ))}
             </AnimatePresence>
           </div>
         )}
 
-        {/* ── FOOTER ── */}
         {!loading && filtered.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -1218,6 +2076,7 @@ export default function Employees() {
               {[
                 { c: "bg-emerald-400", l: "Активные" },
                 { c: "bg-amber-400", l: "В отпуске" },
+                { c: "bg-purple-400", l: "Будущие периоды" },
                 { c: "bg-rose-400", l: "Неактивные" },
               ].map((x) => (
                 <div key={x.l} className="flex items-center gap-2">
@@ -1231,7 +2090,6 @@ export default function Employees() {
         )}
       </div>
 
-      {/* ── MODALS ── */}
       <AnimatePresence>
         {isCreateOpen && (
           <EmployeesCard
@@ -1261,6 +2119,51 @@ export default function Employees() {
             }}
             onSubmit={handleVacation}
             master={vacMaster}
+            isDark={isDark}
+          />
+        )}
+        {isTimeOffDetailsOpen && (
+          <TimeOffDetailsModal
+            isOpen={isTimeOffDetailsOpen}
+            onClose={() => {
+              setIsTimeOffDetailsOpen(false);
+              setTimeOffDetailsMaster(null);
+              setTimeOffDetailsPeriod(null);
+            }}
+            master={timeOffDetailsMaster}
+            period={timeOffDetailsPeriod}
+            onDeleted={async () => {
+              setIsTimeOffDetailsOpen(false);
+              await loadMasters(false);
+            }}
+            onUpdated={async () => {
+              setIsTimeOffDetailsOpen(false);
+              await loadMasters(false);
+            }}
+            isDark={isDark}
+            isUpcoming={false}
+          />
+        )}
+        {isUpcomingModalOpen && upcomingModalMaster && (
+          <UpcomingTimeOffsModal
+            isOpen={isUpcomingModalOpen}
+            onClose={() => {
+              setIsUpcomingModalOpen(false);
+              setUpcomingModalMaster(null);
+              setUpcomingModalPeriods([]);
+            }}
+            master={upcomingModalMaster}
+            timeOffs={upcomingModalPeriods}
+            onPeriodClick={(period) => {
+              // Эта функция будет вызвана при клике на период в модале
+              // Мы уже обрабатываем это внутри компонента
+            }}
+            onDeleted={async () => {
+              await refreshAfterTimeOffChange();
+            }}
+            onUpdated={async () => {
+              await refreshAfterTimeOffChange();
+            }}
             isDark={isDark}
           />
         )}
