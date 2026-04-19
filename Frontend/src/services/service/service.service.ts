@@ -25,6 +25,7 @@ export const serviceService = {
   description?: string;
   duration: number;
   isActive: boolean;
+  img: string;
   categoryId: number;
 }): Promise<IService> {
   // Валидация
@@ -44,6 +45,7 @@ export const serviceService = {
     description: descriptionValue || null, 
     duration: dto.duration,
     isActive: dto.isActive,
+    img: dto.img,
     categoryId: dto.categoryId,
   });
 
@@ -56,6 +58,7 @@ export const serviceService = {
       title: string;
       description: string;
       duration: number;
+      img: string;
       isActive: boolean;
     }
   ): Promise<IService> {

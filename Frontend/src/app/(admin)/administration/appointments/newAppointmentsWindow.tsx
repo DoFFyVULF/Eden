@@ -322,15 +322,15 @@ export default function NewAppointmentsWindow({
       );
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Проверяем, если дата в периоде недоступности
     if (isDateUnavailable) {
       setError("Невозможно создать запись на дату, когда мастер недоступен");
       return;
     }
-    
+
     setIsSubmitting(true);
     setError(null);
     try {
@@ -342,13 +342,18 @@ export default function NewAppointmentsWindow({
       if (!form.service) throw new Error("Выберите услугу");
       if (!form.date) throw new Error("Укажите дату");
       if (!form.time) throw new Error("Укажите время");
-      
+
       const priceItem = servicePrices.find(
         (sp) => sp.service?.id === Number(form.service),
       );
-      if (!priceItem) throw new Error("Не найдена цена услуги");
-      const appointmentTime = `${form.date}T${form.time}:00`;
       
+      if (!priceItem) throw new Error("Не найдена цена услуги");
+
+      // Ensure price is a number
+      const finalPrice = Number(priceItem.price);
+      
+      const appointmentTime = `${form.date}T${form.time}:00`;
+
       if (mode === "edit" && initialData?.id) {
         await appointmentService.update(initialData.id, {
           clientSurname: form.clientSurname.trim(),
@@ -357,7 +362,7 @@ export default function NewAppointmentsWindow({
           masterId: Number(form.master),
           serviceId: Number(form.service),
           appointmentTime,
-          price: priceItem.price,
+          price: finalPrice, // Pass as number
         } as Partial<IUpdateAppointmentDto>);
       } else {
         await appointmentService.create({
@@ -367,10 +372,11 @@ export default function NewAppointmentsWindow({
           masterId: Number(form.master),
           serviceId: Number(form.service),
           appointmentTime,
-          price: priceItem.price.toString(),
+          price: finalPrice, // Pass as number (removed .toString())
           status: AppointmentStatus.Подтвержден,
         } as ICreateAppointmentDto);
       }
+      
       onSuccess?.();
       onClose();
     } catch (err: any) {

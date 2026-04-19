@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import {
   Body,
   Controller,
@@ -14,11 +15,12 @@ import { ServicePriceDto } from './dto/service-price.dto';
 import { UpdateServicePriceDto } from './dto/update-service-price.dto';
 import { Auth } from 'src/auth/decorators/auth.decorator';
 
-@Auth()
+
 @Controller('service-price')
 export class ServicePriceController {
   constructor(private readonly servicePriceService: ServicePriceService) {}
 
+  @Auth()
   @HttpCode(201)
   @Post()
   async create(@Body() dto: ServicePriceDto) {
@@ -43,6 +45,7 @@ export class ServicePriceController {
     return this.servicePriceService.getById(id);
   }
 
+  @Auth()
   @HttpCode(200)
   @Patch(':id')
   async update(
@@ -52,6 +55,13 @@ export class ServicePriceController {
     return this.servicePriceService.update(id, dto);
   }
 
+  @HttpCode(200)
+  @Get('average') // Маршрут будет /service-price/average
+  async getAveragePrice() {
+    return this.servicePriceService.getAveragePrice();
+  }
+
+  @Auth()
   @HttpCode(200)
   @Delete(':id')
   async delete(@Param('id', ParseIntPipe) id: number) {

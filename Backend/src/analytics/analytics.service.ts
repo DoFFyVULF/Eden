@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { TimePeriod, AnalyticsRequestDto } from './dto/analytics-request.dto';
@@ -26,7 +27,6 @@ import { AppointmentStatus } from 'generated/prisma/enums';
 export class AnalyticsService {
   constructor(private prisma: PrismaService) {}
 
-  // Константа для удобства
   private readonly COMPLETED_STATUS = [AppointmentStatus.Завершен];
 
   async getKeyMetrics(
@@ -51,7 +51,6 @@ export class AnalyticsService {
       this.getPreviousPeriodData(dateRange)
     ]);
 
-    // Расчет роста
     const revenueGrowth =
       previousPeriodData.totalRevenue > 0
         ? ((financial.totalRevenue - previousPeriodData.totalRevenue) /
@@ -59,7 +58,6 @@ export class AnalyticsService {
           100
         : 0;
 
-    // Создаем объект ответа с правильными типами
     const response: KeyMetricsResponseDto = {
       period,
       financial: {
@@ -74,7 +72,10 @@ export class AnalyticsService {
         totalClients: clients.totalClients,
         newClients: clients.newClients,
         returningClients: clients.returningClients,
+        repeatClients: clients.repeatClients,
         retentionRate: clients.retentionRate,
+        repeatRate: clients.repeatRate,
+        conversionToRegularRate: clients.conversionToRegularRate, // ← ДОБАВИТЬ
         clientsByMonth: clients.clientsByMonth
       },
       appointments: {
@@ -155,7 +156,7 @@ export class AnalyticsService {
           dto.masterIds.length > 0 && { masterID: { in: dto.masterIds } }),
         ...(dto.serviceIds &&
           dto.serviceIds.length > 0 && { serviceId: { in: dto.serviceIds } }),
-        status: { in: this.COMPLETED_STATUS } // Только завершенные записи
+        status: { in: this.COMPLETED_STATUS }
       },
       include: {
         master: true,
@@ -232,7 +233,7 @@ export class AnalyticsService {
       by: ['masterID'],
       where: {
         appointmentTime: { gte: lastMonth.start, lte: lastMonth.end },
-        status: { in: this.COMPLETED_STATUS } // Только завершенные записи
+        status: { in: this.COMPLETED_STATUS }
       },
       _sum: { price: true },
       _count: { id: true }
@@ -271,7 +272,7 @@ export class AnalyticsService {
       by: ['serviceId'],
       where: {
         appointmentTime: { gte: lastMonth.start, lte: lastMonth.end },
-        status: { in: this.COMPLETED_STATUS } // Только завершенные записи
+        status: { in: this.COMPLETED_STATUS }
       },
       _sum: { price: true },
       _count: { id: true }
@@ -313,7 +314,7 @@ export class AnalyticsService {
   }> {
     const whereClause = {
       appointmentTime: { gte: dateRange.start, lte: dateRange.end },
-      status: { in: this.COMPLETED_STATUS }, // Только завершенные записи
+      status: { in: this.COMPLETED_STATUS },
       ...(masterIds && masterIds.length > 0 && { masterID: { in: masterIds } }),
       ...(serviceIds &&
         serviceIds.length > 0 && { serviceId: { in: serviceIds } })
@@ -341,7 +342,7 @@ export class AnalyticsService {
         FROM appointment
         WHERE "appointment_time" >= ${dateRange.start}
           AND "appointment_time" <= ${dateRange.end}
-          AND status = 'Завершен' -- Только завершенные записи
+          AND status = 'Завершен'
         GROUP BY TO_CHAR("appointment_time", 'YYYY-MM')
         ORDER BY month
       `
@@ -389,87 +390,144 @@ export class AnalyticsService {
     };
   }
 
+
+// ===== ОБНОВЛЕННЫЙ МЕТОД НОРМАЛИЗАЦИИ КЛИЕНТОВ =====
+  private getClientKey(app: {
+    clientPhone?: string | null;
+    clientName?: string | null;
+    clientSurname?: string | null;
+  }): string {
+    const phone = (app.clientPhone || '').trim();
+    const name = (app.clientName || '').trim();
+    const surname = (app.clientSurname || '').trim();
+
+    // Оставляем только цифры
+    let phoneDigits = phone.replace(/\D/g, '');
+
+    // Нормализуем российские номера: 8999... и 7999... превращаем в 999...
+    if (phoneDigits.length === 11 && (phoneDigits.startsWith('7') || phoneDigits.startsWith('8'))) {
+      phoneDigits = phoneDigits.substring(1);
+    }
+
+    if (phoneDigits.length > 0) {
+      return `p:${phoneDigits}`;
+    }
+    return `n:${surname.toLowerCase()}|${name.toLowerCase()}`;
+  }
+
+  // ===== ОБНОВЛЕННЫЙ МЕТОД ПОДСЧЕТА МЕТРИК =====
   async getClientMetrics(dateRange: { start: Date; end: Date }): Promise<{
     totalClients: number;
     newClients: number;
     returningClients: number;
+    repeatClients: number;
     retentionRate: number;
+    repeatRate: number;
+    conversionToRegularRate: number;
     clientsByMonth: ClientGrowthDto[];
   }> {
-    // Получаем всех уникальных клиентов за текущий период
-    const currentPeriodClients = await this.prisma.appointment.groupBy({
-      by: ['clientPhone'],
+    // 1. Загружаем ВСЮ историю записей до конца периода
+    const allAppointments = await this.prisma.appointment.findMany({
       where: {
-        appointmentTime: { gte: dateRange.start, lte: dateRange.end }
-      },
-      _count: { id: true }
-    });
-
-    const currentClientPhones = currentPeriodClients.map(c => c.clientPhone);
-
-    if (currentClientPhones.length === 0) {
-      return {
-        totalClients: 0,
-        newClients: 0,
-        returningClients: 0,
-        retentionRate: 0,
-        clientsByMonth: []
-      };
-    }
-
-    // Находим клиентов, которые были ДО текущего периода
-    const previousClients = await this.prisma.appointment.findMany({
-      where: {
-        appointmentTime: { lt: dateRange.start },
-        clientPhone: { in: currentClientPhones }
+        appointmentTime: { lte: dateRange.end }
       },
       select: {
-        clientPhone: true
-      },
-      distinct: ['clientPhone']
+        appointmentTime: true,
+        clientPhone: true,
+        clientName: true,
+        clientSurname: true
+      }
     });
 
-    const returningClientPhones = new Set(
-      previousClients.map(c => c.clientPhone)
-    );
+    const clientHistory = new Map<string, Date[]>();
 
-    // Возвращающиеся клиенты - те, кто есть в текущем периоде И были ДО
-    const returningClientsCount = returningClientPhones.size;
+    for (const app of allAppointments) {
+      const key = this.getClientKey(app);
+      if (!clientHistory.has(key)) {
+        clientHistory.set(key, []);
+      }
+      clientHistory.get(key)!.push(app.appointmentTime);
+    }
 
-    // Новые клиенты - те, кто есть в текущем периоде, но НЕ было ДО
-    const newClientsCount = currentClientPhones.length - returningClientsCount;
+    let totalClients = 0;
+    let newClients = 0;
+    let returningClients = 0;
+    let repeatClients = 0;
+    
+    // Для подсчета реальной конверсии новых клиентов
+    let classicNewClients = 0;
+    let newClientsWithRepeatVisits = 0;
 
-    // Получаем данные по месяцам
+    for (const [key, dates] of clientHistory.entries()) {
+      // Записи клиента в текущем периоде
+      const currentPeriodVisits = dates.filter(d => d >= dateRange.start && d <= dateRange.end);
+
+      if (currentPeriodVisits.length > 0) {
+        totalClients++;
+        
+        const hasHistoryBefore = dates.some(d => d < dateRange.start);
+        const hasMultipleCurrentVisits = currentPeriodVisits.length >= 2;
+
+        if (hasMultipleCurrentVisits) {
+          repeatClients++;
+        }
+
+        // Клиент считается повторным/вернувшимся, если он был у нас ДО этого периода,
+        // ИЛИ если он пришел впервые, но уже успел сходить 2+ раза за текущий период
+        if (hasHistoryBefore || hasMultipleCurrentVisits) {
+          returningClients++;
+        } else {
+          // Строго новый: первый визит в салоне и был только 1 раз в этом периоде
+          newClients++;
+        }
+
+        // Логика конверсии (сколько из новых вернулись)
+        if (!hasHistoryBefore) {
+          classicNewClients++;
+          if (hasMultipleCurrentVisits) {
+            newClientsWithRepeatVisits++;
+          }
+        }
+      }
+    }
+
+    const conversionToRegularRate = classicNewClients > 0 
+      ? (newClientsWithRepeatVisits / classicNewClients) * 100 
+      : 0;
+
+    // 9. Данные по месяцам (добавлена нормализация телефонов 7/8 прямо в SQL)
     const clientsByMonthRaw = await this.prisma.$queryRaw<
       Array<{ month: string; clients: string }>
     >`
-    SELECT 
-      TO_CHAR(DATE_TRUNC('month', "appointment_time"), 'YYYY-MM') as month,
-      COUNT(DISTINCT "client_phone")::text as clients
-    FROM appointment
-    WHERE "appointment_time" >= ${dateRange.start}
-      AND "appointment_time" <= ${dateRange.end}
-    GROUP BY DATE_TRUNC('month', "appointment_time")
-    ORDER BY month
-  `;
-
-    const clientsByMonth: ClientGrowthDto[] = clientsByMonthRaw.map(item => ({
-      month: item.month,
-      clients: parseInt(item.clients, 10)
-    }));
+      SELECT 
+        TO_CHAR(DATE_TRUNC('month', "appointment_time"), 'YYYY-MM') as month,
+        COUNT(DISTINCT COALESCE(
+          NULLIF(REGEXP_REPLACE(REGEXP_REPLACE(TRIM("client_phone"), '\\D', '', 'g'), '^[78](\\d{10})$', '\\1'), ''),
+          CONCAT(TRIM("client_surname"), '|', TRIM("client_name"))
+        ))::text as clients
+      FROM appointment
+      WHERE "appointment_time" >= ${dateRange.start}
+        AND "appointment_time" <= ${dateRange.end}
+      GROUP BY DATE_TRUNC('month', "appointment_time")
+      ORDER BY month
+    `;
 
     return {
-      totalClients: currentClientPhones.length,
-      newClients: newClientsCount,
-      returningClients: returningClientsCount,
-      retentionRate:
-        currentClientPhones.length > 0
-          ? (returningClientsCount / currentClientPhones.length) * 100
-          : 0,
-      clientsByMonth
+      totalClients,
+      newClients,
+      returningClients,
+      repeatClients,
+      retentionRate: totalClients > 0 ? (returningClients / totalClients) * 100 : 0,
+      repeatRate: totalClients > 0 ? (repeatClients / totalClients) * 100 : 0,
+      conversionToRegularRate: parseFloat(conversionToRegularRate.toFixed(2)),
+      clientsByMonth: clientsByMonthRaw.map(item => ({
+        month: item.month,
+        clients: parseInt(item.clients, 10)
+      }))
     };
   }
 
+  // ===== ИСПРАВЛЕННЫЙ МЕТОД getAppointmentMetrics =====
   async getAppointmentMetrics(
     dateRange: { start: Date; end: Date },
     masterIds?: number[],
@@ -482,44 +540,110 @@ export class AnalyticsService {
     completedAppointments: number;
     conversionRate: number;
   }> {
-    const whereClause = {
+    const whereClause: any = {
       appointmentTime: { gte: dateRange.start, lte: dateRange.end },
       ...(masterIds && masterIds.length > 0 && { masterID: { in: masterIds } }),
       ...(serviceIds &&
         serviceIds.length > 0 && { serviceId: { in: serviceIds } })
     };
 
-    const appointments = await this.prisma.appointment.groupBy({
-      by: ['status'],
+    // Получаем ВСЕ записи сразу для точного подсчета
+    const allAppointments = await this.prisma.appointment.findMany({
       where: whereClause,
-      _count: { id: true }
+      select: {
+        id: true,
+        status: true,
+        createdAt: true
+      }
     });
 
-    const statusMap = new Map<AppointmentStatus, number>();
-    appointments.forEach(item => {
-      statusMap.set(item.status, item._count.id);
-    });
+    const totalAppointments = allAppointments.length;
 
-    const totalAppointments = appointments.reduce(
-      (sum, item) => sum + item._count.id,
+    // Считаем по статусам с помощью reduce для точности
+    const statusCounts = allAppointments.reduce(
+      (acc, app) => {
+        acc[app.status] = (acc[app.status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    // Логируем для отладки
+    console.log('Status counts:', statusCounts);
+    console.log('All statuses:', Object.keys(statusCounts));
+
+    // Определяем завершенные записи (проверяем разные варианты написания)
+    const completedStatuses = [
+      'Завершен',
+      'Завершён',
+      'COMPLETED',
+      'completed',
+      'Done'
+    ];
+    const confirmedStatuses = [
+      'Подтвержден',
+      'Подтверждён',
+      'CONFIRMED',
+      'confirmed'
+    ];
+    const cancelledStatuses = [
+      'Отменен',
+      'Отменён',
+      'CANCELLED',
+      'cancelled',
+      'CANCELED',
+      'canceled'
+    ];
+
+    const completedAppointments = completedStatuses.reduce(
+      (sum, status) => sum + (statusCounts[status] || 0),
       0
     );
-    const newApps = await this.prisma.appointment.count({
-      where: { ...whereClause, createdAt: { gte: dateRange.start } }
+
+    const confirmedAppointments = confirmedStatuses.reduce(
+      (sum, status) => sum + (statusCounts[status] || 0),
+      0
+    );
+
+    const cancelledAppointments = cancelledStatuses.reduce(
+      (sum, status) => sum + (statusCounts[status] || 0),
+      0
+    );
+
+    // Новые записи — созданные в этом периоде
+    const newAppointments = allAppointments.filter(
+      app => app.createdAt >= dateRange.start
+    ).length;
+
+    // Конверсия: завершенные / общее количество * 100
+    const conversionRate =
+      totalAppointments > 0
+        ? (completedAppointments / totalAppointments) * 100
+        : 0;
+
+    // Дополнительно считаем "эффективную конверсию"
+    // (исключая отмененные из знаменателя)
+    const effectiveAppointments = totalAppointments - cancelledAppointments;
+    const effectiveConversionRate =
+      effectiveAppointments > 0
+        ? (completedAppointments / effectiveAppointments) * 100
+        : 0;
+
+    console.log('Metrics:', {
+      totalAppointments,
+      completedAppointments,
+      cancelledAppointments,
+      conversionRate: conversionRate.toFixed(2) + '%',
+      effectiveConversionRate: effectiveConversionRate.toFixed(2) + '%'
     });
 
     return {
       totalAppointments,
-      newAppointments: newApps,
-      confirmedAppointments: statusMap.get(AppointmentStatus.Подтвержден) || 0,
-      cancelledAppointments: statusMap.get(AppointmentStatus.Отменен) || 0,
-      completedAppointments: statusMap.get(AppointmentStatus.Завершен) || 0,
-      conversionRate:
-        totalAppointments > 0
-          ? ((statusMap.get(AppointmentStatus.Завершен) || 0) /
-              totalAppointments) *
-            100
-          : 0
+      newAppointments,
+      confirmedAppointments,
+      cancelledAppointments,
+      completedAppointments,
+      conversionRate: parseFloat(conversionRate.toFixed(2))
     };
   }
 
@@ -534,7 +658,7 @@ export class AnalyticsService {
         by: ['masterID'],
         where: {
           appointmentTime: { gte: dateRange.start, lte: dateRange.end },
-          status: { in: this.COMPLETED_STATUS } // Только завершенные записи
+          status: { in: this.COMPLETED_STATUS }
         },
         _count: { id: true },
         _sum: { price: true }
@@ -572,7 +696,7 @@ export class AnalyticsService {
         by: ['serviceId'],
         where: {
           appointmentTime: { gte: dateRange.start, lte: dateRange.end },
-          status: { in: this.COMPLETED_STATUS } // Только завершенные записи
+          status: { in: this.COMPLETED_STATUS }
         },
         _count: { id: true },
         _sum: { price: true },
@@ -616,7 +740,7 @@ export class AnalyticsService {
     const appointments = await this.prisma.appointment.findMany({
       where: {
         appointmentTime: { gte: previousStart, lte: previousEnd },
-        status: { in: this.COMPLETED_STATUS } // Только завершенные записи
+        status: { in: this.COMPLETED_STATUS }
       }
     });
 

@@ -1,350 +1,351 @@
 "use client";
-import { useState, useEffect } from "react";
-import { category, services } from "@/app/data/services/services.data";
-import { masters } from "@/app/data/services/masters.data";
-import { masterServices } from "@/app/data/services/masterService.data";
-import { masterSchedule } from "@/app/data/services/masterSchedule.data";
-import { weekdaysOrder } from "@/app/data/services/weekdays.data";
-import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber";
-import ServiceCard from "../services/serviceCard";
-import MasterCard from "../services/masterCard";
-import { CalendarTimeSelector } from "@/app/components/ui/public/appointment/TimeSelection";
+
+import { useState, useEffect, useMemo, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import { categoryService } from "@/services/category/category.service";
+import { serviceService } from "@/services/service/service.service";
+import { masterService } from "@/services/master/master.service";
+import { servicePriceService } from "@/services/service-price/service-price.service";
+import { masterScheduleService } from "@/services/schedule/schedule.service";
+import { appointmentService } from "@/services/appointment/appointment.service";
+
+import { ICategory } from "@/types/category.types";
+import { IService } from "@/types/services.types";
+import { IMaster } from "@/types/masters.type";
+import { IServicePrice } from "@/types/service-price.types";
+import { IMasterSchedule } from "@/types/schedule.types";
+import { AppointmentStatus } from "@/types/appointment.types";
+
+import BeautyCalendar from "@/app/components/ui/Beautycalendar";
 import NotificationWindow from "@/app/components/ui/public/appointment/NotificationWindow";
+import ServiceCard from "../services/serviceCard";
+import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber";
 
-interface AppointmentData {
-  masterId: number;
-  day: string;
-  time: string;
+import { Loader2, CheckCircle2, Edit2, ChevronLeft, CalendarCheck } from "lucide-react";
+
+// --- Вспомогательный компонент для компактных итогов ---
+function SelectionSummary({ label, value, onEdit }: { label: string; value: string; onEdit: () => void }) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-center justify-between bg-[#111] border border-white/5 rounded-2xl px-6 py-3 mb-4 max-w-xl mx-auto"
+    >
+      <div>
+        <p className="text-[10px] text-[#6B6560] uppercase tracking-widest">{label}</p>
+        <p className="text-sm font-medium text-[#F0EBE3]">{value}</p>
+      </div>
+      <button onClick={onEdit} className="p-2 hover:bg-white/5 rounded-full transition-colors text-[#C8A97E]">
+        <Edit2 className="w-4 h-4" />
+      </button>
+    </motion.div>
+  );
 }
 
-interface FormData {
-  lastName: string;
-  firstName: string;
-  phone: string;
-  comment: string;
-}
+// Основной контент страницы
+function AppointmentContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const preselectedServiceId = searchParams.get("serviceId");
 
-export default function Appointment() {
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
-  const [selectedService, setSelectedService] = useState<number | null>(null);
+  const [categories, setCategories] = useState<ICategory[]>([]);
+  const [services, setServices] = useState<IService[]>([]);
+  const [masters, setMasters] = useState<IMaster[]>([]);
+  const [prices, setPrices] = useState<IServicePrice[]>([]);
+  const [schedules, setSchedules] = useState<IMasterSchedule[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
   const [selectedMasterId, setSelectedMasterId] = useState<number | null>(null);
-  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentData | null>(null);
-  const [selectedDateFromCalendar, setSelectedDateFromCalendar] = useState<Date | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [formData, setFormData] = useState<FormData>({
-    lastName: "",
-    firstName: "",
-    phone: "",
-    comment: ""
-  });
+  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
 
-  // Сбрасываем выбранное время при смене мастера
+  const [formData, setFormData] = useState({ firstName: "", lastName: "", phone: "", comment: "" });
+
+  // Загрузка данных
   useEffect(() => {
-    setSelectedAppointment(null);
-  }, [selectedMasterId]);
+    Promise.all([
+      categoryService.getAll(),
+      serviceService.getAll(),
+      masterService.getAll(),
+      servicePriceService.getAll(),
+      masterScheduleService.getAll(),
+    ])
+      .then(([cats, servs, masts, priceList, scheds]) => {
+        setCategories(cats.filter((c) => c.isActive !== false));
+        setServices(servs.filter((s) => s.isActive));
+        setMasters(masts.filter((m) => m.isActive));
+        setPrices(priceList.filter((p) => p.isActive !== false));
+        setSchedules(scheds);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
-  // Обработчики выбора
-  const handleCategorySelect = (id: number) => {
-    setSelectedCategory(id);
-    setSelectedService(null);
-    setSelectedMasterId(null);
-  };
+  // АВТОВЫБОР УСЛУГИ ИЗ URL
+  useEffect(() => {
+    if (preselectedServiceId && services.length > 0) {
+      const serviceIdNum = Number(preselectedServiceId);
+      const service = services.find(s => s.id === serviceIdNum);
 
-  const handleServiceSelect = (id: number) => {
-    setSelectedService(prev => prev === id ? null : id);
-    setSelectedMasterId(null);
-  };
-
-  const handleMasterSelect = (id: number) => {
-    setSelectedMasterId(prev => prev === id ? null : id);
-  };
-
-  const handleDateSelect = (date: Date | null) => {
-    setSelectedDateFromCalendar(date);
-  };
-
-  const handleTimeClick = (masterId: number, day: string, time: string) => {
-    setSelectedAppointment({ masterId, day, time });
-  };
-
-  // Обработчики формы
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    
-    if (name === 'phone') {
-      const formattedPhone = formatPhoneNumber(value);
-      setFormData(prev => ({ ...prev, [name]: formattedPhone }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+      if (service) {
+        setSelectedServiceId(serviceIdNum);
+        setSelectedCategoryId(service.categoryId || service.category?.id || null);
+      }
     }
-  };
+  }, [preselectedServiceId, services]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    
-    // Здесь будет логика отправки данных
-    console.log({
-      service: currentService,
-      master: selectedMaster,
-      appointment: selectedAppointment,
-      client: formData
-    });
-    
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setIsSuccess(true);
-    }, 1000);
-  };
+  // Вычисляемые данные
+  const currentCategory = categories.find(c => c.id === selectedCategoryId);
+  const currentService = services.find(s => s.id === selectedServiceId);
+  const currentMaster = masters.find(m => m.id === selectedMasterId);
 
-  const handleCloseNotification = () => {
-    setIsSuccess(false);
-    setSelectedAppointment(null);
-    setSelectedMasterId(null);
-    setSelectedService(null);
-    setSelectedCategory(null);
-    setFormData({ lastName: "", firstName: "", phone: "", comment: "" });
-  };
-
-  // Получение данных
-  const currentService = services.find(service => service.id === selectedService);
-  const selectedMaster = masters.find(master => master.id === selectedMasterId);
-  
-  const filteredServices = services.filter(
-    service => service.categoryId === selectedCategory
+  const filteredServices = useMemo(
+    () => (!selectedCategoryId ? [] : services.filter((s) => s.categoryId === selectedCategoryId)),
+    [services, selectedCategoryId]
   );
 
-  const displayServices = selectedService
-    ? filteredServices.filter(service => service.id === selectedService)
-    : filteredServices;
+  const availableMasters = useMemo(() => {
+    if (!selectedServiceId) return [];
+    const targetId = Number(selectedServiceId);
+    const masterIdsFromPrices = prices
+      .filter((p) => (p.serviceId ?? p.service?.id) === targetId && p.isActive !== false)
+      .map((p) => Number(p.masterId ?? p.master?.id));
+    return masters.filter((m) => masterIdsFromPrices.includes(Number(m.id)));
+  }, [masters, prices, selectedServiceId]);
 
-  const mastersForSelectedService = selectedService
-    ? masterServices.filter(master => master.serviceIds.includes(selectedService))
-    : [];
+  const currentPrice = useMemo(() => {
+    if (!selectedServiceId || !selectedMasterId) return 0;
+    const found = prices.find((p) => {
+      const pSId = p.serviceId ?? p.service?.id;
+      const pMId = p.masterId ?? p.master?.id;
+      return Number(pSId) === Number(selectedServiceId) && Number(pMId) === Number(selectedMasterId);
+    });
+    return found?.price ?? 0;
+  }, [prices, selectedServiceId, selectedMasterId]);
 
-  const selectedMasterSchedule = selectedMasterId
-    ? masterSchedule.find(master => master.masterId === selectedMasterId) ?? null
-    : null;
+  const masterScheduleData = useMemo(() => {
+    if (!selectedMasterId) return null;
+    const masterSchedules = schedules.filter((s) => (s.masterId ?? s.master?.id) === selectedMasterId);
+    const DOW_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+    const schedule: any = { mon: null, tue: null, wed: null, thu: null, fri: null, sat: null, sun: null };
+    masterSchedules.forEach((s) => {
+      const key = DOW_KEYS[s.dayOfWeek];
+      if (key) {
+        const start = s.startTime.includes("T") ? s.startTime.split("T")[1].slice(0, 5) : s.startTime.slice(0, 5);
+        const end = s.endTime.includes("T") ? s.endTime.split("T")[1].slice(0, 5) : s.endTime.slice(0, 5);
+        schedule[key] = { workingHours: { start, end }, appointments: [] };
+      }
+    });
+    return { masterId: selectedMasterId, schedule };
+  }, [selectedMasterId, schedules]);
+
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((p) => ({ ...p, [name]: name === "phone" ? formatPhoneNumber(value) : value }));
+  };
+
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  // Базовая проверка, что всё выбрано
+  if (!selectedAppointment || !selectedServiceId || !selectedMasterId) {
+    console.error("Не все данные выбраны");
+    return;
+  }
+
+  setSubmitting(true);
+
+  try {
+    // 1. Формируем корректную дату ISO. 
+    // Убедись, что selectedAppointment.day в формате 'YYYY-MM-DD'
+    const appointmentDate = new Date(`${selectedAppointment.day}T${selectedAppointment.time}:00`);
+
+    // 2. Подготавливаем объект, принудительно превращая строки в числа
+    const dto = {
+      serviceId: Number(selectedServiceId),
+      masterId: Number(selectedMasterId),
+      appointmentTime: appointmentDate.toISOString(), // NestJS/Prisma любят ISO
+      clientName: formData.firstName.trim(),
+      clientSurname: formData.lastName.trim(),
+      clientPhone: formData.phone.replace(/\D/g, ''), // Отправляем только цифры (лучшая практика)
+      price: Number(currentPrice), // Важно для Decimal в Prisma
+      comment: formData.comment?.trim() || undefined,
+      status: AppointmentStatus.Новый,
+    };
+
+    console.log("Отправка DTO:", dto); // Посмотри в консоль перед ошибкой
+
+    await appointmentService.create(dto);
+    setSuccess(true);
+  } catch (err: any) {
+    // ВАЖНО: Посмотри детали ошибки в консоли
+    console.error("Ошибка 400 детали:", err.response?.data); 
+    alert(`Ошибка: ${err.response?.data?.message || "Проверьте введенные данные"}`);
+  } finally {
+    setSubmitting(false);
+  }
+};
+
+  if (loading) return <div className="min-h-screen bg-[#080808] flex items-center justify-center"><Loader2 className="w-7 h-7 text-[#C8A97E] animate-spin" /></div>;
 
   return (
-    <div className="container">
+    <div className="min-h-screen bg-[#080808] text-[#F0EBE3] pb-24 pt-32 px-4">
+      <div className="container mx-auto max-w-5xl overflow-hidden">
+        
+        <header className="text-center mb-8">
+          <h1 className="text-4xl md:text-5xl font-light mb-4" style={{ fontFamily: "serif" }}>Онлайн запись</h1>
+        </header>
 
-      {/* Выбор категории */}
-      <div className="text-center">
-        <div className="flex flex-row flex-wrap justify-evenly mt-5">
-          {category.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => handleCategorySelect(cat.id)}
-              className={`relative px-4 py-2 transition-all ease-in-out ${
-                selectedCategory === cat.id ? "" : "opacity-70"
-              }`}
-            >
-              {cat.title}
-              {selectedCategory === cat.id && (
-                <>
-                  <span className="absolute top-0 right-0 w-2 h-2 border-r-2 border-t-2 border-blue" />
-                  <span className="absolute bottom-0 left-0 w-2 h-2 border-l-2 border-b-2 border-blue" />
-                </>
-              )}
-            </button>
-          ))}
+        {/* КНОПКА СБРОСА (если пришли из каталога) */}
+        <div className="flex justify-center h-12">
+          <AnimatePresence>
+            {preselectedServiceId && !selectedAppointment && (
+              <motion.button
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                onClick={() => {
+                  window.history.replaceState(null, '', '/appointment');
+                  setSelectedServiceId(null);
+                  setSelectedCategoryId(null);
+                  setSelectedMasterId(null);
+                }}
+                className="mb-8 text-[#6B6560] hover:text-[#C8A97E] flex items-center gap-2 text-xs uppercase tracking-widest transition-colors border border-white/5 px-4 py-2 rounded-full bg-white/5"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Выбрать другую услугу
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="relative mt-4">
+          <AnimatePresence mode="wait">
+            
+            {/* ШАГ 1: КАТЕГОРИИ */}
+            {!selectedCategoryId && (
+              <motion.section 
+                key="step1"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="text-center"
+              >
+                <p className="text-xs text-[#6B6560] uppercase tracking-widest mb-8">Выберите направление</p>
+                <div className="flex flex-wrap justify-center gap-3">
+                  {categories.map((cat) => (
+                    <button key={cat.id} onClick={() => setSelectedCategoryId(cat.id)} className="px-8 py-4 rounded-2xl border border-white/10 bg-[#0e0e0e] hover:border-[#C8A97E] hover:text-[#C8A97E] transition-all text-sm uppercase tracking-widest">
+                      {cat.title}
+                    </button>
+                  ))}
+                </div>
+              </motion.section>
+            )}
+
+            {/* ШАГ 2: УСЛУГИ */}
+            {selectedCategoryId && !selectedServiceId && (
+              <motion.section key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                <SelectionSummary label="Направление" value={currentCategory?.title || ""} onEdit={() => setSelectedCategoryId(null)} />
+                <p className="text-xs text-[#6B6560] uppercase tracking-widest text-center my-8">Выберите услугу</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredServices.map((s) => (
+                    <div key={s.id} onClick={() => setSelectedServiceId(s.id)} className="cursor-pointer active:scale-95 transition-transform">
+                      <ServiceCard service={s} />
+                    </div>
+                  ))}
+                </div>
+              </motion.section>
+            )}
+
+            {/* ШАГ 3: МАСТЕР */}
+            {selectedServiceId && !selectedMasterId && (
+              <motion.section key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                <SelectionSummary label="Услуга" value={currentService?.title || ""} onEdit={() => setSelectedServiceId(null)} />
+                <p className="text-xs text-[#6B6560] uppercase tracking-widest text-center my-8">Выберите мастера</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                  {availableMasters.map((m) => {
+                     const priceObj = prices.find(p => (p.serviceId ?? p.service?.id) === selectedServiceId && (p.masterId ?? p.master?.id) === m.id);
+                     return (
+                      <button key={m.id} onClick={() => setSelectedMasterId(m.id)} className="flex items-center gap-4 p-5 rounded-3xl border border-white/5 bg-[#0e0e0e] hover:border-[#C8A97E] transition-all">
+                        <img src={m.photo || "/avatar-placeholder.png"} className="w-16 h-16 rounded-full object-cover" alt="" />
+                        <div className="text-left">
+                          <p className="font-bold text-base">{m.surname} {m.name}</p>
+                          <p className="text-xs text-[#6B6560]">{m.specialization}</p>
+                          <p className="text-sm text-[#C8A97E] mt-1">{priceObj?.price.toLocaleString()} ₽</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.section>
+            )}
+
+            {/* ШАГ 4: КАЛЕНДАРЬ */}
+            {selectedMasterId && !selectedAppointment && (
+              <motion.section key="step4" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, x: -20 }}>
+                <SelectionSummary label="Мастер" value={`${currentMaster?.surname} ${currentMaster?.name}`} onEdit={() => setSelectedMasterId(null)} />
+                <div className="max-w-xl mx-auto bg-[#0e0e0e] rounded-3xl p-6 border border-white/5 mt-8">
+                  <BeautyCalendar
+                    selectedMasterId={selectedMasterId}
+                    selectedMasterSchedule={masterScheduleData}
+                    selectedAppointment={selectedAppointment}
+                    handleTimeClick={(masterId, day, time) => setSelectedAppointment({ masterId, day, time })}
+                  />
+                </div>
+              </motion.section>
+            )}
+
+            {/* ШАГ 5: ФОРМА */}
+            {selectedAppointment && (
+              <motion.section key="step5" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-md mx-auto">
+                <div className="bg-[#C8A97E]/5 border border-[#C8A97E]/20 p-6 rounded-3xl mb-8 space-y-3">
+                   <div className="flex justify-between text-xs text-[#6B6560] uppercase tracking-tighter"><span>{currentService?.title}</span><span>{currentPrice.toLocaleString()} ₽</span></div>
+                   <div className="flex justify-between text-sm font-medium"><span>{currentMaster?.surname} {currentMaster?.name}</span><span>{selectedAppointment.day}, {selectedAppointment.time}</span></div>
+                   <button onClick={() => setSelectedAppointment(null)} className="text-[10px] text-[#C8A97E] underline flex items-center gap-1"><ChevronLeft className="w-3 h-3" /> Изменить время</button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <input name="lastName" placeholder="Фамилия" onChange={handleInput} required className="w-full bg-[#111] border border-white/5 p-4 rounded-2xl focus:border-[#C8A97E] outline-none transition-colors" />
+                    <input name="firstName" placeholder="Имя" onChange={handleInput} required className="w-full bg-[#111] border border-white/5 p-4 rounded-2xl focus:border-[#C8A97E] outline-none transition-colors" />
+                  </div>
+                  <input name="phone" placeholder="Телефон" value={formData.phone} onChange={handleInput} required className="w-full bg-[#111] border border-white/5 p-4 rounded-2xl focus:border-[#C8A97E] outline-none transition-colors" />
+                  <textarea name="comment" placeholder="Комментарий к записи" onChange={handleInput} rows={3} className="w-full bg-[#111] border border-white/5 p-4 rounded-2xl focus:border-[#C8A97E] outline-none transition-colors resize-none" />
+                  
+                  <button type="submit" disabled={submitting} className="w-full bg-[#C8A97E] text-[#1a1208] py-5 rounded-2xl font-bold text-lg hover:shadow-[0_10px_30px_rgba(200,169,126,0.25)] transition-all">
+                    {submitting ? "Бронируем..." : "Записаться на сеанс"}
+                  </button>
+                </form>
+              </motion.section>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
-      {/* Сетка услуг и мастеров */}
-      <div className="flex flex-wrap justify-center gap-12 max-[1158px]:justify-center max-[1158px]:gap-8">
-        {/* Услуги */}
-        <div className="flex flex-row flex-wrap justify-around gap-3.5 mt-10">
-          {selectedCategory ? (
-            displayServices.length > 0 ? (
-              displayServices.map((service) => (
-                <ServiceCard
-                  key={service.id}
-                  id={service.id}
-                  title={service.title}
-                  img={service.img}
-                  duration={service.duration}
-                  price={service.price}
-                  isAppointment={false}
-                  isSelected={selectedService === service.id}
-                  onSelect={() => handleServiceSelect(service.id)}
-                />
-              ))
-            ) : (
-              <p className="text-gray-400">В этой категории пока нет услуг.</p>
-            )
-          ) : (
-            <p className="text-gray-400">Выберите категорию</p>
-          )}
-        </div>
-
-        {/* Мастера */}
-        <div className="flex flex-col gap-3 mt-8">
-          {selectedService && displayServices.length > 0 && (
-            <h2 className="text-center text-lg font-semibold text-white/90">
-              Выберите мастера
-            </h2>
-          )}
-
-          {mastersForSelectedService.length > 0 ? (
-            mastersForSelectedService.map((master) => {
-              const masterData = masters.find(m => m.id === master.masterId);
-              if (!masterData) return null;
-
-              return (
-                <MasterCard
-                  key={master.masterId}
-                  name={masterData.name}
-                  specialty={masterData.specialty}
-                  photo={masterData.photo}
-                  isSelected={selectedMasterId === master.masterId}
-                  onSelect={() => handleMasterSelect(master.masterId)}
-                />
-              );
-            })
-          ) : selectedService ? (
-            <p className="text-center text-gray-400 mt-4">
-              Нет доступных мастеров для этой услуги.
-            </p>
-          ) : null}
-        </div>
-
-        {/* Календарь и время */}
-        {selectedService && selectedMasterId && (
-          <CalendarTimeSelector
-            selectedMasterId={selectedMasterId}
-            selectedMasterSchedule={selectedMasterSchedule}
-            onDateSelect={handleDateSelect}
-            handleTimeClick={handleTimeClick}
-            selectedAppointment={selectedAppointment}
-          />
-        )}
-      </div>
-
-      {/* Форма записи */}
-      {selectedService && selectedMasterId && selectedAppointment && (
-        <form onSubmit={handleSubmit} className="flex justify-center mb-10">
-          <div className="max-w-1/2 flex flex-col mt-8 bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-            <h2 className="text-xl font-semibold text-white mb-6 text-center">
-              📋 Данные для записи
-            </h2>
-
-            <div className="space-y-4">
-              {/* Информация о записи */}
-              <div className="bg-gray-700/30 rounded-lg p-4 mb-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                  <div>
-                    <span className="text-gray-400">Услуга:</span>
-                    <p className="text-white font-medium">{currentService?.title}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Время:</span>
-                    <p className="text-white font-medium">
-                      {selectedAppointment.time},{" "}
-                      {weekdaysOrder.find(day => day.key === selectedAppointment.day)?.label}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Стоимость:</span>
-                    <p className="text-emerald-400 font-medium">{currentService?.price} ₽</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Поля формы */}
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="lastName" className="block text-sm font-medium text-gray-300 mb-2">
-                      Фамилия *
-                    </label>
-                    <input
-                      type="text"
-                      name="lastName"
-                      value={formData.lastName}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                      placeholder="Введите фамилию"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="firstName" className="block text-sm font-medium text-gray-300 mb-2">
-                      Имя *
-                    </label>
-                    <input
-                      type="text"
-                      name="firstName"
-                      value={formData.firstName}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                      placeholder="Введите имя"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-2">
-                    Номер телефона *
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                    placeholder="+7 (___) ___-__-__"
-                    maxLength={18}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="comment" className="block text-sm font-medium text-gray-300 mb-2">
-                    Комментарий к записи
-                    <span className="text-gray-500 text-xs ml-1">(необязательно)</span>
-                  </label>
-                  <textarea
-                    name="comment"
-                    value={formData.comment}
-                    onChange={handleInputChange}
-                    rows={3}
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none"
-                    placeholder="Дополнительные пожелания или комментарии..."
-                  />
-                </div>
-              </div>
-
-              {/* Кнопка отправки */}
-              <div className="pt-4">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-600 text-white font-semibold py-4 px-6 rounded-lg transition duration-200 transform hover:scale-[1.02] active:scale-[0.98] disabled:transform-none"
-                >
-                  {isSubmitting ? "⏳ Отправка..." : "📅 Записаться"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </form>
-      )}
-
-      {/* Уведомление об успехе */}
-      {isSuccess && currentService && selectedDateFromCalendar && selectedAppointment && (
+      {success && currentService && currentMaster && selectedAppointment && (
         <NotificationWindow
+          onClose={() => { setSuccess(false); router.push('/'); }}
           serviceTitle={currentService.title}
-          servicePrice={currentService.price}
-          appointmentDate={selectedDateFromCalendar}
+          servicePrice={currentPrice}
+          appointmentDate={new Date(selectedAppointment.day)}
           appointmentTime={selectedAppointment.time}
-          appointmentMaster={selectedMaster?.name}
-          onClose={handleCloseNotification}
+          appointmentMaster={`${currentMaster.surname} ${currentMaster.name}`}
         />
       )}
     </div>
+  );
+}
+
+// Обязательная обертка для useSearchParams в Next.js
+export default function AppointmentPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#080808] flex items-center justify-center"><Loader2 className="w-7 h-7 text-[#C8A97E] animate-spin" /></div>}>
+      <AppointmentContent />
+    </Suspense>
   );
 }

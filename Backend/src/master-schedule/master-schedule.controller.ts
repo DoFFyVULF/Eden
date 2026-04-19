@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
+ 
 import {
   Controller,
   Get,
@@ -16,11 +16,12 @@ import { UpdateMasterScheduleDto } from './dto/update-master-schedule.dto';
 import { MasterTimeOffDto } from './dto/master-time-off.dto';
 import { Auth } from 'src/auth/decorators/auth.decorator';
 
-@Auth()
+
 @Controller('master-schedule')
 export class MasterScheduleController {
   constructor(private readonly masterScheduleService: MasterScheduleService) {}
 
+  @Auth()
   @HttpCode(201)
   @Post()
   create(@Body() dto: MasterScheduleDto) {
@@ -39,6 +40,7 @@ export class MasterScheduleController {
     return this.masterScheduleService.findOne(id);
   }
 
+  @Auth()
   @HttpCode(200)
   @Patch(':id')
   update(
@@ -48,6 +50,7 @@ export class MasterScheduleController {
     return this.masterScheduleService.update(id, dto);
   }
 
+  @Auth()
   @HttpCode(200)
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
@@ -74,6 +77,7 @@ export class MasterScheduleController {
     return this.masterScheduleService.updateTimeOff(id, dto);
   }
 
+  
   @HttpCode(200)
   @Get(':masterId/time-off')
   getTimeOff(@Param('masterId', ParseIntPipe) masterId: number) {
@@ -85,6 +89,7 @@ export class MasterScheduleController {
     return this.masterScheduleService.getMasterCurrentStatus(masterId);
   }
 
+  @Auth()
   @HttpCode(200)
   @Delete('time-off/:id')
   deleteTimeOff(@Param('id', ParseIntPipe) id: number) {

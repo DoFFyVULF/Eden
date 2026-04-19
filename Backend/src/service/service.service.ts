@@ -27,6 +27,7 @@ export class ServiceService {
         description: dto.description,
         duration: dto.duration,
         isActive: dto.isActive ?? true,
+        img: dto.img,
         category: { connect: { id: dto.categoryId } },
       },
       include: { category: true },

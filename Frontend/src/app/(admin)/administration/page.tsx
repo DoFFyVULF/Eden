@@ -466,11 +466,11 @@ export default function AdminPage() {
               </div>
 
               <h1
-                className={`text-4xl md:text-5xl lg:text-6xl font-black leading-none tracking-tight mb-3 ${
+                className={`flex gap-3 flex-wrap text-4xl md:text-5xl lg:text-6xl font-black leading-none tracking-tight mb-3 ${
                   isDark ? "text-white" : "text-gray-900"
                 }`}
               >
-                Добро{" "}
+                Добро
                 <span
                   className={`${
                     isDark

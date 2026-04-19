@@ -6,6 +6,8 @@ export enum AppointmentStatus {
   Отменен = "Отменен"
 }
 
+
+
 export interface IMasterLite {
   id: number;
   surname: string;
@@ -38,15 +40,15 @@ export interface IAppointment {
 
 // DTO для создания/обновления
 export interface ICreateAppointmentDto {
+  serviceId: number;
+  masterId: number;
+  appointmentTime: string;  // ISO строка
+  price: number;
   clientSurname: string;
   clientName: string;
   clientPhone: string;
-  masterId: number;
-  serviceId: number;
-  appointmentTime: string;
-  duration?: number;
-  price: string; 
-  status?: AppointmentStatus;
+  comment?: string;
+  status: AppointmentStatus;
 }
 
 export interface IUpdateAppointmentDto {

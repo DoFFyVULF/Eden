@@ -1,4 +1,4 @@
-import { axiosWithAuth } from "@/api/interceptors";
+import { axiosClassic, axiosWithAuth } from "@/api/interceptors";
 import {
   IAppointment,
   ICreateAppointmentDto,
@@ -53,7 +53,7 @@ export const appointmentService = {
     const params: any = { date };
     if (masterId !== undefined) params.masterId = masterId;
 
-    const { data } = await axiosWithAuth.get<IAppointment[]>("/appointment", {
+    const { data } = await axiosClassic.get<IAppointment[]>("/appointment", {
       params,
     });
 

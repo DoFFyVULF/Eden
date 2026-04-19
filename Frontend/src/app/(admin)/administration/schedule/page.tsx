@@ -305,110 +305,171 @@ export default function MasterSchedulePage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             {/* ── WEEKLY — 2/3 ── */}
-            <div className="lg:col-span-2 space-y-4">
+            <div className="lg:col-span-2 space-y-5">
               <div className="flex items-center gap-3 mb-1">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
-                  <CalendarDays size={17} className="text-white" />
+                <div className="relative">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                    <CalendarDays size={18} className="text-white" />
+                  </div>
+                  <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white dark:border-gray-900" />
                 </div>
                 <div>
-                  <h2 className={`text-lg font-black ${isDark ? "text-white" : "text-gray-900"}`}>
+                  <h2 className={`text-xl font-black tracking-tight ${isDark ? "text-white" : "text-gray-900"}`}>
                     Еженедельный шаблон
                   </h2>
-                  <p className={`text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}>
-                    Повторяется каждую неделю
+                  <p className={`text-xs font-medium ${isDark ? "text-white/35" : "text-gray-400"}`}>
+                    Повторяется каждую неделю · {stats.weekly} смен
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
                 {DAYS.map((day, idx) => {
                   const dayItems = byDay[idx] ?? [];
                   const grad = DAY_GRADS[idx];
+                  const hasItems = dayItems.length > 0;
+
                   return (
                     <motion.div key={day}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.04 }}
-                      className={`rounded-2xl p-4 transition-all duration-300 overflow-hidden relative ${cardCls}`}
+                      initial={{ opacity: 0, scale: 0.97 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: idx * 0.05 }}
+                      whileHover={{ y: -2, transition: { duration: 0.2 } }}
+                      className={`group relative rounded-3xl p-5 transition-all duration-300 overflow-hidden ${
+                        isDark
+                          ? "bg-white/[0.06] backdrop-blur-xl border border-white/[0.08] hover:border-white/[0.14] hover:bg-white/[0.08] shadow-lg hover:shadow-xl"
+                          : "bg-white border border-gray-100 hover:border-gray-200 shadow-sm hover:shadow-lg"
+                      }`}
                     >
-                      {/* Accent top line */}
-                      <div className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r ${grad} opacity-50`} />
+                      {/* Decorative gradient orb */}
+                      <div className={`absolute -top-12 -right-12 w-28 h-28 bg-gradient-to-br ${grad} opacity-[0.08] rounded-full blur-3xl group-hover:opacity-[0.15] transition-opacity duration-500`} />
 
-                      {/* Day header */}
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-black text-sm shadow-sm`}>
-                            {day.charAt(0)}
+                      {/* Header */}
+                      <div className="relative flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`relative w-11 h-11 rounded-2xl bg-gradient-to-br ${grad} flex items-center justify-center text-white shadow-md overflow-hidden`}>
+                            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <span className="text-base font-black relative z-10">
+                              {day.charAt(0)}
+                            </span>
                           </div>
-                          <span className={`font-bold text-sm ${isDark ? "text-white/90" : "text-gray-800"}`}>
-                            {day}
-                          </span>
+                          <div>
+                            <span className={`block font-bold text-sm ${isDark ? "text-white/90" : "text-gray-800"}`}>
+                              {day}
+                            </span>
+                            <span className={`text-xs font-medium ${
+                              hasItems
+                                ? isDark ? "text-emerald-400/70" : "text-emerald-600/70"
+                                : isDark ? "text-white/20" : "text-gray-400"
+                            }`}>
+                              {hasItems ? `${dayItems.length} ${dayItems.length === 1 ? "смена" : "смен"}` : "выходной"}
+                            </span>
+                          </div>
                         </div>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
-                          dayItems.length
+
+                        {/* Status indicator */}
+                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+                          hasItems
                             ? isDark
-                              ? "bg-emerald-500/10 border-emerald-400/15 text-emerald-400"
-                              : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                              ? "bg-emerald-500/15 text-emerald-300 border border-emerald-400/20"
+                              : "bg-emerald-50 text-emerald-700 border border-emerald-200"
                             : isDark
-                              ? "bg-white/[0.05] border-white/[0.08] text-white/25"
-                              : "bg-gray-50 border-gray-200 text-gray-400"
+                              ? "bg-white/[0.04] text-white/25 border border-white/[0.06]"
+                              : "bg-gray-50 text-gray-400 border border-gray-100"
                         }`}>
-                          {dayItems.length} смен
-                        </span>
+                          <div className={`w-1.5 h-1.5 rounded-full ${
+                            hasItems ? "bg-emerald-400 animate-pulse" : isDark ? "bg-white/20" : "bg-gray-300"
+                          }`} />
+                          {hasItems ? "Рабочий" : "Выходной"}
+                        </div>
                       </div>
 
+                      {/* Divider */}
+                      <div className={`h-px mb-4 ${
+                        isDark
+                          ? "bg-gradient-to-r from-white/[0.08] via-white/[0.06] to-transparent"
+                          : "bg-gradient-to-r from-gray-100 via-gray-100 to-transparent"
+                      }`} />
+
                       {/* Shifts */}
-                      <div className="space-y-2">
-                        {dayItems.map(item => (
+                      <div className="relative space-y-2.5">
+                        {dayItems.map((item, itemIdx) => (
                           <motion.div key={item.id}
-                            whileHover={{ x: 2 }}
-                            className={`group flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all duration-150 ${
+                            initial={{ opacity: 0, x: -8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: itemIdx * 0.06 }}
+                            whileHover={{ x: 3, scale: 1.01 }}
+                            className={`group/item relative flex items-center justify-between px-4 py-3 rounded-2xl border transition-all duration-200 ${
                               isDark
-                                ? "bg-white/[0.05] border-white/[0.07] hover:bg-white/[0.08]"
-                                : "bg-gray-50/80 border-gray-100 hover:bg-gray-100/60"
+                                ? "bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.07] hover:border-white/[0.1]"
+                                : "bg-gray-50/50 border-gray-100/50 hover:bg-white hover:border-gray-200 hover:shadow-sm"
                             }`}
                           >
-                            <div className="flex items-center gap-2.5">
-                              <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${grad} flex items-center justify-center shadow-sm flex-shrink-0`}>
-                                <Clock size={12} className="text-white" />
+                            <div className="flex items-center gap-3">
+                              {/* Time badge */}
+                              <div className={`relative flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br ${grad} flex flex-col items-center justify-center shadow-sm overflow-hidden`}>
+                                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover/item:opacity-100 transition-opacity" />
+                                <span className="text-xs font-bold text-white leading-none relative z-10">
+                                  {fmtTime(item.startTime)}
+                                </span>
+                                <span className="text-[8px] text-white/70 font-medium relative z-10">
+                                  {fmtTime(item.endTime)}
+                                </span>
                               </div>
+
+                              {/* Master info */}
                               <div>
                                 <div className={`text-sm font-bold ${isDark ? "text-white/90" : "text-gray-800"}`}>
                                   {fmtTime(item.startTime)} — {fmtTime(item.endTime)}
                                 </div>
                                 {selectedMasterId === "all" && (
                                   <div className="flex items-center gap-1.5 mt-0.5">
-                                    <div className={`w-4 h-4 rounded-full bg-gradient-to-br ${grad} flex items-center justify-center text-[8px] text-white font-bold flex-shrink-0`}>
+                                    <div className={`w-5 h-5 rounded-lg bg-gradient-to-br ${grad} flex items-center justify-center text-[9px] text-white font-bold shadow-sm`}>
                                       {getInitial(item)}
                                     </div>
-                                    <span className={`text-xs ${isDark ? "text-white/35" : "text-gray-400"}`}>
+                                    <span className={`text-xs font-medium ${isDark ? "text-white/40" : "text-gray-400"}`}>
                                       {getMasterName(item)}
                                     </span>
                                   </div>
                                 )}
                               </div>
                             </div>
+
+                            {/* Delete button */}
                             <motion.button
-                              whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+                              whileHover={{ scale: 1.15, rotate: 90 }}
+                              whileTap={{ scale: 0.9 }}
                               onClick={() => handleDelete(item.id)}
-                              className={`opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                              className={`opacity-0 group-hover/item:opacity-100 w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
                                 isDark
-                                  ? "bg-rose-500/15 text-rose-400 hover:bg-rose-500/25"
-                                  : "bg-rose-50 text-rose-500 hover:bg-rose-100"
+                                  ? "bg-rose-500/15 text-rose-400 hover:bg-rose-500/30"
+                                  : "bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-600"
                               }`}
                             >
-                              <Trash2 size={13} />
+                              <Trash2 size={14} />
                             </motion.button>
                           </motion.div>
                         ))}
 
                         {dayItems.length === 0 && (
-                          <div className={`flex flex-col items-center justify-center py-5 rounded-xl border-2 border-dashed ${
-                            isDark ? "border-white/[0.06]" : "border-gray-200"
-                          }`}>
-                            <Calendar size={18} className={`mb-1 ${isDark ? "text-white/15" : "text-gray-300"}`} />
-                            <span className={`text-xs ${isDark ? "text-white/20" : "text-gray-300"}`}>Выходной</span>
-                          </div>
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className={`flex flex-col items-center justify-center py-6 rounded-2xl border-2 border-dashed ${
+                              isDark
+                                ? "border-white/[0.05] hover:border-white/[0.08]"
+                                : "border-gray-100 hover:border-gray-200"
+                            } transition-colors`}
+                          >
+                            <div className={`w-10 h-10 rounded-xl mb-2 flex items-center justify-center ${
+                              isDark ? "bg-white/[0.04]" : "bg-gray-50"
+                            }`}>
+                              <Calendar size={18} className={isDark ? "text-white/15" : "text-gray-300"} />
+                            </div>
+                            <span className={`text-xs font-semibold ${isDark ? "text-white/20" : "text-gray-300"}`}>
+                              Выходной
+                            </span>
+                          </motion.div>
                         )}
                       </div>
                     </motion.div>
@@ -434,7 +495,7 @@ export default function MasterSchedulePage() {
               </div>
 
               {/* Specific list card */}
-              <div className={`rounded-2xl overflow-hidden ${glassCls}`}>
+              <div className={`rounded-2xl overflow-hidden ${glassCls} mt-6`}>
                 <div className={`px-5 py-4 border-b flex items-center justify-between ${
                   isDark ? "border-white/[0.07]" : "border-gray-100"
                 }`}>

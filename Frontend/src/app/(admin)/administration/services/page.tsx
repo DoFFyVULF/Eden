@@ -25,7 +25,8 @@ import {
   Package,
   Activity,
   SlidersHorizontal,
-  AlertCircle,
+  Image as ImageIcon,
+  Link as LinkIcon,
 } from "lucide-react";
 
 type SortField = "title" | "duration" | "category" | "status";
@@ -64,6 +65,7 @@ export default function Services() {
     duration: 0,
     categoryId: 0,
     isActive: true,
+    img: "",
   });
 
   useEffect(() => {
@@ -183,9 +185,11 @@ export default function Services() {
       duration: 0,
       categoryId: categories[0]?.id ?? 0,
       isActive: true,
+      img: "",
     });
     setIsModalOpen(true);
   };
+
   const openEdit = (s: IService) => {
     setEditingService(s);
     setForm({
@@ -194,9 +198,11 @@ export default function Services() {
       duration: s.duration,
       categoryId: s.categoryId,
       isActive: s.isActive,
+      img: s.img || "",
     });
     setIsModalOpen(true);
   };
+
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingService(null);
@@ -232,13 +238,17 @@ export default function Services() {
         duration: form.duration,
         isActive: form.isActive,
         categoryId: form.categoryId,
+        img: form.img.trim(),
       };
+
       if (editingService)
         await serviceService.update(editingService.id, payload);
       else await serviceService.create(payload);
+
       await loadServices(false);
       closeModal();
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert("Не удалось сохранить услугу");
     } finally {
       setIsLoading(false);
@@ -705,6 +715,8 @@ export default function Services() {
             <AnimatePresence mode="popLayout">
               {filtered.map((svc, i) => {
                 const grad = catGrad(svc.categoryId);
+                const hasImg = svc.img && svc.img.trim() !== "";
+
                 return (
                   <motion.div
                     key={svc.id}
@@ -714,127 +726,166 @@ export default function Services() {
                     exit={{ opacity: 0, scale: 0.96 }}
                     transition={{ delay: i * 0.03, duration: 0.25 }}
                     whileHover={{ y: -3 }}
-                    className={`relative rounded-2xl p-5 transition-all duration-300 overflow-hidden flex flex-col ${cardCls}`}
+                    className={`relative rounded-2xl transition-all duration-300 overflow-hidden flex flex-col ${cardCls}`}
                   >
-                    {/* Accent top line */}
-                    <div
-                      className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r ${grad} opacity-60`}
-                    />
-
-                    {/* Status badge top-right */}
-                    <div className="absolute top-4 right-4">
-                      <span
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
-                          svc.isActive
-                            ? isDark
-                              ? "bg-emerald-500/10 border-emerald-400/15 text-emerald-400"
-                              : "bg-emerald-50 border-emerald-200 text-emerald-700"
-                            : isDark
-                              ? "bg-rose-500/10 border-rose-400/15 text-rose-400"
-                              : "bg-rose-50 border-rose-200 text-rose-600"
-                        }`}
-                      >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${svc.isActive ? "bg-emerald-400" : "bg-rose-400"}`}
+                    {/* IMAGE THUMBNAIL SECTION */}
+                    {hasImg ? (
+                      <div className="relative h-40 w-full overflow-hidden bg-gray-100 dark:bg-white/5 group">
+                        <img
+                          src={svc.img || ""}
+                          alt={svc.title}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = "none";
+                            const parent = target.parentElement;
+                            if (parent) {
+                              parent.className = `relative h-40 w-full overflow-hidden flex items-center justify-center bg-gradient-to-br ${grad}`;
+                              parent.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-image opacity-50"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`;
+                            }
+                          }}
                         />
-                        {svc.isActive ? "Активна" : "Скрыта"}
-                      </span>
-                    </div>
-
-                    {/* Service icon + title */}
-                    <div className="flex items-start gap-3 mb-3 pr-20">
-                      <div
-                        className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${grad} flex items-center justify-center shadow-lg flex-shrink-0`}
-                      >
-                        <Package size={20} className="text-white" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        
+                        {/* Status Badge on Image */}
+                        <div className="absolute top-3 right-3">
+                          <span
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border backdrop-blur-md ${
+                              svc.isActive
+                                ? "bg-emerald-500/90 border-emerald-400 text-white shadow-lg"
+                                : "bg-rose-500/90 border-rose-400 text-white shadow-lg"
+                            }`}
+                          >
+                            {svc.isActive ? "Active" : "Hidden"}
+                          </span>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1 pt-0.5">
-                        <h3
-                          className={`font-bold text-base leading-tight ${isDark ? "text-white/95" : "text-gray-900"}`}
-                        >
-                          {svc.title}
-                        </h3>
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    <p
-                      className={`text-xs leading-relaxed mb-4 line-clamp-2 flex-shrink-0 ${
-                        svc.description
-                          ? isDark
-                            ? "text-white/45"
-                            : "text-gray-500"
-                          : isDark
-                            ? "text-white/20"
-                            : "text-gray-300"
-                      }`}
-                    >
-                      {svc.description || "Без описания"}
-                    </p>
-
-                    {/* Info pills */}
-                    <div className="flex flex-wrap gap-2 flex-1">
-                      {/* Category */}
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border ${
-                          isDark
-                            ? "bg-white/[0.06] border-white/[0.08] text-white/60"
-                            : "bg-gray-50 border-gray-200 text-gray-600"
-                        }`}
-                      >
+                    ) : (
+                      /* NO IMAGE HEADER */
+                      <>
                         <div
-                          className={`w-3.5 h-3.5 rounded-md bg-gradient-to-br ${grad}`}
+                          className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${grad} opacity-80`}
                         />
-                        {catName(svc.categoryId)}
-                      </span>
-                      {/* Duration */}
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border ${
-                          isDark
-                            ? "bg-amber-500/8 border-amber-400/15 text-amber-400"
-                            : "bg-amber-50 border-amber-200 text-amber-700"
+                        <div className="absolute top-3 right-3 z-10">
+                          <span
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border backdrop-blur-md shadow-sm ${
+                              svc.isActive
+                                ? isDark
+                                  ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-400"
+                                  : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                                : isDark
+                                  ? "bg-rose-500/20 border-rose-400/30 text-rose-400"
+                                  : "bg-rose-50 border-rose-200 text-rose-600"
+                            }`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${svc.isActive ? "bg-emerald-400" : "bg-rose-400"}`}
+                            />
+                            {svc.isActive ? "Active" : "Hidden"}
+                          </span>
+                        </div>
+                      </>
+                    )}
+
+                    {/* CONTENT BODY */}
+                    <div className="p-5 flex flex-col flex-1">
+                      {/* Title & Icon Row */}
+                      <div className="flex items-start gap-3 mb-3">
+                        {!hasImg && (
+                          <div
+                            className={`w-10 h-10 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center shadow-md flex-shrink-0 mt-0.5`}
+                          >
+                            <Package size={18} className="text-white" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <h3
+                            className={`font-bold text-base leading-tight ${isDark ? "text-white/95" : "text-gray-900"}`}
+                          >
+                            {svc.title}
+                          </h3>
+                        </div>
+                      </div>
+
+                      {/* Description */}
+                      <p
+                        className={`text-xs leading-relaxed mb-4 line-clamp-2 flex-shrink-0 ${
+                          svc.description
+                            ? isDark
+                              ? "text-white/45"
+                              : "text-gray-500"
+                            : isDark
+                              ? "text-white/20"
+                              : "text-gray-300"
                         }`}
                       >
-                        <Clock size={11} />
-                        {svc.duration} мин
-                      </span>
-                    </div>
+                        {svc.description || "Без описания"}
+                      </p>
 
-                    {/* Footer */}
-                    <div
-                      className={`flex items-center justify-between mt-4 pt-4 border-t ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}
-                    >
-                      <div className="flex gap-1.5">
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={() => openEdit(svc)}
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
+                      {/* Info pills */}
+                      <div className="flex flex-wrap gap-2 mt-auto">
+                        {/* Category */}
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border ${
                             isDark
-                              ? "bg-blue-500/10 border-blue-400/15 text-blue-400 hover:bg-blue-500/20"
-                              : "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
+                              ? "bg-white/[0.06] border-white/[0.08] text-white/60"
+                              : "bg-gray-50 border-gray-200 text-gray-600"
                           }`}
                         >
-                          <Edit size={14} />
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={() => deleteService(svc.id)}
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
+                          <div
+                            className={`w-3 h-3 rounded-md bg-gradient-to-br ${grad}`}
+                          />
+                          {catName(svc.categoryId)}
+                        </span>
+                        {/* Duration */}
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border ${
                             isDark
-                              ? "bg-rose-500/10 border-rose-400/15 text-rose-400 hover:bg-rose-500/20"
-                              : "bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100"
+                              ? "bg-amber-500/8 border-amber-400/15 text-amber-400"
+                              : "bg-amber-50 border-amber-200 text-amber-700"
                           }`}
                         >
-                          <Trash2 size={14} />
-                        </motion.button>
+                          <Clock size={11} />
+                          {svc.duration} мин
+                        </span>
                       </div>
-                      <span
-                        className={`text-xs font-mono ${isDark ? "text-white/20" : "text-gray-300"}`}
+
+                      {/* Footer Actions */}
+                      <div
+                        className={`flex items-center justify-between mt-4 pt-4 border-t ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}
                       >
-                        #{svc.id}
-                      </span>
+                        <div className="flex gap-1.5">
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => openEdit(svc)}
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
+                              isDark
+                                ? "bg-blue-500/10 border-blue-400/15 text-blue-400 hover:bg-blue-500/20"
+                                : "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
+                            }`}
+                          >
+                            <Edit size={14} />
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => deleteService(svc.id)}
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
+                              isDark
+                                ? "bg-rose-500/10 border-rose-400/15 text-rose-400 hover:bg-rose-500/20"
+                                : "bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100"
+                            }`}
+                          >
+                            <Trash2 size={14} />
+                          </motion.button>
+                        </div>
+                        <span
+                          className={`text-xs font-mono ${isDark ? "text-white/20" : "text-gray-300"}`}
+                        >
+                          #{svc.id}
+                        </span>
+                      </div>
                     </div>
                   </motion.div>
                 );
@@ -943,6 +994,64 @@ export default function Services() {
               {/* Body */}
               <div className="flex-1 overflow-y-auto">
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                  {/* Image URL Input */}
+                  <div className={sectionCls}>
+                    <label
+                      className={`block text-xs font-bold uppercase tracking-wider mb-2.5 ${isDark ? "text-white/35" : "text-gray-400"}`}
+                    >
+                      Ссылка на фото{" "}
+                      <span
+                        className={`normal-case font-normal ${isDark ? "text-white/20" : "text-gray-300"}`}
+                      >
+                        (необязательно)
+                      </span>
+                    </label>
+                    <div className="relative">
+                      <LinkIcon
+                        size={14}
+                        className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/25" : "text-gray-400"}`}
+                      />
+                      <input
+                        type="url"
+                        name="img"
+                        value={form.img}
+                        onChange={handleInput}
+                        placeholder="https://example.com/image.jpg"
+                        className={`${inputCls} pl-10`}
+                      />
+                    </div>
+
+                    {/* Preview */}
+                    {form.img && (
+                      <div className="mt-3 relative group">
+                        <div
+                          className={`w-full h-32 rounded-xl overflow-hidden border ${
+                            isDark
+                              ? "border-white/10 bg-white/5"
+                              : "border-gray-200 bg-gray-50"
+                          }`}
+                        >
+                          <img
+                            src={form.img}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display =
+                                "none";
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setForm((p) => ({ ...p, img: "" }))}
+                          className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-md hover:bg-rose-600 transition-colors"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Title */}
                   <div className={sectionCls}>
                     <label

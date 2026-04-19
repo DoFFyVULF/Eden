@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   Plus,
   Users,
   UserPlus,
-  Star,
   Phone,
   Scissors,
   MoreVertical,
@@ -1179,6 +1178,8 @@ function MasterCard({
   onVacation,
   onViewTimeOff,
   onViewUpcoming,
+  onMenuToggle,
+  menuButtonRef,
 }: {
   master: IMaster;
   status?: MasterStatusInfo;
@@ -1190,19 +1191,20 @@ function MasterCard({
   onVacation: () => void;
   onViewTimeOff: () => void;
   onViewUpcoming: () => void;
+  onMenuToggle: (id: number) => void;
+  menuButtonRef: (el: HTMLButtonElement | null) => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const isTimeOff = !!(status?.isOnTimeOff && status.currentPeriod);
   const hasUpcoming = upcomingTimeOffs.length > 0;
   const grad = specGrad(master.specialization);
 
   const cardCls = isDark
-    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1] hover:bg-white/[0.1] hover:border-white/[0.15] shadow-lg hover:shadow-xl"
-    : "bg-white border border-gray-200/80 hover:border-gray-300/80 shadow-sm hover:shadow-lg";
+    ? "bg-gradient-to-b from-white/[0.06] to-transparent backdrop-blur-xl border border-white/[0.08] hover:border-white/[0.14] transition-all duration-300"
+    : "bg-gradient-to-b from-white to-gray-50/50 border border-gray-200/60 hover:border-gray-300/70 transition-all duration-300";
 
   const menuCls = isDark
-    ? "bg-slate-900/95 backdrop-blur-2xl border border-white/[0.1] shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
-    : "bg-white border border-gray-200/70 shadow-2xl";
+    ? "bg-zinc-900/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl"
+    : "bg-white border border-gray-100 shadow-xl";
 
   const MENU_ITEMS = [
     ...(hasUpcoming
@@ -1263,22 +1265,20 @@ function MasterCard({
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 16, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.96 }}
-      whileHover={{ y: -3 }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      whileHover={{ y: -4 }}
       transition={{ duration: 0.25 }}
-      className={`relative rounded-2xl p-5 transition-all duration-300 ${cardCls}`}
+      className={`rounded-[20px] overflow-hidden ${cardCls}`}
     >
-      <div
-        className={`absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r ${grad} opacity-50`}
-      />
-
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-start gap-3">
-          <div className="relative flex-shrink-0">
+      <div className="p-5 pb-4">
+        {/* Top row: avatar + info */}
+        <div className="flex items-start gap-4">
+          {/* Avatar */}
+          <div className="relative shrink-0">
             <div
-              className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-lg shadow-lg overflow-hidden`}
+              className={`w-[60px] h-[60px] rounded-[16px] bg-gradient-to-br ${grad} flex items-center justify-center text-white font-semibold text-lg overflow-hidden shadow-md`}
             >
               {master.photo ? (
                 <img
@@ -1290,120 +1290,80 @@ function MasterCard({
                 getInitials(master)
               )}
             </div>
+            {/* Status dot */}
             <div
-              className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 ${
+              className={`absolute -bottom-[3px] -right-[3px] w-[14px] h-[14px] rounded-full border-2 ${
                 isTimeOff
                   ? "bg-amber-400"
                   : master.isActive
                     ? "bg-emerald-400"
-                    : "bg-rose-400"
-              } ${isDark ? "border-slate-900" : "border-white"}`}
-            >
-              {master.isActive && !isTimeOff && (
-                <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-60" />
-              )}
-            </div>
+                    : "bg-gray-300"
+              } ${isDark ? "border-zinc-900" : "border-white"}`}
+            />
           </div>
 
-          <div className="min-w-0">
+          {/* Info */}
+          <div className="min-w-0 flex-1">
             <h3
-              className={`font-bold text-base leading-tight ${isDark ? "text-white/95" : "text-gray-900"}`}
+              className={`font-semibold text-[16px] leading-tight ${isDark ? "text-white" : "text-gray-900"}`}
             >
               {master.surname} {master.name}
             </h3>
             {master.middlename && (
               <p
-                className={`text-xs mt-0.5 ${isDark ? "text-white/35" : "text-gray-400"}`}
+                className={`text-[13px] mt-0.5 ${isDark ? "text-white/35" : "text-gray-400"}`}
               >
                 {master.middlename}
               </p>
             )}
             <span
-              className={`inline-flex items-center gap-1 mt-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gradient-to-r ${grad} text-white shadow-sm`}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium bg-gradient-to-r ${grad} text-white mt-2`}
             >
-              <Scissors size={10} />
               {master.specialization}
             </span>
           </div>
+
+          {/* Menu trigger */}
+          <div className="relative shrink-0">
+            <motion.button
+              ref={menuButtonRef}
+              whileTap={{ scale: 0.9 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMenuToggle(master.id!);
+              }}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                isDark
+                  ? "text-white/30 hover:text-white/60 hover:bg-white/[0.06]"
+                  : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <MoreVertical size={15} />
+            </motion.button>
+          </div>
         </div>
 
-        <div className="relative flex-shrink-0">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setMenuOpen(!menuOpen)}
-            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
-              menuOpen
-                ? isDark
-                  ? "bg-white/[0.12] text-white/90"
-                  : "bg-gray-100 text-gray-700"
-                : isDark
-                  ? "bg-white/[0.06] text-white/40 hover:bg-white/[0.1] hover:text-white/70"
-                  : "text-gray-400 hover:bg-gray-100"
+        {/* Phone */}
+        {master.phone && (
+          <div
+            className={`flex items-center gap-2 text-[13px] mt-3.5 px-3 py-2 rounded-xl ${
+              isDark
+                ? "bg-white/[0.04] text-white/50"
+                : "bg-gray-50/80 text-gray-500"
             }`}
           >
-            <MoreVertical size={15} />
-          </motion.button>
-
-          <AnimatePresence>
-            {menuOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setMenuOpen(false)}
-                />
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.93, y: -6 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.93, y: -6 }}
-                  transition={{ duration: 0.12 }}
-                  className={`absolute right-0 top-full mt-1.5 w-56 rounded-2xl overflow-hidden z-50 ${menuCls}`}
-                >
-                  <div className="p-1.5 space-y-0.5">
-                    {MENU_ITEMS.map((item) => (
-                      <motion.button
-                        key={item.label}
-                        whileHover={{ x: 3 }}
-                        onClick={() => {
-                          item.onClick();
-                          setMenuOpen(false);
-                        }}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-left ${item.color} ${item.hover}`}
-                      >
-                        <div className="flex-shrink-0">{item.icon}</div>
-                        <div>
-                          <div className="text-sm font-semibold">
-                            {item.label}
-                          </div>
-                          <div
-                            className={`text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}
-                          >
-                            {item.sub}
-                          </div>
-                        </div>
-                      </motion.button>
-                    ))}
-                  </div>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-        </div>
+            <Phone size={13} />
+            <span>{formatPhoneNumber(master.phone)}</span>
+          </div>
+        )}
       </div>
 
-      {master.phone && (
-        <div
-          className={`flex items-center gap-2 text-xs mb-4 ${isDark ? "text-white/40" : "text-gray-400"}`}
-        >
-          <Phone size={12} />
-          <span>{formatPhoneNumber(master.phone)}</span>
-        </div>
-      )}
-
+      {/* Bottom section */}
       <div
-        className={`flex items-center justify-between pt-4 border-t ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}
+        className={`pt-3.5 pb-4 px-5 border-t ${isDark ? "border-white/[0.06]" : "border-gray-100"}`}
       >
-        <div className="flex gap-2">
+        <div className="flex items-center justify-between">
+          {/* Status */}
           {isTimeOff && status?.currentPeriod ? (
             <CurrentVacationBadge
               period={status.currentPeriod}
@@ -1411,38 +1371,44 @@ function MasterCard({
               onClick={onViewTimeOff}
             />
           ) : (
-            <span
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                master.isActive
-                  ? isDark
-                    ? "bg-emerald-500/10 border-emerald-400/15 text-emerald-400"
-                    : "bg-emerald-50 border-emerald-200 text-emerald-700"
-                  : isDark
-                    ? "bg-rose-500/10 border-rose-400/15 text-rose-400"
-                    : "bg-rose-50 border-rose-200 text-rose-600"
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-[7px] h-[7px] rounded-full ${
+                  master.isActive ? "bg-emerald-400" : "bg-gray-300"
+                }`}
+              />
+              <span
+                className={`text-[13px] font-medium ${
+                  master.isActive
+                    ? isDark
+                      ? "text-emerald-400"
+                      : "text-emerald-600"
+                    : isDark
+                      ? "text-white/30"
+                      : "text-gray-400"
+                }`}
+              >
+                {master.isActive ? "Активен" : "Неактивен"}
+              </span>
+            </div>
+          )}
+
+          {/* Upcoming periods count */}
+          {hasUpcoming && !isTimeOff && (
+            <button
+              onClick={onViewUpcoming}
+              className={`text-[12px] font-medium flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${
+                isDark
+                  ? "bg-purple-500/10 text-purple-300 hover:bg-purple-500/15"
+                  : "bg-purple-50 text-purple-600 hover:bg-purple-100"
               }`}
             >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${master.isActive ? "bg-emerald-400" : "bg-rose-400"}`}
-              />
-              {master.isActive ? "Активен" : "Неактивен"}
-            </span>
+              <CalendarDays size={11} />
+              {upcomingTimeOffs.length} {upcomingTimeOffs.length === 1 ? "период" : upcomingTimeOffs.length < 5 ? "периода" : "периодов"}
+            </button>
           )}
 
-          {hasUpcoming && !isTimeOff && (
-            <UpcomingTimeOffBadge
-              period={upcomingTimeOffs[0]}
-              isDark={isDark}
-              onClick={onViewUpcoming}
-            />
-          )}
-        </div>
-
-        <div
-          className={`flex items-center gap-1 text-xs font-bold ${isDark ? "text-amber-400" : "text-amber-500"}`}
-        >
-          <Star size={13} className="fill-current" />
-          4.8
+          {!hasUpcoming && !isTimeOff && <div />}
         </div>
       </div>
     </motion.div>
@@ -1484,6 +1450,76 @@ export default function Employees() {
   const [upcomingModalPeriods, setUpcomingModalPeriods] = useState<
     IMasterTimeOff[]
   >([]);
+
+  // Global menu state — only one menu open at a time
+  const [openMenuMasterId, setOpenMenuMasterId] = useState<number | null>(null);
+  const menuButtonRefs = useRef<Record<number, HTMLButtonElement | null>>({});
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+
+  const handleMenuToggle = useCallback((masterId: number) => {
+    setOpenMenuMasterId((prev) => (prev === masterId ? null : masterId));
+  }, []);
+
+  // Clear menuPosition when menu is closed
+  useEffect(() => {
+    if (openMenuMasterId === null) {
+      setMenuPosition(null);
+    }
+  }, [openMenuMasterId]);
+
+  // Update menu position on scroll
+  useEffect(() => {
+    if (openMenuMasterId === null) return;
+
+    const updatePosition = () => {
+      const btn = menuButtonRefs.current[openMenuMasterId];
+      if (!btn) {
+        setOpenMenuMasterId(null);
+        setMenuPosition(null);
+        return;
+      }
+      const rect = btn.getBoundingClientRect();
+      // Close menu if button is off-screen
+      if (rect.bottom < 0 || rect.top > window.innerHeight) {
+        setOpenMenuMasterId(null);
+        setMenuPosition(null);
+        return;
+      }
+      setMenuPosition({
+        top: rect.bottom + window.scrollY + 8,
+        left: rect.right + window.scrollX - 208,
+      });
+    };
+
+    // Set initial position
+    updatePosition();
+
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [openMenuMasterId]);
+
+  // Close menu on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (openMenuMasterId !== null) {
+        const target = e.target as Node;
+        const isMenuButton = Object.values(menuButtonRefs.current).some(
+          (btn) => btn && target === btn
+        );
+        const isMenuDropdown = target.parentElement?.closest('[data-master-menu]');
+        if (!isMenuButton && !isMenuDropdown) {
+          setOpenMenuMasterId(null);
+          setMenuPosition(null);
+        }
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [openMenuMasterId]);
 
   useEffect(() => {
     const check = () =>
@@ -1583,21 +1619,44 @@ export default function Employees() {
 
   const handleCreate = async (data: any) => {
     await masterService.create({
-      ...data,
+      name: data.name,
+      surname: data.surname,
+      middlename: data.middlename || "",
+      specialization: data.specialization,
+      photo: data.photoUrl || "", // Передаем ссылку в поле photo
       phone: data.phone?.replace(/\D/g, "") || "",
+      isActive: data.isActive ?? true,
     });
     await loadMasters(false);
     setIsCreateOpen(false);
   };
 
   const handleUpdate = async (data: any) => {
-    await masterService.update(editMaster!.id!, {
-      ...data,
-      phone: data.phone?.replace(/\D/g, "") || "",
-    });
-    await loadMasters(false);
-    setIsEditOpen(false);
-    setEditMaster(null);
+    if (!editMaster) return;
+
+    // Формируем полный объект обновления.
+    // Берем старые значения из editMaster и перезаписываем новыми из формы.
+    // Это гарантирует, что все обязательные поля (name, surname и т.д.) будут отправлены.
+    const updatePayload = {
+      name: data.name || editMaster.name,
+      surname: data.surname || editMaster.surname,
+      middlename: data.middlename !== undefined ? data.middlename : editMaster.middlename,
+      specialization: data.specialization || editMaster.specialization,
+      phone: data.phone ? data.phone.replace(/\D/g, "") : editMaster.phone,
+      isActive: data.isActive !== undefined ? data.isActive : editMaster.isActive,
+      // Логика фото: если в форме есть ссылка - берем её, иначе оставляем старую
+      photo: data.photoUrl ? data.photoUrl : editMaster.photo,
+    };
+
+    try {
+      await masterService.update(editMaster.id!, updatePayload);
+      await loadMasters(false);
+      setIsEditOpen(false);
+      setEditMaster(null);
+    } catch (error) {
+      console.error("Ошибка при обновлении:", error);
+      alert("Не удалось обновить сотрудника. Проверьте консоль или формат данных.");
+    }
   };
 
   const handleVacation = async (d: VacationFormData) => {
@@ -2034,7 +2093,7 @@ export default function Employees() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5">
             <AnimatePresence mode="popLayout">
               {filtered.map((m) => (
                 <MasterCard
@@ -2055,8 +2114,147 @@ export default function Employees() {
                   }}
                   onViewTimeOff={() => handleOpenTimeOffDetails(m)}
                   onViewUpcoming={() => handleOpenUpcomingModal(m)}
+                  onMenuToggle={handleMenuToggle}
+                  menuButtonRef={(el) => {
+                    menuButtonRefs.current[m.id!] = el;
+                  }}
                 />
               ))}
+            </AnimatePresence>
+
+            {/* Global menu dropdown — rendered once, outside cards */}
+            <AnimatePresence>
+              {openMenuMasterId !== null && (() => {
+                const master = masters.find((m) => m.id === openMenuMasterId);
+                if (!master) return null;
+
+                const isTimeOff = !!(
+                  statuses[openMenuMasterId]?.isOnTimeOff &&
+                  statuses[openMenuMasterId]?.currentPeriod
+                );
+                const upcoming = upcomingTimeOffs[openMenuMasterId] || [];
+                const hasUpcoming = upcoming.length > 0;
+
+                const MENU_ITEMS = [
+                  ...(hasUpcoming
+                    ? [
+                        {
+                          label: "Будущие периоды",
+                          icon: <CalendarDays size={14} />,
+                          color: isDark ? "text-purple-400" : "text-purple-600",
+                          hover: isDark
+                            ? "hover:bg-purple-500/10"
+                            : "hover:bg-purple-50",
+                          onClick: () => {
+                            handleOpenUpcomingModal(master);
+                            setOpenMenuMasterId(null);
+                          },
+                        },
+                      ]
+                    : []),
+                  isTimeOff
+                    ? {
+                        label: "Текущий период",
+                        icon: <Eye size={14} />,
+                        color: isDark ? "text-blue-400" : "text-blue-600",
+                        hover: isDark
+                          ? "hover:bg-blue-500/10"
+                          : "hover:bg-blue-50",
+                        onClick: () => {
+                          handleOpenTimeOffDetails(master);
+                          setOpenMenuMasterId(null);
+                        },
+                      }
+                    : {
+                        label: "Отправить в отпуск",
+                        icon: <Calendar size={14} />,
+                        color: isDark ? "text-purple-400" : "text-purple-600",
+                        hover: isDark
+                          ? "hover:bg-purple-500/10"
+                          : "hover:bg-purple-50",
+                        onClick: () => {
+                          setVacMaster(master);
+                          setIsVacOpen(true);
+                          setOpenMenuMasterId(null);
+                        },
+                      },
+                  {
+                    label: master.isActive ? "Деактивировать" : "Активировать",
+                    icon: <Power size={14} />,
+                    color: isDark ? "text-blue-400" : "text-blue-600",
+                    hover: isDark
+                      ? "hover:bg-blue-500/10"
+                      : "hover:bg-blue-50",
+                    onClick: () => {
+                      handleToggle(master);
+                      setOpenMenuMasterId(null);
+                    },
+                  },
+                  {
+                    label: "Редактировать",
+                    icon: <Edit size={14} />,
+                    color: isDark ? "text-emerald-400" : "text-emerald-600",
+                    hover: isDark
+                      ? "hover:bg-emerald-500/10"
+                      : "hover:bg-emerald-50",
+                    onClick: () => {
+                      setEditMaster(master);
+                      setIsEditOpen(true);
+                      setOpenMenuMasterId(null);
+                    },
+                  },
+                  {
+                    label: "Удалить",
+                    icon: <Trash2 size={14} />,
+                    color: isDark ? "text-rose-400" : "text-rose-500",
+                    hover: isDark
+                      ? "hover:bg-rose-500/10"
+                      : "hover:bg-rose-50",
+                    onClick: () => {
+                      handleDelete(master.id!);
+                      setOpenMenuMasterId(null);
+                    },
+                  },
+                ];
+
+                const menuCls = isDark
+                  ? "bg-zinc-900/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl"
+                  : "bg-white border border-gray-100 shadow-xl";
+
+                return (
+                  <motion.div
+                    key="global-menu"
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.1 }}
+                    data-master-menu
+                    className={`absolute w-52 rounded-xl overflow-hidden z-[100] ${menuCls}`}
+                    style={{
+                      top: menuPosition?.top ?? 0,
+                      left: menuPosition?.left ?? 0,
+                    }}
+                  >
+                    <div className="p-1.5 space-y-0.5">
+                      {MENU_ITEMS.map((item) => (
+                        <motion.button
+                          key={item.label}
+                          whileHover={{ scale: 1.02, x: 2 }}
+                          onClick={item.onClick}
+                          className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors text-left ${item.color} ${item.hover}`}
+                        >
+                          <div className="shrink-0">{item.icon}</div>
+                          <div>
+                            <div className="text-[13px] font-medium">
+                              {item.label}
+                            </div>
+                          </div>
+                        </motion.button>
+                      ))}
+                    </div>
+                  </motion.div>
+                );
+              })()}
             </AnimatePresence>
           </div>
         )}

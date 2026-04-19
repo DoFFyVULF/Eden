@@ -14,11 +14,12 @@ import { ServiceDto } from './dto/service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
 import { Auth } from 'src/auth/decorators/auth.decorator';
 
-@Auth()
+
 @Controller('service')
 export class ServiceController {
   constructor(private readonly serviceService: ServiceService) {}
 
+  @Auth()
   @HttpCode(201)
   @Post()
   async create(@Body() dto: ServiceDto) {
@@ -37,6 +38,7 @@ export class ServiceController {
     return this.serviceService.getById(id);
   }
 
+  @Auth()
   @HttpCode(200)
   @Patch(':id')
   async update(
@@ -46,6 +48,7 @@ export class ServiceController {
     return this.serviceService.update(id, dto);
   }
 
+  @Auth()
   @HttpCode(200)
   @Delete(':id')
   async delete(@Param('id', ParseIntPipe) id: number) {

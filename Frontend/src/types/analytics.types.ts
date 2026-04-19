@@ -46,7 +46,9 @@ export interface ClientMetrics {
   totalClients: number;
   newClients: number;
   returningClients: number;
+  repeatClients: number;        // ← ДОБАВЛЕНО: клиенты с 2+ визитами в периоде
   retentionRate: number;
+  repeatRate: number;          // ← ДОБАВЛЕНО: процент с повторными визитами
   clientsByMonth: ClientGrowth[];
 }
 
@@ -152,7 +154,6 @@ export interface RevenueTrend {
 // ===== ТИПЫ ДЛЯ ДЕТАЛЬНОЙ ФИНАНСОВОЙ АНАЛИТИКИ =====
 
 export interface FinancialAnalyticsResponse {
-  // Основные показатели
   overview: {
     totalRevenue: number;
     revenueGrowth: number;
@@ -161,24 +162,18 @@ export interface FinancialAnalyticsResponse {
     totalTransactions: number;
     activeClients: number;
   };
-
-  // Динамика выручки по дням/неделям/месяцам
   revenueTrend: {
     date: string;
     revenue: number;
     transactions: number;
     averageCheck: number;
   }[];
-
-  // Распределение выручки по категориям
   revenueByCategory: {
     category: string;
     amount: number;
     percentage: number;
     growth: number;
   }[];
-
-  // Выручка по мастерам
   revenueByMasters: {
     masterId: number;
     masterName: string;
@@ -188,8 +183,6 @@ export interface FinancialAnalyticsResponse {
     averageCheck: number;
     growth: number;
   }[];
-
-  // Выручка по услугам
   revenueByServices: {
     serviceId: number;
     serviceName: string;
@@ -199,44 +192,33 @@ export interface FinancialAnalyticsResponse {
     averagePrice: number;
     growth: number;
   }[];
-
-  // Почасовая статистика
   revenueByHour: {
     hour: number;
     revenue: number;
     transactions: number;
   }[];
-
-  // Статистика по дням недели
   revenueByWeekday: {
     weekday: string;
     revenue: number;
     transactions: number;
     averageCheck: number;
   }[];
-
-  // Методы оплаты
   paymentMethods: {
     method: string;
     amount: number;
     percentage: number;
     count: number;
   }[];
-
-  // Прогноз
   forecast: {
     nextMonth: number;
     nextQuarter: number;
     confidence: number;
   };
-
-  // Метаданные
   period: {
     startDate: string;
     endDate: string;
     periodType: string;
   };
-  
   lastUpdated: string;
 }
 

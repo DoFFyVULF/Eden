@@ -51,7 +51,16 @@ export class ClientMetricsDto {
   returningClients: number;
 
   @ApiProperty()
+  repeatClients: number;
+
+  @ApiProperty()
   retentionRate: number;
+
+  @ApiProperty()
+  repeatRate: number;
+
+  @ApiProperty()
+  conversionToRegularRate: number;  // ← ДОБАВИТЬ
 
   @ApiProperty({ type: () => [ClientGrowthDto] })
   clientsByMonth: ClientGrowthDto[];

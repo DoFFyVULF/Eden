@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
+ 
+ 
 import {
   Controller,
   Get,
@@ -18,7 +18,7 @@ import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { Auth } from 'src/auth/decorators/auth.decorator';
 import { AppointmentStatus } from 'generated/prisma/enums';
 
-@Auth()
+
 @Controller('appointment')
 export class AppointmentController {
   constructor(private readonly appointmentService: AppointmentService) {}
@@ -54,12 +54,14 @@ export class AppointmentController {
     return this.appointmentService.findAll();
   }
 
+  @Auth()
   @HttpCode(200)
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.appointmentService.findOne(id);
   }
 
+  @Auth()
   @HttpCode(200)
   @Patch(':id')
   update(
@@ -69,6 +71,7 @@ export class AppointmentController {
     return this.appointmentService.update(id, dto);
   }
 
+  @Auth()
   @HttpCode(200)
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {

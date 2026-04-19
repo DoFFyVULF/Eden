@@ -8,23 +8,23 @@ import { IAppointment, AppointmentStatus } from "@/types/appointment.types";
 import { IUser } from "@/types/user.types";
 import {
   Search,
-  Filter,
   Calendar,
   Clock,
   Users,
-  UserCheck,
-  CheckCircle,
-  XCircle,
-  Clock4,
+  CheckCircle2,
   AlertCircle,
   ChevronDown,
   ChevronUp,
-  TrendingUp,
   RefreshCw,
   CalendarDays,
-  BarChart3,
-  Shield,
-  Calendar as CalendarIcon,
+  SlidersHorizontal,
+  X,
+  UserCheck,
+  Clock4,
+  ArrowUpRight,
+  TrendingUp,
+  Flame,
+  Activity,
 } from "lucide-react";
 
 type SortField = "time" | "client" | "service" | "date";
@@ -36,12 +36,26 @@ export default function MasterAppointments() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDark, setIsDark] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const [sortField, setSortField] = useState<SortField>("time");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [dateFilter, setDateFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Theme detection
+  useEffect(() => {
+    const check = () =>
+      setIsDark(document.documentElement.classList.contains("dark"));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => obs.disconnect();
+  }, []);
 
   const loadData = async (showLoading = true) => {
     if (showLoading) {
@@ -77,13 +91,28 @@ export default function MasterAppointments() {
     loadData();
   }, []);
 
-  // Только подтвержденные записи для основного списка
   const confirmedAppointments = useMemo(() => {
     return appointments.filter(app => app.status === AppointmentStatus.Подтвержден);
   }, [appointments]);
 
-  const sortAppointments = (appointments: IAppointment[]): IAppointment[] => {
-    const sorted = [...appointments].sort((a, b) => {
+  const todayAppointments = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    return confirmedAppointments.filter(
+      (app) =>
+        new Date(app.appointmentTime).toISOString().split("T")[0] === today
+    );
+  }, [confirmedAppointments]);
+
+  const newAppointments = useMemo(() => {
+    return appointments.filter((app) => app.status === AppointmentStatus.Новый);
+  }, [appointments]);
+
+  const completedAppointments = useMemo(() => {
+    return appointments.filter((app) => app.status === AppointmentStatus.Завершен);
+  }, [appointments]);
+
+  const sortAppointments = (list: IAppointment[]): IAppointment[] => {
+    const sorted = [...list].sort((a, b) => {
       let aValue: string | number = "";
       let bValue: string | number = "";
 
@@ -151,36 +180,6 @@ export default function MasterAppointments() {
     searchQuery,
   ]);
 
-  const todayAppointments = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
-    return confirmedAppointments.filter(
-      (app) =>
-        new Date(app.appointmentTime).toISOString().split("T")[0] === today
-    );
-  }, [confirmedAppointments]);
-
-  const upcomingAppointments = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    return confirmedAppointments.filter(
-      (app) =>
-        new Date(app.appointmentTime) >= today
-    );
-  }, [confirmedAppointments]);
-
-  const newAppointments = useMemo(() => {
-    return appointments.filter((app) => app.status === AppointmentStatus.Новый);
-  }, [appointments]);
-
-  const completedAppointments = useMemo(() => {
-    return appointments.filter((app) => app.status === AppointmentStatus.Завершен);
-  }, [appointments]);
-
-  const cancelledAppointments = useMemo(() => {
-    return appointments.filter((app) => app.status === AppointmentStatus.Отменен);
-  }, [appointments]);
-
   const handleSortChange = (field: SortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -199,7 +198,7 @@ export default function MasterAppointments() {
     const date = new Date(isoString);
     return date.toLocaleDateString("ru-RU", {
       day: "2-digit",
-      month: "long",
+      month: "2-digit",
       year: "numeric",
     });
   };
@@ -212,513 +211,629 @@ export default function MasterAppointments() {
     });
   };
 
-  const getStatusIcon = (status: AppointmentStatus) => {
+  const getStatusInfo = (status: AppointmentStatus) => {
     switch (status) {
       case AppointmentStatus.Новый:
-        return <AlertCircle className="w-4 h-4 text-amber-500" />;
+        return { dot: "bg-amber-400", label: "Новый", color: "text-amber-400" };
       case AppointmentStatus.Подтвержден:
-        return <CheckCircle className="w-4 h-4 text-emerald-500" />;
+        return { dot: "bg-emerald-400", label: "Подтверждён", color: "text-emerald-400" };
       case AppointmentStatus.Завершен:
-        return <Clock4 className="w-4 h-4 text-blue-500" />;
+        return { dot: "bg-blue-400", label: "Завершён", color: "text-blue-400" };
       case AppointmentStatus.Отменен:
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return { dot: "bg-rose-400", label: "Отменён", color: "text-rose-400" };
       default:
-        return null;
+        return { dot: "bg-gray-400", label: status, color: "text-gray-400" };
     }
   };
 
-  const getStatusColor = (status: AppointmentStatus) => {
-    switch (status) {
-      case AppointmentStatus.Новый:
-        return "bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-amber-200";
-      case AppointmentStatus.Подтвержден:
-        return "bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-200";
-      case AppointmentStatus.Завершен:
-        return "bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border-blue-200";
-      case AppointmentStatus.Отменен:
-        return "bg-gradient-to-r from-rose-100 to-red-100 text-rose-700 border-rose-200";
-      default:
-        return "bg-gray-100 text-gray-700 border-gray-200";
-    }
-  };
+  const glassCls = isDark
+    ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1] shadow-lg"
+    : "bg-white border border-gray-200/70 shadow-sm";
+
+  const STAT_CARDS = [
+    {
+      num: todayAppointments.length,
+      label: "Сегодня",
+      sub: "подтверждённых",
+      icon: <CalendarDays size={22} />,
+      gradient: "from-emerald-500 to-teal-500",
+      glow: "shadow-emerald-500/25",
+    },
+    {
+      num: newAppointments.length,
+      label: "Новых",
+      sub: "ждут подтверждения",
+      icon: <AlertCircle size={22} />,
+      gradient: "from-amber-500 to-orange-500",
+      glow: "shadow-amber-500/25",
+      pulse: newAppointments.length > 0,
+    },
+    {
+      num: confirmedAppointments.length,
+      label: "Активных",
+      sub: "в очереди",
+      icon: <CheckCircle2 size={22} />,
+      gradient: "from-blue-500 to-indigo-500",
+      glow: "shadow-blue-500/25",
+    },
+    {
+      num: completedAppointments.length,
+      label: "Завершено",
+      sub: "всего выполнено",
+      icon: <Clock4 size={22} />,
+      gradient: "from-purple-500 to-pink-500",
+      glow: "shadow-purple-500/25",
+    },
+  ];
+
+  const SORT_OPTS: { field: SortField; label: string; icon: React.ReactNode }[] = [
+    { field: "time", label: "Время", icon: <Clock size={14} /> },
+    { field: "date", label: "Дата", icon: <Calendar size={14} /> },
+    { field: "client", label: "Клиент", icon: <Users size={14} /> },
+    { field: "service", label: "Услуга", icon: <TrendingUp size={14} /> },
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
-      <div className="max-w-8xl mx-auto">
-        {/* Заголовок и управление */}
-        <div className="mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+    <div className="min-h-screen p-4 md:p-6 lg:p-8">
+      {/* Ambient orbs — dark only */}
+      {isDark && (
+        <div className="fixed inset-0 pointer-events-none overflow-hidden -z-0">
+          <div className="absolute -top-48 -right-48 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute -bottom-48 -left-48 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl animate-pulse delay-1000" />
+          <div className="absolute top-1/2 left-1/3 w-72 h-72 bg-indigo-500/8 rounded-full blur-3xl" />
+        </div>
+      )}
+
+      <div className="max-w-9xl mx-auto relative z-10 space-y-8">
+        {/* ── HEADER ─────────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+            {/* Left — greeting */}
             <div>
-              <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-3 mb-2"
+              <div className="flex items-center gap-2 mb-3">
+                <div
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border ${
+                    isDark
+                      ? "bg-white/[0.07] border-white/[0.1] text-white/50"
+                      : "bg-gray-100 border-gray-200 text-gray-400"
+                  }`}
+                >
+                  <Activity size={11} />
+                  Управление записями
+                </div>
+              </div>
+
+              <h1
+                className={`text-4xl md:text-5xl lg:text-6xl font-black leading-none tracking-tight mb-3 ${
+                  isDark ? "text-white" : "text-gray-900"
+                }`}
               >
-                <div className="p-2.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl">
-                  <CalendarDays className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-                    Мои записи
-                  </h1>
-                  <p className="text-gray-600 mt-1">
-                    Добро пожаловать,{" "}
-                    <span className="font-semibold text-gray-900">
-                      {currentUser?.name || "Мастер"}
-                    </span>
-                    ! Управляйте своими записями.
-                  </p>
-                </div>
-              </motion.div>
+                Мои{" "}
+                <span
+                  className={`${
+                    isDark
+                      ? "bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent"
+                      : "bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"
+                  }`}
+                >
+                  записи
+                </span>
+              </h1>
+              <p
+                className={`text-base ${isDark ? "text-white/40" : "text-gray-400"}`}
+              >
+                {confirmedAppointments.length} активных · {newAppointments.length} новых
+              </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3">
+            {/* Right — actions */}
+            <div className="flex gap-2.5 flex-wrap">
               <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-medium hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
-              >
-                <Filter className="w-4 h-4" />
-                Фильтры
-                {isFilterOpen ? (
-                  <ChevronDown className="w-4 h-4 rotate-180" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
-              </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => loadData(false)}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-300/50 text-gray-700 rounded-xl font-medium hover:bg-gray-50/80 transition-all duration-300 shadow-sm"
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.1] text-white/60 hover:text-white/80 hover:bg-white/[0.1]"
+                    : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
+                }`}
               >
                 <RefreshCw
-                  className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+                  size={15}
+                  className={isRefreshing ? "animate-spin" : ""}
                 />
                 Обновить
               </motion.button>
             </div>
           </div>
+        </motion.div>
 
-          {/* Расширенные фильтры */}
+        {/* ── STAT CARDS ──────────────────────────────────────── */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2
+                className={`text-lg font-black tracking-tight ${isDark ? "text-white/90" : "text-gray-900"}`}
+              >
+                Статистика
+              </h2>
+              <p
+                className={`text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}
+              >
+                Ключевые показатели
+              </p>
+            </div>
+            <div
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+                isDark
+                  ? "border-white/[0.08] text-white/30"
+                  : "border-gray-200 text-gray-400"
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Live
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {STAT_CARDS.map((s, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.06 }}
+                whileHover={{ y: -3, scale: 1.02 }}
+                className={`relative rounded-2xl p-5 overflow-hidden transition-all duration-300 ${
+                  isDark
+                    ? `bg-white/[0.07] border border-white/[0.1] backdrop-blur-xl hover:bg-white/[0.1] shadow-lg ${s.glow}`
+                    : "bg-white border border-gray-200/70 shadow-sm hover:shadow-md"
+                }`}
+              >
+                {/* Gradient accent corner */}
+                <div
+                  className={`absolute -top-4 -right-4 w-20 h-20 rounded-full bg-gradient-to-br ${s.gradient} opacity-${isDark ? "15" : "8"} blur-xl`}
+                />
+
+                <div className="relative">
+                  <div
+                    className={`inline-flex p-2 rounded-xl mb-3 bg-gradient-to-br ${s.gradient} shadow-lg ${s.glow}`}
+                  >
+                    <span className="text-white">{s.icon}</span>
+                  </div>
+                  {"pulse" in s && s.pulse && s.num > 0 && (
+                    <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+                  )}
+                  <div
+                    className={`text-3xl font-black leading-none mb-1 ${isDark ? "text-white" : "text-gray-900"}`}
+                  >
+                    {isLoading ? "—" : s.num}
+                  </div>
+                  <div
+                    className={`text-sm font-semibold ${isDark ? "text-white/70" : "text-gray-700"}`}
+                  >
+                    {s.label}
+                  </div>
+                  <div
+                    className={`text-xs mt-0.5 ${isDark ? "text-white/35" : "text-gray-400"}`}
+                  >
+                    {s.sub}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── SEARCH & FILTER ─────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.28 }}
+          className={`rounded-2xl p-4 transition-all duration-300 ${glassCls}`}
+        >
+          <div className="flex gap-3 flex-wrap">
+            {/* Search */}
+            <div className="flex-1 min-w-[200px] relative">
+              <Search
+                size={16}
+                className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/30" : "text-gray-400"}`}
+              />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Поиск по клиенту, услуге..."
+                className={`w-full h-11 pl-10 pr-4 rounded-xl text-sm border outline-none transition-all ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.1] text-white/90 placeholder-white/25 focus:border-white/20 focus:bg-white/[0.09]"
+                    : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
+                }`}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-lg ${isDark ? "text-white/40 hover:text-white/60" : "text-gray-400 hover:text-gray-600"}`}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Date */}
+            <div className="relative">
+              <Calendar
+                size={15}
+                className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/30" : "text-gray-400"}`}
+              />
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className={`h-11 pl-10 pr-4 rounded-xl text-sm border outline-none cursor-pointer transition-all ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.1] text-white/90 focus:border-white/20"
+                    : "bg-gray-50 border-gray-200 text-gray-700 focus:border-blue-300 focus:bg-white"
+                }`}
+              />
+            </div>
+
+            {/* Sort toggle */}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className={`h-11 flex items-center gap-2 px-4 rounded-xl text-sm font-semibold border transition-all duration-200 ${
+                isFilterOpen
+                  ? isDark
+                    ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300"
+                    : "bg-blue-50 border-blue-300 text-blue-600"
+                  : isDark
+                    ? "bg-white/[0.07] border-white/[0.1] text-white/60 hover:text-white/80"
+                    : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-white shadow-sm"
+              }`}
+            >
+              <SlidersHorizontal size={15} />
+              Сортировка
+              {isFilterOpen ? (
+                <ChevronUp size={13} />
+              ) : (
+                <ChevronDown size={13} />
+              )}
+            </motion.button>
+
+            {/* Clear all */}
+            {(searchQuery || dateFilter) && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={clearFilters}
+                className={`h-11 px-4 rounded-xl text-sm font-semibold border transition-all ${
+                  isDark
+                    ? "bg-rose-500/10 border-rose-400/20 text-rose-400 hover:bg-rose-500/15"
+                    : "bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100"
+                }`}
+              >
+                <X size={15} />
+              </motion.button>
+            )}
+          </div>
+
+          {/* Sort pills */}
           <AnimatePresence>
             {isFilterOpen && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: "auto", marginTop: 12 }}
+                exit={{ opacity: 0, height: 0, marginTop: 0 }}
                 className="overflow-hidden"
               >
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 mb-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Поиск */}
-                    <div className="relative">
-                      <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        placeholder="Поиск по клиентам, услугам..."
-                        className="w-full pl-10 pr-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 placeholder-gray-500 transition-all duration-300"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-
-                    {/* Фильтр по дате */}
-                    <div className="relative">
-                      <Calendar className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="date"
-                        className="w-full pl-10 pr-4 py-3.5 bg-white/90 backdrop-blur-sm border border-gray-300/50 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-300"
-                        value={dateFilter}
-                        onChange={(e) => setDateFilter(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Сортировка */}
-                  <div className="mt-6">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                      Сортировка:
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {(
-                        [
-                          {
-                            field: "time" as SortField,
-                            label: "Время",
-                            icon: Clock,
-                          },
-                          {
-                            field: "client" as SortField,
-                            label: "Клиент",
-                            icon: Users,
-                          },
-                          {
-                            field: "service" as SortField,
-                            label: "Услуга",
-                            icon: TrendingUp,
-                          },
-                          {
-                            field: "date" as SortField,
-                            label: "Дата",
-                            icon: CalendarIcon,
-                          },
-                        ] as const
-                      ).map(({ field, label, icon: Icon }) => (
+                <div
+                  className={`pt-3 border-t ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}
+                >
+                  <p
+                    className={`text-xs font-semibold mb-2.5 ${isDark ? "text-white/30" : "text-gray-400"}`}
+                  >
+                    Сортировать по:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {SORT_OPTS.map((opt) => {
+                      const active = sortField === opt.field;
+                      return (
                         <motion.button
-                          key={field}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => handleSortChange(field)}
-                          className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-xl transition-all duration-300 border ${
-                            sortField === field
-                              ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md border-transparent"
-                              : "bg-white/80 text-gray-700 border-gray-300/50 hover:bg-gray-50/80"
+                          key={opt.field}
+                          whileHover={{ scale: 1.04 }}
+                          whileTap={{ scale: 0.96 }}
+                          onClick={() => handleSortChange(opt.field)}
+                          className={`flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-semibold border transition-all duration-150 ${
+                            active
+                              ? isDark
+                                ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300"
+                                : "bg-blue-100 border-blue-300 text-blue-700"
+                              : isDark
+                                ? "bg-white/[0.05] border-white/[0.08] text-white/50 hover:text-white/70 hover:border-white/[0.12]"
+                                : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-white"
                           }`}
                         >
-                          <Icon className="w-3 h-3" />
-                          {label}
-                          {sortField === field && (
-                            <span className="ml-1">
-                              {sortOrder === "asc" ? (
-                                <ChevronUp className="w-3 h-3" />
-                              ) : (
-                                <ChevronDown className="w-3 h-3" />
-                              )}
-                            </span>
-                          )}
+                          {opt.icon}
+                          {opt.label}
+                          {active &&
+                            (sortOrder === "asc" ? (
+                              <ChevronUp size={11} />
+                            ) : (
+                              <ChevronDown size={11} />
+                            ))}
                         </motion.button>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-
-                  {/* Кнопки управления фильтрами */}
-                  {(dateFilter || searchQuery) && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex justify-end mt-6 pt-4 border-t border-gray-200/50"
-                    >
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={clearFilters}
-                        className="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-300/50 rounded-lg hover:bg-red-50/50 transition-all duration-300"
-                      >
-                        <XCircle className="w-4 h-4" />
-                        Сбросить фильтры
-                      </motion.button>
-                    </motion.div>
-                  )}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </motion.div>
 
-        {/* Статистика */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-gradient-to-br from-emerald-500 to-green-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
+        {/* ── RESULT META ─────────────────────────────────────── */}
+        {!isLoading && !error && (
+          <div
+            className={`flex items-center justify-between px-1 mb-3 text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}
           >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <CheckCircle className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">
-                {todayAppointments.length}
-              </div>
-              <div className="text-emerald-100 font-medium">На сегодня</div>
-              <div className="text-sm text-emerald-200/80 mt-2">
-                Подтвержденные записи
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <AlertCircle className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">
-                {newAppointments.length}
-              </div>
-              <div className="text-amber-100 font-medium">Новые</div>
-              <div className="text-sm text-amber-200/80 mt-2">
-                Требуют подтверждения
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <CalendarDays className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">
-                {confirmedAppointments.length}
-              </div>
-              <div className="text-blue-100 font-medium">Подтверждено</div>
-              <div className="text-sm text-blue-200/80 mt-2">
-                Предстоящие записи
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <BarChart3 className="w-16 h-16" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-4xl font-bold mb-2">
-                {completedAppointments.length}
-              </div>
-              <div className="text-purple-100 font-medium">Завершено</div>
-              <div className="text-sm text-purple-200/80 mt-2">
-                Выполненные записи
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Информация о фильтрации */}
-        {filteredAndSortedAppointments.length !== confirmedAppointments.length && (
-          <div className="mb-4 px-4 py-2 bg-blue-50/80 backdrop-blur-sm rounded-xl text-sm text-blue-700 border border-blue-200/50">
-            Показано {filteredAndSortedAppointments.length} из {confirmedAppointments.length} подтвержденных записей
-          </div>
-        )}
-
-        {/* Карточки записей */}
-        {isLoading ? (
-          <div className="text-center py-20">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-            <p className="mt-4 text-gray-500 font-medium">
-              Загрузка записей...
-            </p>
-          </div>
-        ) : error ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="col-span-full bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-gray-200/50"
-          >
-            <div className="w-20 h-20 bg-gradient-to-r from-red-200 to-red-300 rounded-full flex items-center justify-center mx-auto mb-6">
-              <XCircle className="w-10 h-10 text-red-500" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">
-              Ошибка загрузки
-            </h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">{error}</p>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => loadData(true)}
-              className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 inline-flex items-center gap-2"
-            >
-              <RefreshCw className="w-5 h-5" />
-              Попробовать снова
-            </motion.button>
-          </motion.div>
-        ) : confirmedAppointments.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="col-span-full bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-gray-200/50"
-          >
-            <div className="w-20 h-20 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CalendarDays className="w-10 h-10 text-gray-400" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">
-              Нет подтвержденных записей
-            </h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              У вас пока нет подтвержденных записей. Новые записи появятся после подтверждения администратором.
-            </p>
-          </motion.div>
-        ) : filteredAndSortedAppointments.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="col-span-full bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-gray-200/50"
-          >
-            <div className="w-20 h-20 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Search className="w-10 h-10 text-gray-400" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">
-              Ничего не найдено
-            </h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              Попробуйте изменить параметры поиска или фильтрации
-            </p>
-            {(searchQuery || dateFilter) && (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={clearFilters}
-                className="px-6 py-2.5 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-300 inline-flex items-center gap-2"
-              >
-                <XCircle className="w-4 h-4" />
-                Сбросить фильтры
-              </motion.button>
-            )}
-          </motion.div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
-            <AnimatePresence>
-              {filteredAndSortedAppointments.map((appointment, index) => (
-                <motion.div
-                  key={appointment.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  whileHover={{ y: -2 }}
-                  className="bg-gradient-to-br from-white to-gray-50/50 rounded-2xl border border-gray-200/50 p-4 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm group"
-                >
-                  {/* Верхняя часть с датой и статусом */}
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-gray-500 mb-1">
-                        Запланировано
-                      </div>
-                      <div className="text-lg font-bold text-gray-900 truncate">
-                        {formatDate(appointment.appointmentTime)}
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1 flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        {formatTime(appointment.appointmentTime)}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {getStatusIcon(appointment.status)}
-                      <span
-                        className={`px-2.5 py-1 text-xs font-bold rounded-full border ${getStatusColor(appointment.status)} whitespace-nowrap`}
-                      >
-                        {appointment.status}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Разделитель */}
-                  <div className="h-px bg-gradient-to-r from-transparent via-gray-300/50 to-transparent my-4" />
-
-                  {/* Клиент */}
-                  <div className="mb-4">
-                    <div className="text-xs text-gray-600 mb-2">Клиент</div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                        {appointment.clientName[0]?.toUpperCase() || "К"}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-bold text-gray-900 truncate">
-                          {appointment.clientSurname} {appointment.clientName}
-                        </div>
-                        <div className="text-xs text-gray-600 truncate">
-                          {appointment.clientPhone}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Услуга и детали */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                    <div className="bg-gradient-to-br from-blue-50/50 to-cyan-50/50 rounded-xl p-3 border border-blue-200/30">
-                      <div className="text-xs text-gray-600 mb-1">Услуга</div>
-                      <div className="text-sm font-bold text-gray-900 truncate">
-                        {appointment.service.title}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {appointment.service.duration} мин.
-                      </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-emerald-50/50 to-green-50/50 rounded-xl p-3 border border-emerald-200/30">
-                      <div className="text-xs text-gray-600 mb-1">
-                        Стоимость
-                      </div>
-                      <div className="text-base font-bold text-emerald-700">
-                        {appointment.price.toLocaleString()} ₽
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Информация */}
-                  <div className="pt-3 border-t border-gray-200/50">
-                    <div className="text-xs text-gray-500 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 truncate">
-                        <UserCheck className="w-3.5 h-3.5 flex-shrink-0" />
-                        <span className="truncate">
-                          Мастер: {appointment.master.surname}{" "}
-                          {appointment.master.name}
-                        </span>
-                      </div>
-                      <div className="text-gray-400 font-mono text-xs sm:text-sm flex-shrink-0">
-                        ID: {appointment.id}
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        )}
-
-        {/* Информация внизу */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 text-sm text-gray-500">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500"></div>
-              <span>Новые ({newAppointments.length})</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-500 to-green-500"></div>
-              <span>Подтвержденные ({confirmedAppointments.length})</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500"></div>
-              <span>Завершенные ({completedAppointments.length})</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-rose-500 to-red-500"></div>
-              <span>Отмененные ({cancelledAppointments.length})</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
             <span>
-              Показано: {filteredAndSortedAppointments.length} из{" "}
-              {confirmedAppointments.length} подтвержденных
+              {filteredAndSortedAppointments.length === confirmedAppointments.length
+                ? `${filteredAndSortedAppointments.length} записей`
+                : `${filteredAndSortedAppointments.length} из ${confirmedAppointments.length}`}
             </span>
-            {currentUser?.login && (
-              <span className="text-blue-600 font-medium flex items-center gap-2">
-                <Shield className="w-4 h-4" />
-                {currentUser.login}
-              </span>
-            )}
           </div>
-        </div>
+        )}
+
+        {/* ── APPOINTMENTS LIST ────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.35 }}
+        >
+          {isLoading ? (
+            <div className={`rounded-2xl p-16 text-center ${glassCls}`}>
+              <div
+                className={`w-10 h-10 rounded-full border-3 border-t-transparent animate-spin mx-auto mb-4 ${
+                  isDark ? "border-purple-400" : "border-blue-400"
+                }`}
+                style={{ borderWidth: 3 }}
+              />
+              <p
+                className={`text-sm ${isDark ? "text-white/40" : "text-gray-400"}`}
+              >
+                Загрузка записей...
+              </p>
+            </div>
+          ) : error ? (
+            <div className={`rounded-2xl p-8 text-center ${glassCls}`}>
+              <p className="text-rose-500 font-medium mb-4">{error}</p>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => loadData(true)}
+                className={`px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r ${
+                  isDark
+                    ? "from-indigo-500 to-purple-600"
+                    : "from-blue-500 to-purple-600"
+                }`}
+              >
+                Повторить
+              </motion.button>
+            </div>
+          ) : confirmedAppointments.length === 0 ? (
+            <div className={`rounded-2xl p-16 text-center ${glassCls}`}>
+              <div
+                className={`w-16 h-16 rounded-2xl mx-auto mb-5 flex items-center justify-center ${isDark ? "bg-white/[0.07]" : "bg-gray-100"}`}
+              >
+                <CalendarDays
+                  size={26}
+                  className={isDark ? "text-white/25" : "text-gray-300"}
+                />
+              </div>
+              <p
+                className={`text-lg font-bold mb-1 ${isDark ? "text-white/70" : "text-gray-600"}`}
+              >
+                Нет подтверждённых записей
+              </p>
+              <p
+                className={`text-sm ${isDark ? "text-white/30" : "text-gray-400"}`}
+              >
+                Записи появятся после подтверждения администратором
+              </p>
+            </div>
+          ) : filteredAndSortedAppointments.length === 0 ? (
+            <div className={`rounded-2xl p-16 text-center ${glassCls}`}>
+              <div
+                className={`w-16 h-16 rounded-2xl mx-auto mb-5 flex items-center justify-center ${isDark ? "bg-white/[0.07]" : "bg-gray-100"}`}
+              >
+                <Search
+                  size={26}
+                  className={isDark ? "text-white/25" : "text-gray-300"}
+                />
+              </div>
+              <p
+                className={`text-lg font-bold mb-1 ${isDark ? "text-white/70" : "text-gray-600"}`}
+              >
+                Ничего не найдено
+              </p>
+              <p
+                className={`text-sm ${isDark ? "text-white/30" : "text-gray-400"}`}
+              >
+                Попробуйте изменить параметры поиска
+              </p>
+              {(searchQuery || dateFilter) && (
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  onClick={clearFilters}
+                  className={`mt-5 px-5 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
+                    isDark
+                      ? "border-white/10 text-white/50 hover:bg-white/[0.07]"
+                      : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                  }`}
+                >
+                  Сбросить фильтры
+                </motion.button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <AnimatePresence mode="popLayout">
+                {filteredAndSortedAppointments.map((appointment, index) => (
+                  <motion.div
+                    key={appointment.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ delay: Math.min(index * 0.04, 0.3) }}
+                    whileHover={{ x: 4 }}
+                    className={`rounded-2xl p-5 transition-all duration-200 cursor-default group ${
+                      isDark
+                        ? "bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.12]"
+                        : "bg-white border border-gray-200/70 hover:shadow-md"
+                    }`}
+                  >
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                      {/* Left: Time + Client */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start gap-4">
+                          {/* Time block */}
+                          <div
+                            className={`text-center py-3 px-4 rounded-xl font-black text-sm leading-none flex-shrink-0 ${
+                              isDark
+                                ? "bg-white/[0.07] text-white/90"
+                                : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
+                            <div>{formatTime(appointment.appointmentTime)}</div>
+                            <div className={`text-xs mt-1 font-semibold ${isDark ? "text-white/40" : "text-gray-500"}`}>
+                              {formatDate(appointment.appointmentTime)}
+                            </div>
+                          </div>
+
+                          {/* Client info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-2">
+                              {/* Avatar */}
+                              <div
+                                className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 bg-gradient-to-br ${
+                                  isDark
+                                    ? "from-indigo-500 to-purple-600"
+                                    : "from-blue-500 to-purple-600"
+                                }`}
+                              >
+                                {appointment.clientName[0]?.toUpperCase() || "К"}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div
+                                  className={`font-bold text-base truncate ${isDark ? "text-white/90" : "text-gray-800"}`}
+                                >
+                                  {appointment.clientSurname} {appointment.clientName}
+                                </div>
+                                <div
+                                  className={`text-xs ${isDark ? "text-white/35" : "text-gray-400"}`}
+                                >
+                                  {appointment.clientPhone}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Service */}
+                            <div
+                              className={`text-sm font-semibold ${isDark ? "text-white/70" : "text-gray-600"}`}
+                            >
+                              {appointment.service.title}
+                            </div>
+                            <div
+                              className={`text-xs mt-0.5 ${isDark ? "text-white/30" : "text-gray-400"}`}
+                            >
+                              {appointment.service.duration} мин.
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Price + Status */}
+                      <div className="flex items-center gap-4 lg:flex-shrink-0">
+                        {/* Price */}
+                        <div className="text-right">
+                          <div
+                            className={`text-xl font-black ${
+                              isDark ? "text-emerald-400" : "text-emerald-600"
+                            }`}
+                          >
+                            {appointment.price.toLocaleString()} ₽
+                          </div>
+                          <div
+                            className={`text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}
+                          >
+                            Стоимость
+                          </div>
+                        </div>
+
+                        {/* Status */}
+                        <div
+                          className={`flex items-center gap-2 px-3 py-2 rounded-xl ${
+                            isDark
+                              ? "bg-white/[0.06] border border-white/[0.08]"
+                              : "bg-gray-50 border border-gray-200/60"
+                          }`}
+                        >
+                          <span
+                            className={`w-2 h-2 rounded-full ${getStatusInfo(appointment.status).dot}`}
+                          />
+                          <span
+                            className={`text-xs font-semibold ${getStatusInfo(appointment.status).color}`}
+                          >
+                            {getStatusInfo(appointment.status).label}
+                          </span>
+                          <ArrowUpRight
+                            size={12}
+                            className={`opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? "text-white/30" : "text-gray-400"}`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
+        </motion.div>
+
+        {/* ── FOOTER ──────────────────────────────────────────── */}
+        {!isLoading && !error && filteredAndSortedAppointments.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className={`mt-8 pt-6 border-t flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs ${
+              isDark
+                ? "border-white/[0.07] text-white/25"
+                : "border-gray-100 text-gray-400"
+            }`}
+          >
+            <div className="flex flex-wrap items-center gap-5">
+              {[
+                { color: "bg-amber-400", label: "Новые" },
+                { color: "bg-emerald-400", label: "Подтверждённые" },
+                { color: "bg-indigo-400", label: "Завершённые" },
+                { color: "bg-rose-400", label: "Отменённые" },
+              ].map((l) => (
+                <div key={l.label} className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${l.color}`} />
+                  {l.label}
+                </div>
+              ))}
+            </div>
+            <span>Загружено: {appointments.length} записей</span>
+          </motion.div>
+        )}
       </div>
     </div>
   );

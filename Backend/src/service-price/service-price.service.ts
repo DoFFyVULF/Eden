@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -10,32 +11,51 @@ import { UpdateServicePriceDto } from './dto/update-service-price.dto';
 export class ServicePriceService {
   constructor(private prisma: PrismaService) {}
 
+  // Преобразование Decimal в number
+  private transformPrice(price: any): number {
+    return price ? Number(price) : 0;
+  }
+
+  // Преобразование ответа с ценами
+  private transformServicePrice(servicePrice: any) {
+    return {
+      ...servicePrice,
+      price: this.transformPrice(servicePrice.price),
+      durationOverride: servicePrice.durationOverride 
+        ? Number(servicePrice.durationOverride) 
+        : null,
+    };
+  }
+
   async getById(id: number) {
     const servicePrice = await this.prisma.servicePrice.findUnique({
-      where: { id }
+      where: { id },
+      include: { service: true, master: true },
     });
 
     if (!servicePrice) {
       throw new NotFoundException(`Цена на услугу с ID ${id} не найдена`);
     }
 
-    return servicePrice;
+    return this.transformServicePrice(servicePrice);
   }
 
   async getByMaster(masterID: number) {
-    return this.prisma.servicePrice.findMany({
+    const prices = await this.prisma.servicePrice.findMany({
       where: { masterID },
       include: { service: true, master: true },
-      orderBy: { id: 'asc' }
+      orderBy: { id: 'asc' },
     });
+
+    return prices.map(price => this.transformServicePrice(price));
   }
 
   async create(dto: ServicePriceDto) {
     const serviceExists = await this.prisma.service.findUnique({
-      where: { id: dto.serviceId }
+      where: { id: dto.serviceId },
     });
     const masterExists = await this.prisma.master.findUnique({
-      where: { id: dto.masterId }
+      where: { id: dto.masterId },
     });
 
     if (!serviceExists) {
@@ -46,16 +66,18 @@ export class ServicePriceService {
       throw new NotFoundException(`Мастер с ID ${dto.masterId} не найден`);
     }
 
-    return this.prisma.servicePrice.create({
+    const created = await this.prisma.servicePrice.create({
       data: {
         service: { connect: { id: dto.serviceId } },
         master: { connect: { id: dto.masterId } },
         price: dto.price,
         isActive: dto.isActive ?? true,
-        durationOverride: dto.durationOverride ?? null
+        durationOverride: dto.durationOverride ?? null,
       },
-      include: { master: true, service: true }
+      include: { master: true, service: true },
     });
+
+    return this.transformServicePrice(created);
   }
 
   async update(id: number, dto: UpdateServicePriceDto) {
@@ -67,23 +89,26 @@ export class ServicePriceService {
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
     if (dto.serviceId) data.service = { connect: { id: dto.serviceId } };
     if (dto.masterId) data.master = { connect: { id: dto.masterId } };
-
     if (dto.durationOverride !== undefined) {
       data.durationOverride = dto.durationOverride;
     }
 
-    return this.prisma.servicePrice.update({
+    const updated = await this.prisma.servicePrice.update({
       where: { id },
       data,
-      include: { master: true, service: true }
+      include: { master: true, service: true },
     });
+
+    return this.transformServicePrice(updated);
   }
 
   async getAll() {
-    return this.prisma.servicePrice.findMany({
+    const prices = await this.prisma.servicePrice.findMany({
       include: { master: true, service: true },
-      orderBy: { id: 'asc' }
+      orderBy: { id: 'asc' },
     });
+
+    return prices.map(price => this.transformServicePrice(price));
   }
 
   async delete(id: number) {
@@ -91,7 +116,20 @@ export class ServicePriceService {
     return this.prisma.servicePrice.delete({ where: { id } });
   }
 
-   async count(): Promise<number> {
+  async count(): Promise<number> {
     return this.prisma.servicePrice.count();
+  }
+
+  // Метод для получения средней цены
+  async getAveragePrice(): Promise<number> {
+    const prices = await this.prisma.servicePrice.findMany({
+      where: { isActive: true },
+      select: { price: true },
+    });
+
+    if (prices.length === 0) return 0;
+
+    const sum = prices.reduce((acc, curr) => acc + Number(curr.price), 0);
+    return Math.round((sum / prices.length) * 100) / 100;
   }
 }

@@ -15,7 +15,7 @@ import { MasterDto } from './dto/master.dto';
 import { UpdateMasterDto } from './dto/update-master.dto';
 import { Auth } from 'src/auth/decorators/auth.decorator';
 
-@Auth()
+
 @Controller('master')
 export class MasterController {
   constructor(private readonly masterService: MasterService) {}
@@ -38,12 +38,14 @@ export class MasterController {
     return { data: master };
   }
 
+  @Auth()
   @HttpCode(201)
   @Post()
   async create(@Body() dto: MasterDto) {
     return this.masterService.create(dto);
   }
 
+  @Auth()
   @HttpCode(200)
   @Patch(':id')
   async update(
@@ -53,6 +55,7 @@ export class MasterController {
     return this.masterService.update(id, dto);
   }
 
+  @Auth()
   @Delete(':id')
   async delete(@Param('id', ParseIntPipe) id: number) {
     const deleted = await this.masterService.delete(id);

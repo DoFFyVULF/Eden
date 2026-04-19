@@ -479,7 +479,7 @@ export default function AnalyticsPage() {
                   isDark ? "text-white" : "text-gray-900"
                 }`}
               >
-                Бизнес аналитика 📈
+                Бизнес аналитика 
               </h1>
               <p
                 className={`mt-2 text-sm ${

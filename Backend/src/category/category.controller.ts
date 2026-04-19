@@ -15,7 +15,7 @@ import { CategoryDto } from './dto/category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Auth } from 'src/auth/decorators/auth.decorator';
 
-@Auth()
+
 @Controller('category')
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
@@ -37,12 +37,14 @@ export class CategoryController {
     return category;
   }
 
+  @Auth()
   @HttpCode(201)
   @Post()
   async create(@Body() dto: CategoryDto) {
     return this.categoryService.create(dto);
   }
 
+  @Auth()
   @HttpCode(200)
   @Patch(':id')
   async update(
@@ -52,6 +54,7 @@ export class CategoryController {
     return this.categoryService.update(id, dto);
   }
 
+  @Auth()
   @Delete(':id')
   async delete(@Param('id', ParseIntPipe) id: number) {
     await this.categoryService.delete(id);

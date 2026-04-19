@@ -6,7 +6,8 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs', 'dist/**', 'node_modules/**'],
+    // Игнорируем служебные папки и файлы
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'eslint.config.mjs'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -23,6 +24,14 @@ export default tseslint.config(
         tsconfigRootDir: import.meta.dirname,
       },
     },
+  },
+  {
+    // Специальные настройки для JavaScript файлов (например, jest.config.js)
+    files: ['**/*.js', '**/*.mjs'],
+    ...tseslint.configs.disableTypeChecked, // Отключаем проверку типов для JS
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off', // Разрешаем require в JS
+    }
   },
   {
     rules: {

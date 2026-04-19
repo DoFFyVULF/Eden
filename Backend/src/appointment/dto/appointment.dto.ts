@@ -5,7 +5,7 @@ import {
   IsEnum,
   IsOptional,
   Length,
-  Matches
+  Matches,
 } from 'class-validator';
 import { AppointmentStatus } from 'generated/prisma/enums';
 
@@ -32,7 +32,7 @@ export class AppointmentDto {
   @IsDateString()
   appointmentTime: string; // ISO date string
 
-  @IsString()
+  @IsInt()
   price: string; // decimal как строка (рекомендуется)
 
   @IsOptional()

@@ -1,21 +1,20 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
   User,
   Phone,
   Scissors,
-  Camera,
-  Upload,
   Trash2,
   UserPlus,
   Loader2,
   CheckCircle,
-  Image as ImageIcon,
+  Link as LinkIcon,
   Edit,
   Shield,
+  Image as ImageIcon,
 } from "lucide-react";
 import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber";
 import { IMaster } from "@/types/masters.type";
@@ -26,7 +25,7 @@ interface MasterFormData {
   middlename: string;
   phone: string;
   specialization: string;
-  photo?: string;
+  photoUrl?: string; // Только ссылка
   isActive?: boolean;
 }
 
@@ -58,7 +57,6 @@ const SPEC_GRAD: Record<string, string> = {
 const specGrad = (s: string) =>
   SPEC_GRAD[s.toLowerCase()] ?? "from-slate-500 to-gray-600";
 
-// Named export — основной
 export function EmployeesCard({
   isOpen,
   onClose,
@@ -67,10 +65,8 @@ export function EmployeesCard({
   isEditMode = false,
 }: EmployeesCardProps) {
   const [loading, setLoading] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState("");
   const [isDark, setIsDark] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     surname: "",
@@ -101,7 +97,8 @@ export function EmployeesCard({
         phone: master.phone ? formatPhoneNumber(master.phone) : "",
         specialization: master.specialization,
       });
-      setAvatarPreview(master.photo || null);
+      // Если у мастера есть фото, используем его как ссылку
+      setPhotoUrl(master.photo || "");
     } else {
       setForm({
         surname: "",
@@ -110,24 +107,9 @@ export function EmployeesCard({
         phone: "",
         specialization: "",
       });
-      setAvatarPreview(null);
+      setPhotoUrl("");
     }
   }, [master, isEditMode, isOpen]);
-
-  const processImage = (file?: File) => {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Файл не должен превышать 5MB");
-      return;
-    }
-    if (!file.type.startsWith("image/")) {
-      alert("Выберите изображение");
-      return;
-    }
-    const r = new FileReader();
-    r.onload = (e) => setAvatarPreview(e.target?.result as string);
-    r.readAsDataURL(file);
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -148,7 +130,7 @@ export function EmployeesCard({
       await onSubmit?.({
         ...form,
         phone: form.phone.replace(/\D/g, ""),
-        photo: avatarPreview || undefined,
+        photoUrl: photoUrl.trim() || undefined,
         isActive: isEditMode ? master?.isActive : true,
       });
     } catch (err) {
@@ -167,7 +149,7 @@ export function EmployeesCard({
       phone: "",
       specialization: "",
     });
-    setAvatarPreview(null);
+    setPhotoUrl("");
     onClose();
   };
 
@@ -259,7 +241,7 @@ export function EmployeesCard({
             <div className="flex-1 overflow-y-auto">
               <form onSubmit={handleSubmit} className="p-6 lg:p-7">
                 <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-6">
-                  {/* LEFT: AVATAR */}
+                  {/* LEFT: PHOTO URL INPUT */}
                   <div className="flex flex-col gap-4">
                     <div>
                       <p
@@ -267,94 +249,81 @@ export function EmployeesCard({
                           isDark ? "text-white/35" : "text-gray-400"
                         }`}
                       >
-                        <Camera size={12} />
-                        Фото
+                        <LinkIcon size={12} />
+                        Ссылка на фото
                       </p>
 
-                      {avatarPreview ? (
-                        <div className="relative">
+                      {photoUrl ? (
+                        <div className="relative group">
                           <img
-                            src={avatarPreview}
+                            src={photoUrl}
                             alt="preview"
-                            className="w-full h-44 lg:h-36 object-cover rounded-2xl shadow-lg"
+                            className="w-full h-44 lg:h-36 object-cover rounded-2xl shadow-lg border border-white/10"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
                           />
-                          <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-black/40 to-transparent rounded-b-2xl" />
                           <button
                             type="button"
-                            onClick={() => setAvatarPreview(null)}
-                            className="absolute top-2 right-2 w-7 h-7 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-lg hover:bg-rose-600 transition-colors"
+                            onClick={() => setPhotoUrl("")}
+                            className="absolute top-2 right-2 w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-lg hover:bg-rose-600 transition-colors opacity-0 group-hover:opacity-100"
                           >
-                            <Trash2 size={13} />
+                            <Trash2 size={14} />
                           </button>
-                          <label
-                            htmlFor="avatar-input"
-                            className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-white text-xs font-semibold cursor-pointer hover:bg-white/30 transition-colors whitespace-nowrap"
-                          >
-                            <Upload size={11} />
-                            Заменить
-                          </label>
                         </div>
                       ) : (
-                        <label
-                          htmlFor="avatar-input"
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            setDragging(true);
-                          }}
-                          onDragLeave={() => setDragging(false)}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            setDragging(false);
-                            processImage(e.dataTransfer.files?.[0]);
-                          }}
-                          className={`flex flex-col items-center justify-center h-44 lg:h-36 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${
-                            dragging
-                              ? isDark
-                                ? "border-indigo-400/60 bg-indigo-500/10"
-                                : "border-blue-400 bg-blue-50"
-                              : isDark
-                                ? "border-white/[0.1] hover:border-white/[0.18] hover:bg-white/[0.04]"
-                                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50/50"
+                        <div
+                          className={`flex flex-col items-center justify-center h-44 lg:h-36 rounded-2xl border-2 border-dashed ${
+                            isDark
+                              ? "border-white/[0.1] bg-white/[0.02]"
+                              : "border-gray-200 bg-gray-50/50"
                           }`}
                         >
                           <div
                             className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2.5 ${
-                              isDark ? "bg-white/[0.07]" : "bg-gray-100"
+                              isDark ? "bg-white/[0.05]" : "bg-gray-100"
                             }`}
                           >
                             <ImageIcon
                               size={22}
                               className={
-                                isDark ? "text-white/25" : "text-gray-300"
+                                isDark ? "text-white/20" : "text-gray-300"
                               }
                             />
                           </div>
                           <p
-                            className={`text-xs font-semibold mb-1 ${isDark ? "text-white/50" : "text-gray-500"}`}
+                            className={`text-xs font-medium mb-1 ${isDark ? "text-white/40" : "text-gray-500"}`}
                           >
-                            Фото профиля
+                            Нет фото
                           </p>
                           <p
-                            className={`text-[11px] ${isDark ? "text-white/25" : "text-gray-400"}`}
+                            className={`text-[10px] ${isDark ? "text-white/20" : "text-gray-400"}`}
                           >
-                            до 5 МБ
+                            Вставьте ссылку ниже
                           </p>
-                          <div
-                            className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-gradient-to-r ${grad} shadow-sm`}
-                          >
-                            <Upload size={11} />
-                            Выбрать
-                          </div>
-                        </label>
+                        </div>
                       )}
-                      <input
-                        type="file"
-                        id="avatar-input"
-                        ref={fileRef}
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => processImage(e.target.files?.[0])}
-                      />
+
+                      {/* URL Input Field */}
+                      <div className="mt-3 relative">
+                        <LinkIcon
+                          size={14}
+                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${
+                            isDark ? "text-white/25" : "text-gray-400"
+                          }`}
+                        />
+                        <input
+                          type="url"
+                          value={photoUrl}
+                          onChange={(e) => setPhotoUrl(e.target.value)}
+                          placeholder="https://example.com/photo.jpg"
+                          className={`w-full h-11 pl-10 pr-4 rounded-xl text-sm border outline-none transition-all ${
+                            isDark
+                              ? "bg-white/[0.05] border-white/[0.08] text-white/90 placeholder-white/20 focus:border-indigo-400/50"
+                              : "bg-white border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-400"
+                          }`}
+                        />
+                      </div>
                     </div>
 
                     {/* Specialization preview */}

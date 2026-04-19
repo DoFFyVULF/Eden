@@ -67,6 +67,10 @@ export class AppointmentService {
       appointmentTime: {
         gte: start,
         lte: end
+      },
+      // Важно: на календаре нам не нужно показывать отмененные записи как "занятые"
+      status: {
+        notIn: [AppointmentStatus.Отменен]
       }
     };
 
@@ -76,9 +80,13 @@ export class AppointmentService {
 
     return this.prisma.appointment.findMany({
       where,
-      include: {
-        master: true,
-        service: true
+      // ВАЖНО: Выбираем только те поля, которые нужны календарю
+      select: {
+        id: true,
+        appointmentTime: true,
+        status: true,
+        masterID: true
+        // Мы НЕ включаем сюда clientPhone, clientName и т.д.
       },
       orderBy: {
         appointmentTime: 'asc'
@@ -107,8 +115,9 @@ export class AppointmentService {
 
     if (dto.appointmentTime || dto.masterId) {
       const masterId = dto.masterId ?? existing.masterID;
-      const appointmentTime = dto.appointmentTime ?? existing.appointmentTime.toISOString();
-      
+      const appointmentTime =
+        dto.appointmentTime ?? existing.appointmentTime.toISOString();
+
       // Проверяем конфликты, исключая текущую запись и игнорируя отмененные/завершенные
       const conflictingAppointment = await this.prisma.appointment.findFirst({
         where: {
@@ -122,7 +131,9 @@ export class AppointmentService {
       });
 
       if (conflictingAppointment) {
-        throw new BadRequestException(`На это время мастер уже занят другой записью`);
+        throw new BadRequestException(
+          `На это время мастер уже занят другой записью`
+        );
       }
     }
 
@@ -146,7 +157,7 @@ export class AppointmentService {
 
   async complete(id: number) {
     await this.findOne(id);
-    
+
     return this.prisma.appointment.update({
       where: { id },
       data: {
@@ -165,18 +176,20 @@ export class AppointmentService {
     return this.prisma.appointment.count();
   }
 
-  async countActive() :Promise<number> {
+  async countActive(): Promise<number> {
     return this.prisma.appointment.count({
       where: {
         status: {
           in: [AppointmentStatus.Новый, AppointmentStatus.Подтвержден]
         }
       }
-    })
+    });
   }
 
   private async ensureMasterExists(masterId: number) {
-    const master = await this.prisma.master.findUnique({ where: { id: masterId } });
+    const master = await this.prisma.master.findUnique({
+      where: { id: masterId }
+    });
     if (!master) {
       throw new NotFoundException(`Мастер с ID ${masterId} не найден`);
     }
@@ -203,7 +216,9 @@ export class AppointmentService {
     });
 
     if (existing) {
-      throw new BadRequestException(`На ${time} мастер уже занят активной записью`);
+      throw new BadRequestException(
+        `На ${time} мастер уже занят активной записью`
+      );
     }
   }
 }

@@ -44,19 +44,20 @@ model User {
 
 // done
 model Master {
-  id              Int              @id @default(autoincrement())
-  surname         String
-  name            String
-  middlename      String           @map("middle_name")
-  specialization  String
-  phone           String           @unique
-  isActive        Boolean          @default(true) @map("is_active")
-  photo           String?
-  servicePrices   ServicePrice[]
-  appointments    Appointment[]
-  masterSchedules MasterSchedule[]
-  users           User[]
-  masterTimeOffs  MasterTimeOff[]
+  id                   Int                  @id @default(autoincrement())
+  surname              String
+  name                 String
+  middlename           String               @map("middle_name")
+  specialization       String
+  phone                String               @unique
+  isActive             Boolean              @default(true) @map("is_active")
+  photo                String?
+  servicePrices        ServicePrice[]
+  appointments         Appointment[]
+  masterSchedules      MasterSchedule[]
+  users                User[]
+  masterTimeOffs       MasterTimeOff[]
+  appointmentHistories AppointmentHistory[]
 
   @@map("master")
 }
@@ -82,7 +83,7 @@ model MasterTimeOff {
   masterId  Int
   startDate DateTime
   endDate   DateTime
-  type      String 
+  type      String
   comment   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -103,16 +104,17 @@ model Category {
 
 // done
 model Service {
-  id            Int            @id @default(autoincrement())
-  title         String
-  description   String?
-  duration      Int
-  img           String?
-  isActive      Boolean        @default(true) @map("is_active")
-  category      Category       @relation(fields: [categoryId], references: [id])
-  categoryId    Int            @map("category_id")
-  servicePrices ServicePrice[]
-  appointments  Appointment[]
+  id                   Int                  @id @default(autoincrement())
+  title                String
+  description          String?
+  duration             Int
+  img                  String?
+  isActive             Boolean              @default(true) @map("is_active")
+  category             Category             @relation(fields: [categoryId], references: [id])
+  categoryId           Int                  @map("category_id")
+  servicePrices        ServicePrice[]
+  appointments         Appointment[]
+  appointmentHistories AppointmentHistory[]
 
   @@map("service")
 }
@@ -134,35 +136,42 @@ model ServicePrice {
 
 //done
 model Appointment {
-  id              Int               @id @default(autoincrement())
-  clientSurname   String            @map("client_surname")
-  clientName      String            @map("client_name")
-  clientPhone     String            @map("client_phone")
-  master          Master            @relation(fields: [masterID], references: [id])
-  masterID        Int               @map("master_id")
-  service         Service           @relation(fields: [serviceId], references: [id])
-  serviceId       Int               @map("service_id")
-  appointmentTime DateTime          @map("appointment_time")
-  price           Decimal           @db.Decimal(10, 2)
-  status          AppointmentStatus @default(Новый)
-  createdAt       DateTime          @default(now()) @map("created_at")
-  updatedAt       DateTime          @updatedAt @map("updated_at")
+  id                   Int                  @id @default(autoincrement())
+  clientSurname        String               @map("client_surname")
+  clientName           String               @map("client_name")
+  clientPhone          String               @map("client_phone")
+  master               Master               @relation(fields: [masterID], references: [id])
+  masterID             Int                  @map("master_id")
+  service              Service              @relation(fields: [serviceId], references: [id])
+  serviceId            Int                  @map("service_id")
+  appointmentTime      DateTime             @map("appointment_time")
+  price                Decimal              @db.Decimal(10, 2)
+  status               AppointmentStatus    @default(Новый)
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @updatedAt @map("updated_at")
+  appointmentHistories AppointmentHistory[]
 
   @@map("appointment")
 }
 
 //done
 model AppointmentHistory {
-  id              Int      @id @default(autoincrement())
-  appointmentId   Int
-  clientSurname   String
-  clientName      String
-  clientPhone     String
-  masterID        Int
-  serviceId       Int
-  appointmentTime DateTime
-  price           Decimal  @db.Decimal(10, 2)
-  completedAt     DateTime @default(now())
+  id              Int         @id @default(autoincrement())
+  appointment     Appointment @relation(fields: [appointmentId], references: [id])
+  appointmentId   Int         @map("appointment_id")
+  clientSurname   String      @map("client_surname")
+  clientName      String      @map("client_name")
+  clientPhone     String      @map("client_phone")
+  master          Master      @relation(fields: [masterID], references: [id])
+  masterID        Int         @map("master_id")
+  service         Service     @relation(fields: [serviceId], references: [id])
+  serviceId       Int         @map("service_id")
+  appointmentTime DateTime    @map("appointment_time")
+  price           Decimal     @db.Decimal(10, 2)
+  completedAt     DateTime    @default(now()) @map("completed_at")
 
+  @@index([masterID])
+  @@index([serviceId])
+  @@index([appointmentId])
   @@map("appointment_history")
 }

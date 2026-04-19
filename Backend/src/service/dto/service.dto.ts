@@ -21,12 +21,16 @@ export class ServiceDto {
 
   @IsInt()
   @Min(1)
-  duration: number; 
+  duration: number;
 
   @IsBoolean()
   @IsOptional()
   isActive?: boolean = true;
 
+  @IsOptional()
+  @IsString()
+  img?: string;
+
   @IsInt()
-  categoryId: number; 
+  categoryId: number;
 }

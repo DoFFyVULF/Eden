@@ -28,6 +28,7 @@ import {
   Monitor,
   Maximize2,
   Minimize2,
+  RussianRuble,
 } from "lucide-react";
 import Link from "next/link";
 import { adminService } from "@/services/admin/admin.service";
@@ -113,7 +114,7 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
       history: <Clock size={16} />,
       users: <UserCog size={16} />,
       analytics: <BarChart3 size={16} />,
-      prices: <DollarSign size={16} />,
+      prices: <RussianRuble size={16} />,
     }),
     [],
   );
@@ -401,8 +402,11 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
                   <CountPill count={item.count} />
                   {active && (
                     <motion.div
-                      layoutId="navIndicator"
-                      className={`absolute bottom-1.5 left-1/2 -translate-x-1/2 h-0.5 w-6 rounded-full ${
+                      // layoutId="navIndicator"  <-- УБРАТЬ (это вызывает баг)
+                      initial={{ opacity: 0, width: 0, scale: 0.5 }}
+                      animate={{ opacity: 1, width: 24, scale: 1 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
+                      className={`absolute bottom-1.5 left-1/2 -translate-x-1/2 h-0.5 rounded-full ${
                         isDark
                           ? "bg-gradient-to-r from-indigo-400 to-purple-400"
                           : "bg-blue-500"
@@ -530,7 +534,7 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
               >
                 {(user.name || "?").charAt(0).toUpperCase()}
               </div>
-              <div className="hidden xl:block text-left">
+              <div className={`${isRounded ? "hidden" : "hidden xl:block"} text-left`}>
                 <p
                   className={`text-sm font-semibold leading-tight ${isDark ? "text-white/90" : "text-gray-800"}`}
                 >
@@ -560,7 +564,7 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 8, scale: 0.96 }}
                   transition={{ duration: 0.15 }}
-                  className={`absolute top-full right-0 mt-4 w-64 rounded-2xl overflow-hidden z-50 ${dropGlass}`}
+                  className={`absolute top-full right-0 mt-4 ${isRounded ? "w-56" : "w-64"} rounded-2xl overflow-hidden z-50 ${dropGlass}`}
                 >
                   {/* Header */}
                   <div
