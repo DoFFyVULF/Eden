@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { MasterDto } from './dto/master.dto';
@@ -56,8 +57,7 @@ export class MasterService {
         where: { id }
       });
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      if (error.code === 'P2025') {
+      if (error instanceof Error && 'code' in error && error.code === 'P2025') {
         throw new NotFoundException(`Мастер с ID ${id} не найден`);
       }
       throw error;

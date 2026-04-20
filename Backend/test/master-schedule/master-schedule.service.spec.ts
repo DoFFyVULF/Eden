@@ -222,7 +222,7 @@ describe('MasterScheduleService', () => {
     });
 
       it('should throw BadRequestException if end date is before start date', async () => {
-      // 1. Добавляем мок, что мастер существует
+    
       (prisma.master.findUnique as jest.Mock).mockResolvedValue(mockMaster);
 
       const invalidDto: MasterTimeOffDto = {

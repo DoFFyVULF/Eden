@@ -67,7 +67,7 @@ model MasterSchedule {
   id        Int      @id @default(autoincrement())
   master    Master   @relation(fields: [masterID], references: [id], onDelete: Cascade)
   masterID  Int      @map("master_id")
-  dayOfWeek Int?     @map("day_of_week") // ← изменено: Int → Int?
+  dayOfWeek Int?     @map("day_of_week") 
   startTime DateTime @map("start_time")
   endTime   DateTime @map("end_time")
 
