@@ -184,8 +184,8 @@ function AppointmentContent() {
     setSuccess(true);
   } catch (err: any) {
     // ВАЖНО: Посмотри детали ошибки в консоли
-    console.error("Ошибка 400 детали:", err.response?.data); 
-    alert(`Ошибка: ${err.response?.data?.message || "Проверьте введенные данные"}`);
+    console.error("Ошибка 400 детали:", err?.response?.data); 
+    alert(`Ошибка: ${err?.response?.data?.message || "Проверьте введенные данные"}`);
   } finally {
     setSubmitting(false);
   }

@@ -565,7 +565,7 @@ export default function AppointmentsHistoryPage() {
         </motion.div>
 
         {/* STAT CARDS */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 not-sm:grid-cols-1  lg:grid-cols-4 gap-3 mb-6">
           {STAT_CARDS.map((s, i) => (
             <motion.div
               key={i}

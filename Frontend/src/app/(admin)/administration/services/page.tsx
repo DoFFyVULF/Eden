@@ -6,6 +6,7 @@ import { serviceService } from "@/services/service/service.service";
 import { IService } from "@/types/services.types";
 import { ICategory } from "@/types/category.types";
 import { categoryService } from "@/services/category/category.service";
+import AdminConfirmModal from "@/app/components/ui/admin/AdminConfirmModal";
 import {
   Search,
   Plus,
@@ -52,6 +53,8 @@ export default function Services() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
+  const [serviceToDelete, setServiceToDelete] = useState<IService | null>(null);
+  const [isDeletingService, setIsDeletingService] = useState(false);
 
   const [sortField, setSortField] = useState<SortField>("title");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
@@ -255,13 +258,17 @@ export default function Services() {
     }
   };
 
-  const deleteService = async (id: number) => {
-    if (!confirm("Удалить эту услугу?")) return;
+  const deleteService = async () => {
+    if (!serviceToDelete) return;
+    setIsDeletingService(true);
     try {
-      await serviceService.delete(id);
-      setServices((p) => p.filter((s) => s.id !== id));
+      await serviceService.delete(serviceToDelete.id);
+      setServices((p) => p.filter((s) => s.id !== serviceToDelete.id));
+      setServiceToDelete(null);
     } catch {
       alert("Не удалось удалить услугу");
+    } finally {
+      setIsDeletingService(false);
     }
   };
 
@@ -409,7 +416,7 @@ export default function Services() {
         </motion.div>
 
         {/* ── STAT CARDS ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 not-sm:grid-cols-1  lg:grid-cols-4 gap-3">
           {STAT_CARDS.map((s, i) => (
             <motion.div
               key={i}
@@ -870,7 +877,7 @@ export default function Services() {
                           <motion.button
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
-                            onClick={() => deleteService(svc.id)}
+                            onClick={() => setServiceToDelete(svc)}
                             className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
                               isDark
                                 ? "bg-rose-500/10 border-rose-400/15 text-rose-400 hover:bg-rose-500/20"
@@ -1339,6 +1346,24 @@ export default function Services() {
           </motion.div>
         )}
       </AnimatePresence>
+      <AdminConfirmModal
+        isOpen={serviceToDelete !== null}
+        isDark={isDark}
+        title="Удалить услугу"
+        description="Услуга будет удалена из каталога и перестанет участвовать в назначениях и прайсах."
+        itemLabel={
+          serviceToDelete
+            ? `${serviceToDelete.title} · ${catName(serviceToDelete.categoryId)}`
+            : null
+        }
+        confirmText="Удалить услугу"
+        isLoading={isDeletingService}
+        onClose={() => {
+          if (isDeletingService) return;
+          setServiceToDelete(null);
+        }}
+        onConfirm={deleteService}
+      />
     </div>
   );
 }

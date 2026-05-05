@@ -1,6 +1,6 @@
 'use client'
 import Link from "next/link";
-import { routes } from "@/app/lib/routes";
+import { routes } from "@/app/providers/routes";
 import { Instagram, Facebook, Twitter, ArrowUp } from "lucide-react";
 import { useEffect, useState } from "react";
 

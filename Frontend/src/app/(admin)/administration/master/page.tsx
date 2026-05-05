@@ -29,6 +29,7 @@ import {
   Bell,
 } from "lucide-react";
 import EmployeesCard from "@/app/(admin)/administration/master/CreateMasterModal";
+import AdminConfirmModal from "@/app/components/ui/admin/AdminConfirmModal";
 import { masterService } from "@/services/master/master.service";
 import { masterScheduleService } from "@/services/schedule/schedule.service";
 import { MasterStatusInfo, IMasterTimeOff } from "@/types/schedule.types";
@@ -1455,6 +1456,8 @@ export default function Employees() {
   const [openMenuMasterId, setOpenMenuMasterId] = useState<number | null>(null);
   const menuButtonRefs = useRef<Record<number, HTMLButtonElement | null>>({});
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [masterToDelete, setMasterToDelete] = useState<IMaster | null>(null);
+  const [isDeletingMaster, setIsDeletingMaster] = useState(false);
 
   const handleMenuToggle = useCallback((masterId: number) => {
     setOpenMenuMasterId((prev) => (prev === masterId ? null : masterId));
@@ -1677,10 +1680,17 @@ export default function Employees() {
     await loadMasters(false);
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Удалить сотрудника?")) return;
-    await masterService.delete(id);
-    await loadMasters(false);
+  const handleDelete = async () => {
+    if (!masterToDelete?.id) return;
+    setIsDeletingMaster(true);
+    try {
+      await masterService.delete(masterToDelete.id);
+      setMasterToDelete(null);
+      setOpenMenuMasterId(null);
+      await loadMasters(false);
+    } finally {
+      setIsDeletingMaster(false);
+    }
   };
 
   const handleToggle = async (m: IMaster) => {
@@ -1835,7 +1845,7 @@ export default function Employees() {
           </div>
         </motion.div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 not-sm:grid-cols-1 lg:grid-cols-4 gap-3">
           {STAT_CARDS.map((s, i) => (
             <motion.div
               key={i}
@@ -2106,7 +2116,7 @@ export default function Employees() {
                     setEditMaster(m);
                     setIsEditOpen(true);
                   }}
-                  onDelete={() => handleDelete(m.id!)}
+                  onDelete={() => setMasterToDelete(m)}
                   onToggle={() => handleToggle(m)}
                   onVacation={() => {
                     setVacMaster(m);
@@ -2211,7 +2221,7 @@ export default function Employees() {
                       ? "hover:bg-rose-500/10"
                       : "hover:bg-rose-50",
                     onClick: () => {
-                      handleDelete(master.id!);
+                      setMasterToDelete(master);
                       setOpenMenuMasterId(null);
                     },
                   },
@@ -2365,6 +2375,24 @@ export default function Employees() {
             isDark={isDark}
           />
         )}
+        <AdminConfirmModal
+          isOpen={masterToDelete !== null}
+          isDark={isDark}
+          title="Удалить сотрудника"
+          description="Профиль сотрудника будет удалён из системы. Перед удалением убедитесь, что для него не нужны текущие данные и связи."
+          itemLabel={
+            masterToDelete
+              ? `${masterToDelete.surname} ${masterToDelete.name} · ${masterToDelete.specialization}`
+              : null
+          }
+          confirmText="Удалить сотрудника"
+          isLoading={isDeletingMaster}
+          onClose={() => {
+            if (isDeletingMaster) return;
+            setMasterToDelete(null);
+          }}
+          onConfirm={handleDelete}
+        />
       </AnimatePresence>
     </div>
   );

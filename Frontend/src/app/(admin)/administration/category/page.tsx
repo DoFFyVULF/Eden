@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { categoryService } from "@/services/category/category.service";
 import { ICategory } from "@/types/category.types";
+import AdminConfirmModal from "@/app/components/ui/admin/AdminConfirmModal";
 import CreateCategoryModal from "./CreateCategoryModal";
 
 const GRAD_POOL = [
@@ -41,6 +42,8 @@ export default function CategoryPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [categoryToDelete, setCategoryToDelete] = useState<ICategory | null>(null);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
 
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains("dark"));
@@ -93,16 +96,20 @@ export default function CategoryPage() {
     } catch { alert("Не удалось обновить статус"); }
   }, [categories]);
 
-  const deleteCategory = useCallback(async (id: number) => {
-    if (!confirm("Удалить категорию? Все связанные услуги также будут удалены!")) return;
+  const deleteCategory = useCallback(async () => {
+    if (!categoryToDelete) return;
+    setIsDeletingCategory(true);
     try {
-      await categoryService.delete(id);
-      setCategories(prev => prev.filter(c => c.id !== id));
+      await categoryService.delete(categoryToDelete.id);
+      setCategories(prev => prev.filter(c => c.id !== categoryToDelete.id));
       setSelectedId(null);
+      setCategoryToDelete(null);
     } catch (err: any) {
       alert(err.response?.data?.message || "Ошибка при удалении");
+    } finally {
+      setIsDeletingCategory(false);
     }
-  }, []);
+  }, [categoryToDelete]);
 
   // ── design tokens ────────────────────────────────────────────────────────────
   const glassCls = isDark
@@ -204,7 +211,7 @@ export default function CategoryPage() {
         </motion.div>
 
         {/* ── STAT CARDS ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 not-sm:grid-cols-1  lg:grid-cols-4 gap-3">
           {STAT_CARDS.map((s, i) => (
             <motion.div key={i}
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
@@ -419,7 +426,7 @@ export default function CategoryPage() {
                                   </motion.button>
 
                                   <motion.button whileHover={{ x: 3 }}
-                                    onClick={() => deleteCategory(cat.id)}
+                                    onClick={() => setCategoryToDelete(cat)}
                                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-left ${
                                       isDark ? "text-rose-400 hover:bg-rose-500/10" : "text-rose-500 hover:bg-rose-50"
                                     }`}>
@@ -499,6 +506,20 @@ export default function CategoryPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={async () => { await loadCategories(false); }}
+      />
+      <AdminConfirmModal
+        isOpen={categoryToDelete !== null}
+        isDark={isDark}
+        title="Удалить категорию"
+        description="Категория будет удалена вместе со всеми связанными услугами и их настройками."
+        itemLabel={categoryToDelete?.title}
+        confirmText="Удалить категорию"
+        isLoading={isDeletingCategory}
+        onClose={() => {
+          if (isDeletingCategory) return;
+          setCategoryToDelete(null);
+        }}
+        onConfirm={deleteCategory}
       />
     </div>
   );

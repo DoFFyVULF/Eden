@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { routes } from "./lib/routes";
+import { routes } from "./providers/routes";
 import Header from "./components/ui/public/header/Header";
 import Footer from "./components/ui/public/footer/Footer";
 import Masonry from "./animations/Masonry/Masonry";

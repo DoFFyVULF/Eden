@@ -44,37 +44,60 @@ model User {
 
 // done
 model Master {
-  id                   Int                  @id @default(autoincrement())
-  surname              String
-  name                 String
-  middlename           String               @map("middle_name")
-  specialization       String
-  phone                String               @unique
-  isActive             Boolean              @default(true) @map("is_active")
-  photo                String?
-  servicePrices        ServicePrice[]
-  appointments         Appointment[]
-  masterSchedules      MasterSchedule[]
-  users                User[]
-  masterTimeOffs       MasterTimeOff[]
-  appointmentHistories AppointmentHistory[]
+  id                        Int                        @id @default(autoincrement())
+  surname                   String
+  name                      String
+  middlename                String                     @map("middle_name")
+  specialization            String
+  phone                     String                     @unique
+  isActive                  Boolean                    @default(true) @map("is_active")
+  photo                     String?
+  servicePrices             ServicePrice[]
+  appointments              Appointment[]
+  masterSchedules           MasterSchedule[]
+  users                     User[]
+  masterTimeOffs            MasterTimeOff[]
+  appointmentHistories      AppointmentHistory[]
+  masterScheduleSuggestions MasterScheduleSuggestion[]
 
   @@map("master")
 }
 
 //done
 model MasterSchedule {
-  id        Int      @id @default(autoincrement())
-  master    Master   @relation(fields: [masterID], references: [id], onDelete: Cascade)
-  masterID  Int      @map("master_id")
-  dayOfWeek Int?     @map("day_of_week") 
-  startTime DateTime @map("start_time")
-  endTime   DateTime @map("end_time")
+  id                        Int                        @id @default(autoincrement())
+  master                    Master                     @relation(fields: [masterID], references: [id], onDelete: Cascade)
+  masterID                  Int                        @map("master_id")
+  dayOfWeek                 Int?                       @map("day_of_week")
+  startTime                 DateTime                   @map("start_time")
+  endTime                   DateTime                   @map("end_time")
+  masterScheduleSuggestions MasterScheduleSuggestion[]
 
   @@index([masterID])
   @@index([masterID, dayOfWeek])
   @@index([startTime, endTime])
   @@map("master_schedule")
+}
+
+model MasterScheduleSuggestion {
+  id       Int    @id @default(autoincrement())
+  master   Master @relation(fields: [masterId], references: [id])
+  masterId Int    @map("master_id")
+
+  targetSchedule   MasterSchedule? @relation(fields: [targetScheduleId], references: [id])
+  targetScheduleId Int?            @map("target_schedule_id")
+
+  dayOfWeek Int?      @map("day_of_week")
+  date      DateTime?
+  startTime DateTime  @map("start_time")
+  endTime   DateTime  @map("end_time")
+
+  reason String
+  status String @default("pending") // pending, approved, rejected
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("master_schedule_suggestion")
 }
 
 model MasterTimeOff {

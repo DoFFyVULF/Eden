@@ -4,8 +4,11 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { appointmentService } from "@/services/appointment/appointment.service";
 import { userService } from "@/services/user/user.service";
+import { masterService } from "@/services/master/master.service";
 import { IAppointment, AppointmentStatus } from "@/types/appointment.types";
 import { IUser } from "@/types/user.types";
+import { IMaster } from "@/types/masters.type";
+import AppointmentCard from "@/app/components/ui/master/AppointmentCard";
 import {
   Search,
   Calendar,
@@ -17,32 +20,36 @@ import {
   ChevronUp,
   RefreshCw,
   CalendarDays,
+  CalendarRange,
   SlidersHorizontal,
   X,
   UserCheck,
   Clock4,
   ArrowUpRight,
   TrendingUp,
-  Flame,
   Activity,
+  Filter,
 } from "lucide-react";
 
-type SortField = "time" | "client" | "service" | "date";
+type SortField = "status" | "time" | "client" | "service" | "date";
 type SortOrder = "asc" | "desc";
 
 export default function MasterAppointments() {
   const [currentUser, setCurrentUser] = useState<IUser | null>(null);
+  const [masterInfo, setMasterInfo] = useState<IMaster | null>(null);
   const [appointments, setAppointments] = useState<IAppointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(false);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
+  // Filters & Sort
   const [sortField, setSortField] = useState<SortField>("time");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [statusFilter, setStatusFilter] = useState<string>("");
   const [dateFilter, setDateFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [showFilters, setShowFilters] = useState(false);
 
   // Theme detection
   useEffect(() => {
@@ -63,23 +70,41 @@ export default function MasterAppointments() {
     } else {
       setIsRefreshing(true);
     }
-
     setError(null);
 
     try {
+      // 1. Get User
       const userData = await userService.getMe();
       setCurrentUser(userData.data);
 
-      const allAppointments = await appointmentService.getAll();
+      // 2. Get Master Info (Optional but good for header)
+      try {
+        if (userData.data.masterId) {
+          const allMasters = await masterService.getAll();
+          const currentMaster = allMasters.find(
+            (m) => m.id === userData.data.masterId
+          );
+          setMasterInfo(currentMaster || null);
+        }
+      } catch (err) {
+        console.warn("Не удалось загрузить данные мастера:", err);
+      }
 
+      // 3. Get Appointments
+      const allAppointments = await appointmentService.getAll();
+      
+      // Filter for current master and "Подтвержден" status only
       const masterAppointments = allAppointments.filter((appointment) => {
-        return (
-          appointment.master.id === (userData.data.masterId || userData.data.id)
-        );
+        // Depending on your backend structure, adjust this check
+        const appMasterId = appointment.master?.id || appointment.master;
+        const isMasterAppointment = appMasterId === (userData.data.masterId || userData.data.id);
+        const isConfirmed = appointment.status === AppointmentStatus.Подтвержден;
+        return isMasterAppointment && isConfirmed;
       });
 
       setAppointments(masterAppointments);
     } catch (err) {
+      console.error("Ошибка загрузки данных:", err);
       setError("Не удалось загрузить данные. Проверьте соединение.");
     } finally {
       setIsLoading(false);
@@ -91,28 +116,10 @@ export default function MasterAppointments() {
     loadData();
   }, []);
 
-  const confirmedAppointments = useMemo(() => {
-    return appointments.filter(app => app.status === AppointmentStatus.Подтвержден);
-  }, [appointments]);
+  // --- Logic Helpers ---
 
-  const todayAppointments = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
-    return confirmedAppointments.filter(
-      (app) =>
-        new Date(app.appointmentTime).toISOString().split("T")[0] === today
-    );
-  }, [confirmedAppointments]);
-
-  const newAppointments = useMemo(() => {
-    return appointments.filter((app) => app.status === AppointmentStatus.Новый);
-  }, [appointments]);
-
-  const completedAppointments = useMemo(() => {
-    return appointments.filter((app) => app.status === AppointmentStatus.Завершен);
-  }, [appointments]);
-
-  const sortAppointments = (list: IAppointment[]): IAppointment[] => {
-    const sorted = [...list].sort((a, b) => {
+  const sortAppointments = (apps: IAppointment[]): IAppointment[] => {
+    const sorted = [...apps].sort((a, b) => {
       let aValue: string | number = "";
       let bValue: string | number = "";
 
@@ -133,6 +140,16 @@ export default function MasterAppointments() {
           aValue = new Date(a.appointmentTime).setHours(0, 0, 0, 0);
           bValue = new Date(b.appointmentTime).setHours(0, 0, 0, 0);
           break;
+        case "status":
+          const statusOrder = [
+            AppointmentStatus.Новый,
+            AppointmentStatus.Подтвержден,
+            AppointmentStatus.Завершен,
+            AppointmentStatus.Отменен,
+          ];
+          aValue = statusOrder.indexOf(a.status);
+          bValue = statusOrder.indexOf(b.status);
+          break;
         default:
           return 0;
       }
@@ -146,12 +163,11 @@ export default function MasterAppointments() {
         ? (aValue as number) - (bValue as number)
         : (bValue as number) - (aValue as number);
     });
-
     return sorted;
   };
 
   const filteredAndSortedAppointments = useMemo(() => {
-    let filtered = confirmedAppointments;
+    let filtered = appointments;
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -159,7 +175,19 @@ export default function MasterAppointments() {
         (app) =>
           `${app.clientSurname} ${app.clientName}`.toLowerCase().includes(q) ||
           app.service.title.toLowerCase().includes(q) ||
-          app.clientPhone.includes(q),
+          app.clientPhone.includes(q)
+      );
+    }
+
+    if (statusFilter) {
+      const statusMap: Record<string, AppointmentStatus> = {
+        new: AppointmentStatus.Новый,
+        confirmed: AppointmentStatus.Подтвержден,
+        completed: AppointmentStatus.Завершен,
+        cancelled: AppointmentStatus.Отменен,
+      };
+      filtered = filtered.filter(
+        (app) => app.status === statusMap[statusFilter]
       );
     }
 
@@ -167,29 +195,51 @@ export default function MasterAppointments() {
       filtered = filtered.filter(
         (app) =>
           new Date(app.appointmentTime).toISOString().split("T")[0] ===
-          dateFilter,
+          dateFilter
       );
     }
 
     return sortAppointments(filtered);
   }, [
-    confirmedAppointments,
+    appointments,
     sortField,
     sortOrder,
+    statusFilter,
     dateFilter,
     searchQuery,
   ]);
 
-  const handleSortChange = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortOrder("asc");
-    }
-  };
+  // Stats Calculation
+  const stats = useMemo(() => {
+    // Filter to only "Подтвержден" appointments for master
+    const confirmedApps = appointments;
+    
+    const todayStr = new Date().toISOString().split("T")[0];
+    
+    const todayApps = confirmedApps.filter(
+      (app) =>
+        new Date(app.appointmentTime).toISOString().split("T")[0] === todayStr
+    );
+
+    const upcomingApps = confirmedApps.filter(
+      (app) =>
+        new Date(app.appointmentTime) >= new Date()
+    );
+
+    const newApps = confirmedApps.filter(
+      (app) => app.status === AppointmentStatus.Новый
+    );
+
+    return {
+      total: confirmedApps.length,
+      today: todayApps.length,
+      upcoming: upcomingApps.length,
+      new: newApps.length,
+    };
+  }, [appointments]);
 
   const clearFilters = () => {
+    setStatusFilter("");
     setDateFilter("");
     setSearchQuery("");
   };
@@ -197,9 +247,9 @@ export default function MasterAppointments() {
   const formatDate = (isoString: string): string => {
     const date = new Date(isoString);
     return date.toLocaleDateString("ru-RU", {
-      day: "2-digit",
-      month: "2-digit",
       year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
     });
   };
 
@@ -211,70 +261,13 @@ export default function MasterAppointments() {
     });
   };
 
-  const getStatusInfo = (status: AppointmentStatus) => {
-    switch (status) {
-      case AppointmentStatus.Новый:
-        return { dot: "bg-amber-400", label: "Новый", color: "text-amber-400" };
-      case AppointmentStatus.Подтвержден:
-        return { dot: "bg-emerald-400", label: "Подтверждён", color: "text-emerald-400" };
-      case AppointmentStatus.Завершен:
-        return { dot: "bg-blue-400", label: "Завершён", color: "text-blue-400" };
-      case AppointmentStatus.Отменен:
-        return { dot: "bg-rose-400", label: "Отменён", color: "text-rose-400" };
-      default:
-        return { dot: "bg-gray-400", label: status, color: "text-gray-400" };
-    }
-  };
-
+  // Styling Constants
   const glassCls = isDark
     ? "bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1] shadow-lg"
     : "bg-white border border-gray-200/70 shadow-sm";
 
-  const STAT_CARDS = [
-    {
-      num: todayAppointments.length,
-      label: "Сегодня",
-      sub: "подтверждённых",
-      icon: <CalendarDays size={22} />,
-      gradient: "from-emerald-500 to-teal-500",
-      glow: "shadow-emerald-500/25",
-    },
-    {
-      num: newAppointments.length,
-      label: "Новых",
-      sub: "ждут подтверждения",
-      icon: <AlertCircle size={22} />,
-      gradient: "from-amber-500 to-orange-500",
-      glow: "shadow-amber-500/25",
-      pulse: newAppointments.length > 0,
-    },
-    {
-      num: confirmedAppointments.length,
-      label: "Активных",
-      sub: "в очереди",
-      icon: <CheckCircle2 size={22} />,
-      gradient: "from-blue-500 to-indigo-500",
-      glow: "shadow-blue-500/25",
-    },
-    {
-      num: completedAppointments.length,
-      label: "Завершено",
-      sub: "всего выполнено",
-      icon: <Clock4 size={22} />,
-      gradient: "from-purple-500 to-pink-500",
-      glow: "shadow-purple-500/25",
-    },
-  ];
-
-  const SORT_OPTS: { field: SortField; label: string; icon: React.ReactNode }[] = [
-    { field: "time", label: "Время", icon: <Clock size={14} /> },
-    { field: "date", label: "Дата", icon: <Calendar size={14} /> },
-    { field: "client", label: "Клиент", icon: <Users size={14} /> },
-    { field: "service", label: "Услуга", icon: <TrendingUp size={14} /> },
-  ];
-
   return (
-    <div className="min-h-screen p-4 md:p-6 lg:p-8">
+    <div className="min-h-screen p-4 md:p-6 lg:p-8 relative">
       {/* Ambient orbs — dark only */}
       {isDark && (
         <div className="fixed inset-0 pointer-events-none overflow-hidden -z-0">
@@ -285,6 +278,7 @@ export default function MasterAppointments() {
       )}
 
       <div className="max-w-9xl mx-auto relative z-10 space-y-8">
+        
         {/* ── HEADER ─────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: -16 }}
@@ -292,7 +286,7 @@ export default function MasterAppointments() {
           transition={{ duration: 0.5 }}
         >
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-            {/* Left — greeting */}
+            {/* Left — title */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div
@@ -303,7 +297,7 @@ export default function MasterAppointments() {
                   }`}
                 >
                   <Activity size={11} />
-                  Управление записями
+                  Записи
                 </div>
               </div>
 
@@ -312,7 +306,7 @@ export default function MasterAppointments() {
                   isDark ? "text-white" : "text-gray-900"
                 }`}
               >
-                Мои{" "}
+                Мои{ " " }
                 <span
                   className={`${
                     isDark
@@ -320,18 +314,39 @@ export default function MasterAppointments() {
                       : "bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"
                   }`}
                 >
-                  записи
+                  клиенты
                 </span>
               </h1>
               <p
                 className={`text-base ${isDark ? "text-white/40" : "text-gray-400"}`}
               >
-                {confirmedAppointments.length} активных · {newAppointments.length} новых
+                {masterInfo
+                  ? `${masterInfo.surname} ${masterInfo.name}`
+                  : currentUser?.name || currentUser?.login || "Мастер"}
+                { " " }· {stats.total} записей всего
               </p>
             </div>
 
             {/* Right — actions */}
             <div className="flex gap-2.5 flex-wrap">
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 ${
+                   showFilters
+                    ? isDark 
+                      ? "bg-indigo-500/20 border-indigo-500/30 text-indigo-300"
+                      : "bg-blue-50 border-blue-200 text-blue-600"
+                    : isDark
+                      ? "bg-white/[0.07] border-white/[0.1] text-white/60 hover:text-white/80 hover:bg-white/[0.1]"
+                      : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
+                }`}
+              >
+                <SlidersHorizontal size={15} />
+                Фильтры
+              </motion.button>
+
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
@@ -352,249 +367,245 @@ export default function MasterAppointments() {
           </div>
         </motion.div>
 
+        {/* ── FILTERS PANEL (Collapsible) ────────────────────── */}
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className={`overflow-hidden rounded-2xl ${glassCls}`}
+            >
+              <div className="p-5 space-y-4">
+                 <div className="flex flex-col lg:flex-row gap-4">
+                    {/* Search */}
+                    <div className="flex-1 relative">
+                      <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Поиск по клиентам, услугам..."
+                        className={`w-full pl-10 pr-4 py-3 rounded-xl border focus:ring-2 focus:ring-blue-500 outline-none transition-all ${
+                          isDark 
+                            ? "bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-blue-500/50" 
+                            : "bg-gray-50 border-gray-200 text-gray-900 focus:bg-white"
+                        }`}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Status Select */}
+                    <select
+                      className={`px-4 py-3 rounded-xl border focus:ring-2 focus:ring-blue-500 outline-none transition-all appearance-none cursor-pointer ${
+                         isDark 
+                           ? "bg-white/5 border-white/10 text-white focus:border-blue-500/50" 
+                           : "bg-gray-50 border-gray-200 text-gray-900 focus:bg-white"
+                      }`}
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                      <option value="">Все статусы</option>
+                      <option value="new">Новые</option>
+                      <option value="confirmed">Подтвержденные</option>
+                      <option value="completed">Завершенные</option>
+                      <option value="cancelled">Отмененные</option>
+                    </select>
+
+                    {/* Date Input */}
+                    <input
+                      type="date"
+                      className={`px-4 py-3 rounded-xl border focus:ring-2 focus:ring-blue-500 outline-none transition-all ${
+                         isDark 
+                           ? "bg-white/5 border-white/10 text-white focus:border-blue-500/50 [color-scheme:dark]" 
+                           : "bg-gray-50 border-gray-200 text-gray-900 focus:bg-white"
+                      }`}
+                      value={dateFilter}
+                      onChange={(e) => setDateFilter(e.target.value)}
+                    />
+
+                    {(statusFilter || dateFilter || searchQuery) && (
+                      <button
+                        onClick={clearFilters}
+                        className="px-4 py-3 text-red-500 hover:text-red-600 hover:bg-red-500/10 rounded-xl transition-colors flex items-center justify-center"
+                      >
+                        <X size={20} />
+                      </button>
+                    )}
+                 </div>
+
+                 {/* Sort Toggles */}
+                 <div className="flex flex-wrap gap-2 pt-2 border-t border-dashed border-gray-200/20">
+                    <span className={`text-sm font-medium mr-2 self-center ${isDark ? "text-white/40" : "text-gray-500"}`}>
+                      Сортировка:
+                    </span>
+                    {(
+                      ["time", "client", "service", "date", "status"] as SortField[]
+                    ).map((field) => (
+                      <button
+                        key={field}
+                        onClick={() => {
+                          if (sortField === field) {
+                            setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                          } else {
+                            setSortField(field);
+                            setSortOrder("asc");
+                          }
+                        }}
+                        className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${
+                          sortField === field
+                            ? isDark
+                              ? "bg-indigo-500/20 border-indigo-500/30 text-indigo-300"
+                              : "bg-blue-100 text-blue-700 border-blue-200"
+                            : isDark
+                              ? "bg-white/5 border-white/10 text-white/50 hover:text-white/80"
+                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        {field === "time" && "Время"}
+                        {field === "client" && "Клиент"}
+                        {field === "service" && "Услуга"}
+                        {field === "date" && "Дата"}
+                        {field === "status" && "Статус"}
+                        {sortField === field && (
+                          <span className="ml-1 inline-block">
+                            {sortOrder === "asc" ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                 </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* ── STAT CARDS ──────────────────────────────────────── */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2
-                className={`text-lg font-black tracking-tight ${isDark ? "text-white/90" : "text-gray-900"}`}
-              >
-                Статистика
-              </h2>
-              <p
-                className={`text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}
-              >
-                Ключевые показатели
-              </p>
-            </div>
-            <div
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            
+            {/* Card 1: Today */}
+             <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              whileHover={{ y: -3, scale: 1.02 }}
+               className={`relative rounded-2xl p-5 overflow-hidden transition-all duration-300 ${
                 isDark
-                  ? "border-white/[0.08] text-white/30"
-                  : "border-gray-200 text-gray-400"
+                  ? "bg-white/[0.07] border border-white/[0.1] backdrop-blur-xl hover:bg-white/[0.1] shadow-lg shadow-blue-500/20"
+                  : "bg-white border border-gray-200/70 shadow-sm hover:shadow-md"
               }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Live
-            </div>
-          </div>
+             >
+               <div className={`absolute -top-4 -right-4 w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 opacity-${isDark ? "15" : "8"} blur-xl`} />
+               <div className="relative">
+                 <div className="inline-flex p-2 rounded-xl mb-3 bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/25">
+                   <CalendarDays size={22} className="text-white" />
+                 </div>
+                 <div className={`text-3xl font-black leading-none mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
+                  {isLoading ? "—" : stats.today}
+                 </div>
+                 <div className={`text-sm font-semibold ${isDark ? "text-white/70" : "text-gray-700"}`}>
+                  Сегодня
+                 </div>
+                 <div className={`text-xs mt-0.5 ${isDark ? "text-white/35" : "text-gray-400"}`}>
+                  Записей на сегодня
+                 </div>
+               </div>
+             </motion.div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {STAT_CARDS.map((s, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.06 }}
-                whileHover={{ y: -3, scale: 1.02 }}
-                className={`relative rounded-2xl p-5 overflow-hidden transition-all duration-300 ${
-                  isDark
-                    ? `bg-white/[0.07] border border-white/[0.1] backdrop-blur-xl hover:bg-white/[0.1] shadow-lg ${s.glow}`
-                    : "bg-white border border-gray-200/70 shadow-sm hover:shadow-md"
-                }`}
-              >
-                {/* Gradient accent corner */}
-                <div
-                  className={`absolute -top-4 -right-4 w-20 h-20 rounded-full bg-gradient-to-br ${s.gradient} opacity-${isDark ? "15" : "8"} blur-xl`}
-                />
-
-                <div className="relative">
-                  <div
-                    className={`inline-flex p-2 rounded-xl mb-3 bg-gradient-to-br ${s.gradient} shadow-lg ${s.glow}`}
-                  >
-                    <span className="text-white">{s.icon}</span>
-                  </div>
-                  {"pulse" in s && s.pulse && s.num > 0 && (
-                    <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-                  )}
-                  <div
-                    className={`text-3xl font-black leading-none mb-1 ${isDark ? "text-white" : "text-gray-900"}`}
-                  >
-                    {isLoading ? "—" : s.num}
-                  </div>
-                  <div
-                    className={`text-sm font-semibold ${isDark ? "text-white/70" : "text-gray-700"}`}
-                  >
-                    {s.label}
-                  </div>
-                  <div
-                    className={`text-xs mt-0.5 ${isDark ? "text-white/35" : "text-gray-400"}`}
-                  >
-                    {s.sub}
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── SEARCH & FILTER ─────────────────────────────────── */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.28 }}
-          className={`rounded-2xl p-4 transition-all duration-300 ${glassCls}`}
-        >
-          <div className="flex gap-3 flex-wrap">
-            {/* Search */}
-            <div className="flex-1 min-w-[200px] relative">
-              <Search
-                size={16}
-                className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/30" : "text-gray-400"}`}
-              />
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Поиск по клиенту, услуге..."
-                className={`w-full h-11 pl-10 pr-4 rounded-xl text-sm border outline-none transition-all ${
-                  isDark
-                    ? "bg-white/[0.07] border-white/[0.1] text-white/90 placeholder-white/25 focus:border-white/20 focus:bg-white/[0.09]"
-                    : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
-                }`}
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-lg ${isDark ? "text-white/40 hover:text-white/60" : "text-gray-400 hover:text-gray-600"}`}
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-
-            {/* Date */}
-            <div className="relative">
-              <Calendar
-                size={15}
-                className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? "text-white/30" : "text-gray-400"}`}
-              />
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className={`h-11 pl-10 pr-4 rounded-xl text-sm border outline-none cursor-pointer transition-all ${
-                  isDark
-                    ? "bg-white/[0.07] border-white/[0.1] text-white/90 focus:border-white/20"
-                    : "bg-gray-50 border-gray-200 text-gray-700 focus:border-blue-300 focus:bg-white"
-                }`}
-              />
-            </div>
-
-            {/* Sort toggle */}
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => setIsFilterOpen(!isFilterOpen)}
-              className={`h-11 flex items-center gap-2 px-4 rounded-xl text-sm font-semibold border transition-all duration-200 ${
-                isFilterOpen
-                  ? isDark
-                    ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300"
-                    : "bg-blue-50 border-blue-300 text-blue-600"
-                  : isDark
-                    ? "bg-white/[0.07] border-white/[0.1] text-white/60 hover:text-white/80"
-                    : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-white shadow-sm"
+            {/* Card 2: New */}
+             <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              whileHover={{ y: -3, scale: 1.02 }}
+               className={`relative rounded-2xl p-5 overflow-hidden transition-all duration-300 ${
+                isDark
+                  ? "bg-white/[0.07] border border-white/[0.1] backdrop-blur-xl hover:bg-white/[0.1] shadow-lg shadow-emerald-500/20"
+                  : "bg-white border border-gray-200/70 shadow-sm hover:shadow-md"
               }`}
-            >
-              <SlidersHorizontal size={15} />
-              Сортировка
-              {isFilterOpen ? (
-                <ChevronUp size={13} />
-              ) : (
-                <ChevronDown size={13} />
-              )}
-            </motion.button>
+             >
+               <div className={`absolute -top-4 -right-4 w-20 h-20 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 opacity-${isDark ? "15" : "8"} blur-xl`} />
+               <div className="relative">
+                 <div className="inline-flex p-2 rounded-xl mb-3 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
+                   <AlertCircle size={22} className="text-white" />
+                 </div>
+                 <div className={`text-3xl font-black leading-none mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
+                  {isLoading ? "—" : stats.new}
+                 </div>
+                 <div className={`text-sm font-semibold ${isDark ? "text-white/70" : "text-gray-700"}`}>
+                  Новые
+                 </div>
+                 <div className={`text-xs mt-0.5 ${isDark ? "text-white/35" : "text-gray-400"}`}>
+                  Требуют внимания
+                 </div>
+               </div>
+             </motion.div>
 
-            {/* Clear all */}
-            {(searchQuery || dateFilter) && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={clearFilters}
-                className={`h-11 px-4 rounded-xl text-sm font-semibold border transition-all ${
-                  isDark
-                    ? "bg-rose-500/10 border-rose-400/20 text-rose-400 hover:bg-rose-500/15"
-                    : "bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100"
-                }`}
-              >
-                <X size={15} />
-              </motion.button>
-            )}
-          </div>
+            {/* Card 3: Upcoming */}
+             <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              whileHover={{ y: -3, scale: 1.02 }}
+               className={`relative rounded-2xl p-5 overflow-hidden transition-all duration-300 ${
+                isDark
+                  ? "bg-white/[0.07] border border-white/[0.1] backdrop-blur-xl hover:bg-white/[0.1] shadow-lg shadow-purple-500/20"
+                  : "bg-white border border-gray-200/70 shadow-sm hover:shadow-md"
+              }`}
+             >
+               <div className={`absolute -top-4 -right-4 w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 opacity-${isDark ? "15" : "8"} blur-xl`} />
+               <div className="relative">
+                 <div className="inline-flex p-2 rounded-xl mb-3 bg-gradient-to-br from-purple-500 to-pink-600 shadow-lg shadow-purple-500/25">
+                   <Clock size={22} className="text-white" />
+                 </div>
+                 <div className={`text-3xl font-black leading-none mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
+                  {isLoading ? "—" : stats.upcoming}
+                 </div>
+                 <div className={`text-sm font-semibold ${isDark ? "text-white/70" : "text-gray-700"}`}>
+                  Предстоит
+                 </div>
+                 <div className={`text-xs mt-0.5 ${isDark ? "text-white/35" : "text-gray-400"}`}>
+                  Ближайшие записи
+                 </div>
+               </div>
+             </motion.div>
 
-          {/* Sort pills */}
-          <AnimatePresence>
-            {isFilterOpen && (
-              <motion.div
-                initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                animate={{ opacity: 1, height: "auto", marginTop: 12 }}
-                exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                className="overflow-hidden"
-              >
-                <div
-                  className={`pt-3 border-t ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}
-                >
-                  <p
-                    className={`text-xs font-semibold mb-2.5 ${isDark ? "text-white/30" : "text-gray-400"}`}
-                  >
-                    Сортировать по:
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {SORT_OPTS.map((opt) => {
-                      const active = sortField === opt.field;
-                      return (
-                        <motion.button
-                          key={opt.field}
-                          whileHover={{ scale: 1.04 }}
-                          whileTap={{ scale: 0.96 }}
-                          onClick={() => handleSortChange(opt.field)}
-                          className={`flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-semibold border transition-all duration-150 ${
-                            active
-                              ? isDark
-                                ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300"
-                                : "bg-blue-100 border-blue-300 text-blue-700"
-                              : isDark
-                                ? "bg-white/[0.05] border-white/[0.08] text-white/50 hover:text-white/70 hover:border-white/[0.12]"
-                                : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-white"
-                          }`}
-                        >
-                          {opt.icon}
-                          {opt.label}
-                          {active &&
-                            (sortOrder === "asc" ? (
-                              <ChevronUp size={11} />
-                            ) : (
-                              <ChevronDown size={11} />
-                            ))}
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+            {/* Card 4: Total */}
+             <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              whileHover={{ y: -3, scale: 1.02 }}
+               className={`relative rounded-2xl p-5 overflow-hidden transition-all duration-300 ${
+                isDark
+                  ? "bg-white/[0.07] border border-white/[0.1] backdrop-blur-xl hover:bg-white/[0.1] shadow-lg shadow-amber-500/20"
+                  : "bg-white border border-gray-200/70 shadow-sm hover:shadow-md"
+              }`}
+             >
+               <div className={`absolute -top-4 -right-4 w-20 h-20 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 opacity-${isDark ? "15" : "8"} blur-xl`} />
+               <div className="relative">
+                 <div className="inline-flex p-2 rounded-xl mb-3 bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/25">
+                   <Users size={22} className="text-white" />
+                 </div>
+                 <div className={`text-3xl font-black leading-none mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
+                  {isLoading ? "—" : stats.total}
+                 </div>
+                 <div className={`text-sm font-semibold ${isDark ? "text-white/70" : "text-gray-700"}`}>
+                  Всего
+                 </div>
+                 <div className={`text-xs mt-0.5 ${isDark ? "text-white/35" : "text-gray-400"}`}>
+                  За все время
+                 </div>
+               </div>
+             </motion.div>
+           </div>
+         </div>
 
-        {/* ── RESULT META ─────────────────────────────────────── */}
-        {!isLoading && !error && (
-          <div
-            className={`flex items-center justify-between px-1 mb-3 text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}
-          >
-            <span>
-              {filteredAndSortedAppointments.length === confirmedAppointments.length
-                ? `${filteredAndSortedAppointments.length} записей`
-                : `${filteredAndSortedAppointments.length} из ${confirmedAppointments.length}`}
-            </span>
-          </div>
-        )}
-
-        {/* ── APPOINTMENTS LIST ────────────────────────────────── */}
+        {/* ── APPOINTMENTS LIST ─────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.35 }}
+          transition={{ delay: 0.3 }}
         >
           {isLoading ? (
             <div className={`rounded-2xl p-16 text-center ${glassCls}`}>
@@ -604,85 +615,18 @@ export default function MasterAppointments() {
                 }`}
                 style={{ borderWidth: 3 }}
               />
-              <p
-                className={`text-sm ${isDark ? "text-white/40" : "text-gray-400"}`}
-              >
+              <p className={`text-sm ${isDark ? "text-white/40" : "text-gray-400"}`}>
                 Загрузка записей...
               </p>
             </div>
           ) : error ? (
-            <div className={`rounded-2xl p-8 text-center ${glassCls}`}>
-              <p className="text-rose-500 font-medium mb-4">{error}</p>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => loadData(true)}
-                className={`px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r ${
-                  isDark
-                    ? "from-indigo-500 to-purple-600"
-                    : "from-blue-500 to-purple-600"
-                }`}
-              >
-                Повторить
-              </motion.button>
-            </div>
-          ) : confirmedAppointments.length === 0 ? (
-            <div className={`rounded-2xl p-16 text-center ${glassCls}`}>
-              <div
-                className={`w-16 h-16 rounded-2xl mx-auto mb-5 flex items-center justify-center ${isDark ? "bg-white/[0.07]" : "bg-gray-100"}`}
-              >
-                <CalendarDays
-                  size={26}
-                  className={isDark ? "text-white/25" : "text-gray-300"}
-                />
-              </div>
-              <p
-                className={`text-lg font-bold mb-1 ${isDark ? "text-white/70" : "text-gray-600"}`}
-              >
-                Нет подтверждённых записей
-              </p>
-              <p
-                className={`text-sm ${isDark ? "text-white/30" : "text-gray-400"}`}
-              >
-                Записи появятся после подтверждения администратором
-              </p>
-            </div>
-          ) : filteredAndSortedAppointments.length === 0 ? (
-            <div className={`rounded-2xl p-16 text-center ${glassCls}`}>
-              <div
-                className={`w-16 h-16 rounded-2xl mx-auto mb-5 flex items-center justify-center ${isDark ? "bg-white/[0.07]" : "bg-gray-100"}`}
-              >
-                <Search
-                  size={26}
-                  className={isDark ? "text-white/25" : "text-gray-300"}
-                />
-              </div>
-              <p
-                className={`text-lg font-bold mb-1 ${isDark ? "text-white/70" : "text-gray-600"}`}
-              >
-                Ничего не найдено
-              </p>
-              <p
-                className={`text-sm ${isDark ? "text-white/30" : "text-gray-400"}`}
-              >
-                Попробуйте изменить параметры поиска
-              </p>
-              {(searchQuery || dateFilter) && (
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  onClick={clearFilters}
-                  className={`mt-5 px-5 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
-                    isDark
-                      ? "border-white/10 text-white/50 hover:bg-white/[0.07]"
-                      : "border-gray-200 text-gray-500 hover:bg-gray-50"
-                  }`}
-                >
-                  Сбросить фильтры
-                </motion.button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
+             <div className={`rounded-2xl p-16 text-center ${glassCls} border-red-500/20`}>
+               <AlertCircle className={`w-12 h-12 mx-auto mb-4 ${isDark ? "text-red-400" : "text-red-500"}`} />
+               <p className={`font-bold ${isDark ? "text-white" : "text-gray-900"}`}>Ошибка</p>
+               <p className={`text-sm mt-2 ${isDark ? "text-white/60" : "text-gray-500"}`}>{error}</p>
+             </div>
+          ) : filteredAndSortedAppointments.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               <AnimatePresence mode="popLayout">
                 {filteredAndSortedAppointments.map((appointment, index) => (
                   <motion.div
@@ -691,123 +635,48 @@ export default function MasterAppointments() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.98 }}
                     transition={{ delay: Math.min(index * 0.04, 0.3) }}
-                    whileHover={{ x: 4 }}
-                    className={`rounded-2xl p-5 transition-all duration-200 cursor-default group ${
-                      isDark
-                        ? "bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.12]"
-                        : "bg-white border border-gray-200/70 hover:shadow-md"
-                    }`}
+                    layout
                   >
-                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                      {/* Left: Time + Client */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start gap-4">
-                          {/* Time block */}
-                          <div
-                            className={`text-center py-3 px-4 rounded-xl font-black text-sm leading-none flex-shrink-0 ${
-                              isDark
-                                ? "bg-white/[0.07] text-white/90"
-                                : "bg-gray-100 text-gray-800"
-                            }`}
-                          >
-                            <div>{formatTime(appointment.appointmentTime)}</div>
-                            <div className={`text-xs mt-1 font-semibold ${isDark ? "text-white/40" : "text-gray-500"}`}>
-                              {formatDate(appointment.appointmentTime)}
-                            </div>
-                          </div>
-
-                          {/* Client info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-3 mb-2">
-                              {/* Avatar */}
-                              <div
-                                className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 bg-gradient-to-br ${
-                                  isDark
-                                    ? "from-indigo-500 to-purple-600"
-                                    : "from-blue-500 to-purple-600"
-                                }`}
-                              >
-                                {appointment.clientName[0]?.toUpperCase() || "К"}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div
-                                  className={`font-bold text-base truncate ${isDark ? "text-white/90" : "text-gray-800"}`}
-                                >
-                                  {appointment.clientSurname} {appointment.clientName}
-                                </div>
-                                <div
-                                  className={`text-xs ${isDark ? "text-white/35" : "text-gray-400"}`}
-                                >
-                                  {appointment.clientPhone}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Service */}
-                            <div
-                              className={`text-sm font-semibold ${isDark ? "text-white/70" : "text-gray-600"}`}
-                            >
-                              {appointment.service.title}
-                            </div>
-                            <div
-                              className={`text-xs mt-0.5 ${isDark ? "text-white/30" : "text-gray-400"}`}
-                            >
-                              {appointment.service.duration} мин.
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right: Price + Status */}
-                      <div className="flex items-center gap-4 lg:flex-shrink-0">
-                        {/* Price */}
-                        <div className="text-right">
-                          <div
-                            className={`text-xl font-black ${
-                              isDark ? "text-emerald-400" : "text-emerald-600"
-                            }`}
-                          >
-                            {appointment.price.toLocaleString()} ₽
-                          </div>
-                          <div
-                            className={`text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}
-                          >
-                            Стоимость
-                          </div>
-                        </div>
-
-                        {/* Status */}
-                        <div
-                          className={`flex items-center gap-2 px-3 py-2 rounded-xl ${
-                            isDark
-                              ? "bg-white/[0.06] border border-white/[0.08]"
-                              : "bg-gray-50 border border-gray-200/60"
-                          }`}
-                        >
-                          <span
-                            className={`w-2 h-2 rounded-full ${getStatusInfo(appointment.status).dot}`}
-                          />
-                          <span
-                            className={`text-xs font-semibold ${getStatusInfo(appointment.status).color}`}
-                          >
-                            {getStatusInfo(appointment.status).label}
-                          </span>
-                          <ArrowUpRight
-                            size={12}
-                            className={`opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? "text-white/30" : "text-gray-400"}`}
-                          />
-                        </div>
-                      </div>
-                    </div>
+                    <AppointmentCard
+                      appointment={{
+                        clientSurname: appointment.clientSurname,
+                        clientName: appointment.clientName,
+                        clientPhone: appointment.clientPhone,
+                        service: appointment.service.title,
+                        appointmentTime: appointment.appointmentTime,
+                        price: `${appointment.price.toLocaleString()} ₽`,
+                        status: appointment.status,
+                      }}
+                      index={index}
+                      isDark={isDark}
+                      formatTime={formatTime}
+                      formatDate={formatDate}
+                    />
                   </motion.div>
                 ))}
               </AnimatePresence>
+            </div>
+          ) : (
+            <div className={`rounded-2xl p-16 text-center ${glassCls}`}>
+              <div
+                className={`w-16 h-16 rounded-2xl mx-auto mb-5 flex items-center justify-center ${
+                  isDark ? "bg-white/[0.07]" : "bg-gray-100"
+                }`}
+              >
+                <CalendarRange size={26} className={isDark ? "text-white/25" : "text-gray-300"} />
+              </div>
+              <p className={`text-lg font-bold mb-1 ${isDark ? "text-white/70" : "text-gray-600"}`}>
+                Записей не найдено
+              </p>
+              <p className={`text-sm ${isDark ? "text-white/30" : "text-gray-400"}`}>
+                Попробуйте изменить параметры фильтрации
+              </p>
             </div>
           )}
         </motion.div>
 
         {/* ── FOOTER ──────────────────────────────────────────── */}
-        {!isLoading && !error && filteredAndSortedAppointments.length > 0 && (
+        {!isLoading && filteredAndSortedAppointments.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -819,19 +688,22 @@ export default function MasterAppointments() {
             }`}
           >
             <div className="flex flex-wrap items-center gap-5">
-              {[
-                { color: "bg-amber-400", label: "Новые" },
-                { color: "bg-emerald-400", label: "Подтверждённые" },
-                { color: "bg-indigo-400", label: "Завершённые" },
-                { color: "bg-rose-400", label: "Отменённые" },
-              ].map((l) => (
-                <div key={l.label} className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${l.color}`} />
-                  {l.label}
-                </div>
-              ))}
+               <div className="flex items-center gap-2">
+                 <div className="w-2 h-2 rounded-full bg-blue-400" />
+                 Новый
+               </div>
+               <div className="flex items-center gap-2">
+                 <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                 Подтвержден
+               </div>
+               <div className="flex items-center gap-2">
+                 <div className="w-2 h-2 rounded-full bg-gray-400" />
+                 Завершен/Отменен
+               </div>
             </div>
-            <span>Загружено: {appointments.length} записей</span>
+            <span>
+              Показано {filteredAndSortedAppointments.length} из {appointments.length}
+            </span>
           </motion.div>
         )}
       </div>

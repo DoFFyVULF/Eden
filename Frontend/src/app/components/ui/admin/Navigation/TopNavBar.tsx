@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -60,8 +60,14 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const [isRounded, setIsRounded] = useState(true);
+  const [visibleItemsCount, setVisibleItemsCount] = useState<number | null>(
+    null,
+  );
   const pathname = usePathname();
   const router = useRouter();
+  const desktopNavRef = useRef<HTMLElement | null>(null);
+  const moreButtonMeasureRef = useRef<HTMLButtonElement | null>(null);
+  const itemMeasureRefs = useRef<Record<number, HTMLAnchorElement | null>>({});
 
   useEffect(() => {
     const checkIsDark = () => {
@@ -205,11 +211,17 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
       {
         id: 2,
         label: "Расписание",
-        count: counts?.schedule ?? "-",
         href: MASTER_ROUTES.SCHEDULE,
         icon: icons.schedule,
         description: "Мой график",
       },
+         {
+        id: 3,
+        label: "История",
+        href: MASTER_ROUTES.APPOINTMENTS_HISTORY,
+        icon: icons.history,
+        description: "Архив записей",
+      }
     ];
     return isAdmin ? base : master;
   }, [isAdmin, counts, icons]);
@@ -311,6 +323,88 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
       </span>
     ) : null;
 
+  const primaryDesktopItems = isAdmin ? menuItems.slice(0, 6) : menuItems;
+  const defaultOverflowItems = isAdmin ? menuItems.slice(6) : [];
+  const visibleMenuItems =
+    visibleItemsCount === null
+      ? primaryDesktopItems
+      : primaryDesktopItems.slice(0, visibleItemsCount);
+  const overflowMenuItems =
+    visibleItemsCount === null
+      ? defaultOverflowItems
+      : [
+          ...primaryDesktopItems.slice(visibleItemsCount),
+          ...defaultOverflowItems,
+        ];
+
+  useEffect(() => {
+    if (overflowMenuItems.length === 0 && isMenuOpen) {
+      setIsMenuOpen(false);
+    }
+  }, [overflowMenuItems.length, isMenuOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const recalculateVisibleItems = () => {
+      if (window.innerWidth < 1024) {
+        setVisibleItemsCount(primaryDesktopItems.length);
+        return;
+      }
+
+      const navWidth = desktopNavRef.current?.clientWidth ?? 0;
+      const moreButtonWidth = moreButtonMeasureRef.current?.offsetWidth ?? 0;
+      const itemWidths = primaryDesktopItems.map(
+        (item) => itemMeasureRefs.current[item.id]?.offsetWidth ?? 0,
+      );
+
+      if (!navWidth || itemWidths.some((width) => width === 0)) {
+        return;
+      }
+
+      const totalWidth = itemWidths.reduce((sum, width) => sum + width, 0);
+      if (totalWidth <= navWidth) {
+        setVisibleItemsCount(primaryDesktopItems.length);
+        return;
+      }
+
+      let usedWidth = 0;
+      let nextVisibleCount = 0;
+
+      for (let i = 0; i < itemWidths.length; i += 1) {
+        const remainingItems = itemWidths.length - (i + 1);
+        const reservedWidth = remainingItems > 0 ? moreButtonWidth : 0;
+        const nextWidth = usedWidth + itemWidths[i];
+
+        if (nextWidth + reservedWidth > navWidth) {
+          break;
+        }
+
+        usedWidth = nextWidth;
+        nextVisibleCount = i + 1;
+      }
+
+      setVisibleItemsCount(nextVisibleCount);
+    };
+
+    recalculateVisibleItems();
+
+    const resizeObserver = new ResizeObserver(() => {
+      recalculateVisibleItems();
+    });
+
+    if (desktopNavRef.current) {
+      resizeObserver.observe(desktopNavRef.current);
+    }
+
+    window.addEventListener("resize", recalculateVisibleItems);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", recalculateVisibleItems);
+    };
+  }, [primaryDesktopItems, isRounded]);
+
   if (!user)
     return (
       <header
@@ -370,8 +464,11 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
           </Link>
 
           {/* Nav links */}
-          <nav className="flex items-center gap-0.5 flex-1 justify-center">
-            {menuItems.slice(0, 6).map((item) => {
+          <nav
+            ref={desktopNavRef}
+            className="flex items-center gap-0.5 flex-1 justify-center min-w-0"
+          >
+            {visibleMenuItems.map((item) => {
               const active = isActive(item.href);
               return (
                 <Link
@@ -418,7 +515,7 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
             })}
 
             {/* More */}
-            {user.role === "admin" && (
+            {overflowMenuItems.length > 0 && (
               <div
                 className="relative"
                 onMouseEnter={() => setIsMenuOpen(true)}
@@ -451,10 +548,10 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 8, scale: 0.96 }}
                       transition={{ duration: 0.15, ease: "easeOut" }}
-                      className={`absolute top-12 left-0 mt-2 w-72 rounded-2xl overflow-hidden z-50 ${dropGlass}`}
+                      className={`absolute top-full right-0 mt-5 w-72 rounded-2xl overflow-hidden z-50 origin-top-right ${dropGlass}`}
                     >
                       <div className="p-2">
-                        {menuItems.slice(6).map((item) => {
+                        {overflowMenuItems.map((item) => {
                           const active = isActive(item.href);
                           return (
                             <Link
@@ -627,6 +724,56 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
           </div>
         </div>
       </header>
+
+      <div className="pointer-events-none absolute -left-[9999px] top-0 invisible hidden lg:block">
+        <div className="flex items-center gap-0.5">
+          {primaryDesktopItems.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={`measure-${item.id}`}
+                href={item.href}
+                ref={(node) => {
+                  itemMeasureRefs.current[item.id] = node;
+                }}
+                className={`relative px-3.5 py-2 rounded-xl text-sm font-medium flex items-center gap-2 whitespace-nowrap ${
+                  active
+                    ? isDark
+                      ? "text-white bg-white/10"
+                      : "text-blue-700 bg-blue-50/80"
+                    : isDark
+                      ? "text-white/50"
+                      : "text-gray-500"
+                }`}
+              >
+                <span
+                  className={
+                    active
+                      ? isDark
+                        ? "text-purple-300"
+                        : "text-blue-500"
+                      : ""
+                  }
+                >
+                  {item.icon}
+                </span>
+                {item.label}
+                <CountPill count={item.count} />
+              </Link>
+            );
+          })}
+          <button
+            ref={moreButtonMeasureRef}
+            className={`px-3.5 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 whitespace-nowrap ${
+              isDark ? "text-white/50" : "text-gray-500"
+            }`}
+            type="button"
+          >
+            Ещё
+            <ChevronDown size={13} />
+          </button>
+        </div>
+      </div>
 
       {/* ── MOBILE HEADER ───────────────────────────────────── */}
       <header

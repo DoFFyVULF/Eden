@@ -44,6 +44,7 @@ import { IServicePrice, UIServicePrice } from "@/types/service-price.types";
 import { ICategory } from "@/types/category.types";
 import { IMaster } from "@/types/masters.type";
 import { IService } from "@/types/services.types";
+import AdminConfirmModal from "@/app/components/ui/admin/AdminConfirmModal";
 
 type SortField = "service" | "price" | "status";
 type SortOrder = "asc" | "desc";
@@ -161,6 +162,8 @@ export default function MasterServicePrices() {
   const [isDark, setIsDark] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
   const [hoveredCard, setHoveredCard] = useState<number | null>(null);
+  const [priceToDelete, setPriceToDelete] = useState<UIServicePrice | null>(null);
+  const [isDeletingPrice, setIsDeletingPrice] = useState(false);
 
   const [sortField, setSortField] = useState<SortField>("service");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
@@ -497,13 +500,17 @@ export default function MasterServicePrices() {
     }
   };
 
-  const deletePrice = async (id: number) => {
-    if (!confirm("Удалить цену?")) return;
+  const deletePrice = async () => {
+    if (!priceToDelete) return;
+    setIsDeletingPrice(true);
     try {
-      await servicePriceService.delete(id);
-      setPrices((prev) => prev.filter((p) => p.id !== id));
+      await servicePriceService.delete(priceToDelete.id);
+      setPrices((prev) => prev.filter((p) => p.id !== priceToDelete.id));
+      setPriceToDelete(null);
     } catch {
       alert("Ошибка удаления");
+    } finally {
+      setIsDeletingPrice(false);
     }
   };
 
@@ -685,7 +692,7 @@ export default function MasterServicePrices() {
         </motion.div>
 
         {/* ── STAT CARDS ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 not-sm:grid-cols-1  lg:grid-cols-4 gap-3">
           {STAT_CARDS.map((s, i) => {
             const Icon = s.icon;
             return (
@@ -1374,7 +1381,22 @@ export default function MasterServicePrices() {
                                       whileHover={{ scale: 1.15 }}
                                       whileTap={{ scale: 0.9 }}
                                       onClick={() =>
-                                        deletePrice(master.priceId)
+                                        setPriceToDelete({
+                                          id: master.priceId,
+                                          price: master.price,
+                                          isActive: master.isActive,
+                                          durationOverride:
+                                            master.durationOverride,
+                                          serviceId: group.serviceId,
+                                          serviceTitle: group.serviceTitle,
+                                          serviceImg: group.serviceImg,
+                                          categoryId: group.categoryId,
+                                          categoryName: group.categoryName,
+                                          masterId: master.masterId,
+                                          masterFullName: master.masterFullName,
+                                          masterSpecialization:
+                                            master.masterSpecialization,
+                                        })
                                       }
                                       className={`w-7 h-7 rounded-lg flex items-center justify-center border transition-all ${
                                         isDark
@@ -1976,6 +1998,24 @@ export default function MasterServicePrices() {
           </motion.div>
         )}
       </AnimatePresence>
+      <AdminConfirmModal
+        isOpen={priceToDelete !== null}
+        isDark={isDark}
+        title="Удалить цену"
+        description="Связка мастера и услуги будет удалена из прайса. При необходимости её можно будет создать заново."
+        itemLabel={
+          priceToDelete
+            ? `${priceToDelete.serviceTitle} · ${priceToDelete.masterFullName}`
+            : null
+        }
+        confirmText="Удалить цену"
+        isLoading={isDeletingPrice}
+        onClose={() => {
+          if (isDeletingPrice) return;
+          setPriceToDelete(null);
+        }}
+        onConfirm={deletePrice}
+      />
     </div>
   );
 }

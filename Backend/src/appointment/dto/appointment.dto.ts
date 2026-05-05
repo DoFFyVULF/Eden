@@ -3,6 +3,7 @@ import {
   IsInt,
   IsDateString,
   IsEnum,
+  IsNumber,
   IsOptional,
   Length,
   Matches,
@@ -32,8 +33,11 @@ export class AppointmentDto {
   @IsDateString()
   appointmentTime: string; // ISO date string
 
-  @IsInt()
-  price: string; // decimal как строка (рекомендуется)
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'price must be a number with up to 2 decimal places' }
+  )
+  price: number;
 
   @IsOptional()
   @IsEnum(AppointmentStatus)

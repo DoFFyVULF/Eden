@@ -1,5 +1,6 @@
- module.exports = {
-   theme: {
+module.exports = {
+  darkMode: 'class',
+  theme: {
      extend: {
        animation: {
          'star-movement-bottom': 'star-movement-bottom linear infinite alternate',

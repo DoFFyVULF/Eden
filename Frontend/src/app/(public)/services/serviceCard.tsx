@@ -5,7 +5,7 @@ import { motion, Variants, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { Clock, MoveUpRight, X, CalendarCheck } from "lucide-react";
 import { IService } from "@/types/services.types";
-import { routes } from "@/app/lib/routes";
+import { routes } from "@/app/providers/routes";
 import { usePathname } from "next/navigation";
 
 const itemVariants: Variants = {

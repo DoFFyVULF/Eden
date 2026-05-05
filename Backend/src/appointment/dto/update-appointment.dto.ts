@@ -1,6 +1,7 @@
 import {
   IsString,
   IsInt,
+  IsNumber,
   IsOptional,
   IsDateString,
   IsEnum,
@@ -38,8 +39,11 @@ export class UpdateAppointmentDto {
   appointmentTime?: string;
 
   @IsOptional()
-  @IsString()
-  price?: string;
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'price must be a number with up to 2 decimal places' }
+  )
+  price?: number;
 
   @IsOptional()
   @IsEnum(AppointmentStatus)

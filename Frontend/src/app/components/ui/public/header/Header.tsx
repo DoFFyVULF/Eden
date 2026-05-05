@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { routes } from "@/app/lib/routes";
+import { routes } from "@/app/providers/routes";
 import { useState, useEffect, useRef } from "react";
 import { Menu, X } from "lucide-react";
 

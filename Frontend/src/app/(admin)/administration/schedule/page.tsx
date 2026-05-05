@@ -6,6 +6,7 @@ import { masterScheduleService } from "@/services/schedule/schedule.service";
 import { masterService } from "@/services/master/master.service";
 import type { IMasterSchedule } from "@/types/schedule.types";
 import type { IMaster } from "@/types/masters.type";
+import AdminConfirmModal from "@/app/components/ui/admin/AdminConfirmModal";
 import ScheduleModal from "./ScheduleModal";
 import {
   Trash2, Calendar, Clock, Plus, User, ChevronDown, ChevronUp,
@@ -37,6 +38,8 @@ export default function MasterSchedulePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
+  const [scheduleToDelete, setScheduleToDelete] = useState<IMasterSchedule | null>(null);
+  const [isDeletingSchedule, setIsDeletingSchedule] = useState(false);
 
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains("dark"));
@@ -98,10 +101,18 @@ export default function MasterSchedulePage() {
     masters: masters.length,
   }), [filtered, masters]);
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Удалить эту запись из расписания?")) return;
-    try { await masterScheduleService.delete(id); fetchData(false); }
-    catch { alert("Ошибка при удалении"); }
+  const handleDelete = async () => {
+    if (!scheduleToDelete) return;
+    setIsDeletingSchedule(true);
+    try {
+      await masterScheduleService.delete(scheduleToDelete.id);
+      setScheduleToDelete(null);
+      fetchData(false);
+    } catch {
+      alert("Ошибка при удалении");
+    } finally {
+      setIsDeletingSchedule(false);
+    }
   };
 
   const fmtTime = (s: string) =>
@@ -192,7 +203,7 @@ export default function MasterSchedulePage() {
         </motion.div>
 
         {/* ── STAT CARDS ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 not-sm:grid-cols-1 lg:grid-cols-4 gap-3">
           {STAT_CARDS.map((s, i) => (
             <motion.div key={i}
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
@@ -439,7 +450,7 @@ export default function MasterSchedulePage() {
                             <motion.button
                               whileHover={{ scale: 1.15, rotate: 90 }}
                               whileTap={{ scale: 0.9 }}
-                              onClick={() => handleDelete(item.id)}
+                              onClick={() => setScheduleToDelete(item)}
                               className={`opacity-0 group-hover/item:opacity-100 w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
                                 isDark
                                   ? "bg-rose-500/15 text-rose-400 hover:bg-rose-500/30"
@@ -559,7 +570,7 @@ export default function MasterSchedulePage() {
 
                             <motion.button
                               whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                              onClick={() => handleDelete(item.id)}
+                              onClick={() => setScheduleToDelete(item)}
                               className={`opacity-0 group-hover:opacity-100 w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
                                 isDark
                                   ? "bg-rose-500/15 text-rose-400 hover:bg-rose-500/25"
@@ -663,6 +674,24 @@ export default function MasterSchedulePage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={() => { fetchData(false); setIsModalOpen(false); }}
+      />
+      <AdminConfirmModal
+        isOpen={scheduleToDelete !== null}
+        isDark={isDark}
+        title="Удалить смену"
+        description="Запись исчезнет из расписания, и этот слот больше не будет доступен."
+        itemLabel={
+          scheduleToDelete
+            ? `${getMasterName(scheduleToDelete)} · ${fmtTime(scheduleToDelete.startTime)} — ${fmtTime(scheduleToDelete.endTime)}`
+            : null
+        }
+        confirmText="Удалить смену"
+        isLoading={isDeletingSchedule}
+        onClose={() => {
+          if (isDeletingSchedule) return;
+          setScheduleToDelete(null);
+        }}
+        onConfirm={handleDelete}
       />
     </div>
   );
