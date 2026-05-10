@@ -1,6 +1,8 @@
 import { axiosWithAuth } from "@/api/interceptors";
 import type {
+  CreateScheduleSuggestionDto,
   IMasterSchedule,
+  IScheduleSuggestion,
   IMasterTimeOff,
   MasterStatusInfo,
 } from "@/types/schedule.types";
@@ -75,6 +77,37 @@ export const masterScheduleService = {
 
   async delete(id: number): Promise<void> {
     await axiosWithAuth.delete(`/master-schedule/${id}`);
+  },
+
+  async getSuggestions(): Promise<IScheduleSuggestion[]> {
+    const { data } = await axiosWithAuth.get<IScheduleSuggestion[]>(
+      "/master-schedule/suggestions",
+    );
+    return data;
+  },
+
+  async createSuggestion(
+    dto: CreateScheduleSuggestionDto,
+  ): Promise<IScheduleSuggestion> {
+    const { data } = await axiosWithAuth.post<IScheduleSuggestion>(
+      "/master-schedule/suggestions",
+      dto,
+    );
+    return data;
+  },
+
+  async acceptSuggestion(id: number): Promise<IScheduleSuggestion> {
+    const { data } = await axiosWithAuth.patch<IScheduleSuggestion>(
+      `/master-schedule/suggestions/${id}/accept`,
+    );
+    return data;
+  },
+
+  async rejectSuggestion(id: number): Promise<IScheduleSuggestion> {
+    const { data } = await axiosWithAuth.patch<IScheduleSuggestion>(
+      `/master-schedule/suggestions/${id}/reject`,
+    );
+    return data;
   },
 
   async getTimeOffByMaster(masterId: number): Promise<IMasterTimeOff[]> {

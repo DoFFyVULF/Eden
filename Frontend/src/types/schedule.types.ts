@@ -1,7 +1,7 @@
 export interface IMasterSchedule {
   id: number;
   masterId: number;
-  dayOfWeek: number; // 0 = Пн, 1 = Вт, ..., 6 = Вс
+  dayOfWeek: number | null; // 0 = Пн, 1 = Вт, ..., 6 = Вс
   startTime: string; // ISO-строка, например: "2025-01-01T09:00:00.000Z"
   endTime: string;   // аналогично
   createdAt?: string;
@@ -53,4 +53,35 @@ export type MasterStatusInfo = {
     endDate: string;
     comment?: string;
   } | null;
+};
+
+export interface IScheduleSuggestion {
+  id: number;
+  masterId: number;
+  targetScheduleId: number | null;
+  dayOfWeek: number | null;
+  date: string | null;
+  startTime: string;
+  endTime: string;
+  reason?: string;
+  status: string;
+  createdAt: string;
+  masterScheduleId?: number | null;
+  master?: {
+    id: number;
+    surname: string;
+    name: string;
+    patronymic?: string | null;
+    isActive?: boolean;
+  };
+}
+
+export type CreateScheduleSuggestionDto = {
+  masterId: number;
+  targetScheduleId?: number | null;
+  dayOfWeek: number | null;
+  date?: string | null;
+  startTime: string;
+  endTime: string;
+  reason?: string;
 };

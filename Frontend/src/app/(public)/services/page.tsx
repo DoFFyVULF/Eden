@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { serviceService } from "@/services/service/service.service";
 import { masterService } from "@/services/master/master.service";
@@ -22,7 +22,15 @@ const containerVariants = {
   },
 };
 
-export default function ServicesPage() {
+function ServicesPageFallback() {
+  return (
+    <div className="min-h-screen bg-[#080808] flex items-center justify-center">
+      <Loader2 className="w-7 h-7 text-[#C8A97E] animate-spin" />
+    </div>
+  );
+}
+
+function ServicesPageContent() {
   const searchParams = useSearchParams();
   const preselectedServiceId = searchParams.get("serviceId");
 
@@ -151,5 +159,13 @@ export default function ServicesPage() {
         
       </div>
     </div>
+  );
+}
+
+export default function ServicesPage() {
+  return (
+    <Suspense fallback={<ServicesPageFallback />}>
+      <ServicesPageContent />
+    </Suspense>
   );
 }

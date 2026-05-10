@@ -15,14 +15,17 @@ const mapServicePriceToUI = (
     id: price.id,
     price: price.price,
     isActive: price.isActive,
+    durationOverride: price.durationOverride ?? null,
 
     serviceId: service.id,
     serviceTitle: service.title,
     categoryId: service.categoryId,
     categoryName: categoryMap.get(service.categoryId) ?? "Не указана",
+    serviceImg: service.img ?? null,
 
     masterId: master.id,
-    masterFullName:  `${master.surname} ${master.name}`,
+    masterFullName: `${master.surname} ${master.name}`,
+    masterSpecialization: master.specialization ?? "",
   };
 };
 

@@ -137,6 +137,10 @@ function AppointmentContent() {
     const DOW_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
     const schedule: any = { mon: null, tue: null, wed: null, thu: null, fri: null, sat: null, sun: null };
     masterSchedules.forEach((s) => {
+      if (s.dayOfWeek == null) {
+        return;
+      }
+
       const key = DOW_KEYS[s.dayOfWeek];
       if (key) {
         const start = s.startTime.includes("T") ? s.startTime.split("T")[1].slice(0, 5) : s.startTime.slice(0, 5);
