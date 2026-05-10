@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import AppointmentItem from "./AppointmentItem";
 import AppointmentConfirmWindow from "./appointmentsConfirWnd";
 import NewAppointmentsWindow from "./newAppointmentsWindow";
+import { useAdminAppointmentNotifications } from "@/app/components/ui/admin/appointments/AdminAppointmentNotifications";
 import { appointmentService } from "@/services/appointment/appointment.service";
 import { IAppointment, AppointmentStatus } from "@/types/appointment.types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -49,6 +50,22 @@ export default function AdminAppointments() {
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [dateFilter, setDateFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const { latestAppointment, latestEventKey } = useAdminAppointmentNotifications();
+
+  useEffect(() => {
+    if (!latestAppointment || !latestEventKey) {
+      return;
+    }
+
+    setAppointments((prev) => {
+      if (prev.some((appointment) => appointment.id === latestAppointment.id)) {
+        return prev;
+      }
+
+      return [latestAppointment, ...prev];
+    });
+  }, [latestAppointment, latestEventKey]);
+
 
   useEffect(() => {
     const check = () =>

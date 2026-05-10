@@ -65,37 +65,40 @@ model Master {
 
 //done
 model MasterSchedule {
-  id                        Int                        @id @default(autoincrement())
-  master                    Master                     @relation(fields: [masterID], references: [id], onDelete: Cascade)
-  masterID                  Int                        @map("master_id")
-  dayOfWeek                 Int?                       @map("day_of_week")
-  startTime                 DateTime                   @map("start_time")
-  endTime                   DateTime                   @map("end_time")
+  id       Int    @id @default(autoincrement())
+  master   Master @relation(fields: [masterID], references: [id], onDelete: Cascade)
+  masterID Int    @map("master_id")
+
+  dayOfWeek Int?     @map("day_of_week")
+  startTime DateTime @map("start_time")
+  endTime   DateTime @map("end_time")
+
+  suggestions               MasterScheduleSuggestion[] @relation("ScheduleSuggestions")
   masterScheduleSuggestions MasterScheduleSuggestion[]
 
-  @@index([masterID])
-  @@index([masterID, dayOfWeek])
-  @@index([startTime, endTime])
   @@map("master_schedule")
 }
 
 model MasterScheduleSuggestion {
-  id       Int    @id @default(autoincrement())
+  id Int @id @default(autoincrement())
+
   master   Master @relation(fields: [masterId], references: [id])
   masterId Int    @map("master_id")
 
-  targetSchedule   MasterSchedule? @relation(fields: [targetScheduleId], references: [id])
+  targetSchedule   MasterSchedule? @relation("ScheduleSuggestions", fields: [targetScheduleId], references: [id])
   targetScheduleId Int?            @map("target_schedule_id")
 
-  dayOfWeek Int?      @map("day_of_week")
+  dayOfWeek Int?
   date      DateTime?
-  startTime DateTime  @map("start_time")
-  endTime   DateTime  @map("end_time")
+  startTime DateTime
+  endTime   DateTime
 
   reason String
-  status String @default("pending") // pending, approved, rejected
+  status String @default("pending")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt        DateTime        @default(now())
+  masterSchedule   MasterSchedule? @relation(fields: [masterScheduleId], references: [id])
+  masterScheduleId Int?
 
   @@map("master_schedule_suggestion")
 }
@@ -163,6 +166,8 @@ model Appointment {
   clientSurname        String               @map("client_surname")
   clientName           String               @map("client_name")
   clientPhone          String               @map("client_phone")
+  clientIp             String?              @map("client_ip")
+  clientFingerprint    String?              @map("client_fingerprint")
   master               Master               @relation(fields: [masterID], references: [id])
   masterID             Int                  @map("master_id")
   service              Service              @relation(fields: [serviceId], references: [id])

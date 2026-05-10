@@ -203,7 +203,7 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
       {
         id: 1,
         label: "Записи",
-        count: counts?.appointments ?? "-",
+       
         href: MASTER_ROUTES.APPOINTMENTS,
         icon: icons.appointments,
         description: "Мои записи",
@@ -435,7 +435,7 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
       <header
         className={`${isRounded ? "max-w-min mx-auto rounded-3xl top-4 " : ""} hidden lg:flex fixed top-0 left-0 right-0 z-50 h-16 border-b transition-all duration-300 ${glassCls}`}
       >
-        <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between w-full gap-6">
+        <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between w-full gap-8д">
           {/* Logo */}
           <Link
             href={ADMIN_ROUTES.DASHBOARD}

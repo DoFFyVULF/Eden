@@ -365,7 +365,7 @@ export default function NewAppointmentsWindow({
           price: finalPrice, // Pass as number
         } as Partial<IUpdateAppointmentDto>);
       } else {
-        await appointmentService.create({
+        await appointmentService.createAdmin({
           clientSurname: form.clientSurname.trim(),
           clientName: form.clientName.trim(),
           clientPhone: form.clientPhone.replace(/\D/g, ""),

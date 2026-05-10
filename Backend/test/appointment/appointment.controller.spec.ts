@@ -11,7 +11,8 @@ describe('AppointmentController', () => {
   let appointmentService: AppointmentService;
 
   const mockAppointmentService = {
-    create: jest.fn(),
+    createPublic: jest.fn(),
+    createAdmin: jest.fn(),
     findAll: jest.fn(),
     findOne: jest.fn(),
     findByDate: jest.fn(),
@@ -44,8 +45,8 @@ describe('AppointmentController', () => {
     expect(controller).toBeDefined();
   });
 
-  describe('create', () => {
-    it('should create appointment', async () => {
+  describe('createPublic', () => {
+    it('should create public appointment', async () => {
       const dto: AppointmentDto = {
         clientSurname: 'Ivanov',
         clientName: 'Ivan',
@@ -53,14 +54,51 @@ describe('AppointmentController', () => {
         masterId: 1,
         serviceId: 1,
         appointmentTime: '2024-01-15T10:00:00Z',
-        price: '1000',
+        price: 1000,
       };
       const result = { id: 1, ...dto };
 
-      mockAppointmentService.create.mockResolvedValue(result);
+      mockAppointmentService.createPublic.mockResolvedValue(result);
 
-      expect(await controller.create(dto)).toBe(result);
-      expect(mockAppointmentService.create).toHaveBeenCalledWith(dto);
+      expect(
+        await controller.createPublic(
+          dto,
+          {
+            headers: {},
+            ip: '127.0.0.1',
+          } as any,
+          'device-1'
+        )
+      ).toBe(result);
+      expect(mockAppointmentService.createPublic).toHaveBeenCalledWith(dto, {
+        clientIp: '127.0.0.1',
+        clientFingerprint: 'device-1'
+      });
+    });
+
+    it('should create admin appointment for admin user', async () => {
+      const dto: AppointmentDto = {
+        clientSurname: 'Ivanov',
+        clientName: 'Ivan',
+        clientPhone: '+79001234567',
+        masterId: 1,
+        serviceId: 1,
+        appointmentTime: '2024-01-15T10:00:00Z',
+        price: 1000,
+      };
+      const result = { id: 1, ...dto };
+
+      mockAppointmentService.createAdmin.mockResolvedValue(result);
+
+      expect(
+        await controller.createAdmin(dto, {
+          id: 1,
+          name: 'Admin',
+          role: 'admin' as any,
+          isActive: true,
+        })
+      ).toBe(result);
+      expect(mockAppointmentService.createAdmin).toHaveBeenCalledWith(dto);
     });
   });
 

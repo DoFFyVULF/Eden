@@ -1,11 +1,17 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  BadRequestException,
+  HttpException
+} from '@nestjs/common';
 import { AppointmentService } from 'src/appointment/appointment.service';
 import { PrismaService } from 'src/prisma.service';
 import { AppointmentDto } from 'src/appointment/dto/appointment.dto';
 import { UpdateAppointmentDto } from 'src/appointment/dto/update-appointment.dto';
 import { AppointmentStatus } from 'generated/prisma/enums';
+import { AppointmentStreamService } from 'src/appointment/appointment-stream.service';
+import { PublicAppointmentMetadata } from 'src/appointment/appointment.service';
 
 describe('AppointmentService', () => {
   let service: AppointmentService;
@@ -46,6 +52,11 @@ describe('AppointmentService', () => {
     status: AppointmentStatus.Новый,
   };
 
+  const publicMetadata: PublicAppointmentMetadata = {
+    clientIp: '127.0.0.1',
+    clientFingerprint: 'device-1'
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -70,6 +81,12 @@ describe('AppointmentService', () => {
             },
           },
         },
+        {
+          provide: AppointmentStreamService,
+          useValue: {
+            emitNewAppointment: jest.fn()
+          }
+        }
       ],
     }).compile();
 
@@ -83,40 +100,105 @@ describe('AppointmentService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('create', () => {
-    it('should create appointment successfully', async () => {
+  describe('createPublic', () => {
+    it('should create public appointment successfully', async () => {
       (prisma.master.findUnique as jest.Mock).mockResolvedValue(mockMaster);
       (prisma.service.findUnique as jest.Mock).mockResolvedValue(mockService);
+      (prisma.appointment.count as jest.Mock).mockResolvedValue(0);
       (prisma.appointment.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.appointment.create as jest.Mock).mockResolvedValue(mockAppointment);
 
-      const result = await service.create(mockAppointmentDto);
+      const result = await service.createPublic(
+        mockAppointmentDto,
+        publicMetadata
+      );
 
       expect(result).toEqual(mockAppointment);
       expect(prisma.master.findUnique).toHaveBeenCalledWith({ where: { id: 1 } });
       expect(prisma.service.findUnique).toHaveBeenCalledWith({ where: { id: 1 } });
+      expect(prisma.appointment.count).toHaveBeenCalled();
       expect(prisma.appointment.create).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if master not found', async () => {
       (prisma.master.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.create(mockAppointmentDto)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.createPublic(mockAppointmentDto, publicMetadata)
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException if service not found', async () => {
       (prisma.master.findUnique as jest.Mock).mockResolvedValue(mockMaster);
       (prisma.service.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.create(mockAppointmentDto)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.createPublic(mockAppointmentDto, publicMetadata)
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw HttpException with 429 if phone limit exceeded', async () => {
+      (prisma.master.findUnique as jest.Mock).mockResolvedValue(mockMaster);
+      (prisma.service.findUnique as jest.Mock).mockResolvedValue(mockService);
+      (prisma.appointment.count as jest.Mock)
+        .mockResolvedValueOnce(2)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0);
+
+      await expect(
+        service.createPublic(mockAppointmentDto, publicMetadata)
+      ).rejects.toMatchObject({
+        status: 429
+      });
+    });
+
+    it('should throw HttpException with 429 if device limit exceeded even with new phone', async () => {
+      (prisma.master.findUnique as jest.Mock).mockResolvedValue(mockMaster);
+      (prisma.service.findUnique as jest.Mock).mockResolvedValue(mockService);
+      (prisma.appointment.count as jest.Mock)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(2)
+        .mockResolvedValueOnce(0);
+
+      await expect(
+        service.createPublic(
+          {
+            ...mockAppointmentDto,
+            clientPhone: '+79009999999'
+          },
+          publicMetadata
+        )
+      ).rejects.toMatchObject({
+        status: 429
+      });
     });
 
     it('should throw BadRequestException if time is taken', async () => {
       (prisma.master.findUnique as jest.Mock).mockResolvedValue(mockMaster);
       (prisma.service.findUnique as jest.Mock).mockResolvedValue(mockService);
+      (prisma.appointment.count as jest.Mock)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0);
       (prisma.appointment.findFirst as jest.Mock).mockResolvedValue(mockAppointment);
 
-      await expect(service.create(mockAppointmentDto)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.createPublic(mockAppointmentDto, publicMetadata)
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('createAdmin', () => {
+    it('should create admin appointment without rate limit check', async () => {
+      (prisma.master.findUnique as jest.Mock).mockResolvedValue(mockMaster);
+      (prisma.service.findUnique as jest.Mock).mockResolvedValue(mockService);
+      (prisma.appointment.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.appointment.create as jest.Mock).mockResolvedValue(mockAppointment);
+
+      const result = await service.createAdmin(mockAppointmentDto);
+
+      expect(result).toEqual(mockAppointment);
+      expect(prisma.appointment.count).not.toHaveBeenCalled();
     });
   });
 

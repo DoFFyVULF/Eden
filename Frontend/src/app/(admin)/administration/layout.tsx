@@ -6,6 +6,7 @@ import { QueryProvider } from "@/app/providers/QueryProvider";
 import { getAccessToken } from "@/services/auth/auth-token.service";
 import { axiosWithAuth } from "@/api/interceptors";
 import TopNavBar from "@/app/components/ui/admin/Navigation/TopNavBar";
+import { AdminAppointmentNotificationsProvider } from "@/app/components/ui/admin/appointments/AdminAppointmentNotifications";
 import { Pangolin } from "next/font/google";
 import { JetBrains_Mono } from "next/font/google";
 import { Tektur } from "next/font/google";
@@ -124,13 +125,15 @@ export default function AdminRootLayout({
         className={`${tektur.className} ${isDark ? "dark" : ""} min-h-screen transition-colors duration-500`}
       >
         {isAuth ? (
-          <div className="flex flex-col min-h-screen">
-            <TopNavBar isAdmin={true} />
-            {/* main тоже без фона, прозрачный */}
-            <main className="flex-1 p-4 md:p-6 lg:p-8 pt-10 lg:pt-12">
-              {children}
-            </main>
-          </div>
+          <AdminAppointmentNotificationsProvider enabled={isAuth}>
+            <div className="flex flex-col min-h-screen">
+              <TopNavBar isAdmin={true} />
+              {/* main тоже без фона, прозрачный */}
+              <main className="flex-1 p-4 md:p-6 lg:p-8 pt-10 lg:pt-12">
+                {children}
+              </main>
+            </div>
+          </AdminAppointmentNotificationsProvider>
         ) : (
           <div className="w-full min-h-screen">{children}</div>
         )}

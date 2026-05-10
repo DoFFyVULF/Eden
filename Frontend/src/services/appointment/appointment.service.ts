@@ -5,6 +5,30 @@ import {
   IUpdateAppointmentDto,
 } from "@/types/appointment.types";
 
+const PUBLIC_APPOINTMENT_FINGERPRINT_KEY = "public-appointment-device-id";
+
+function getPublicAppointmentFingerprint() {
+  if (typeof window === "undefined") return undefined;
+
+  const existingFingerprint = window.localStorage.getItem(
+    PUBLIC_APPOINTMENT_FINGERPRINT_KEY
+  );
+
+  if (existingFingerprint) return existingFingerprint;
+
+  const fingerprint =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  window.localStorage.setItem(
+    PUBLIC_APPOINTMENT_FINGERPRINT_KEY,
+    fingerprint
+  );
+
+  return fingerprint;
+}
+
 export const appointmentService = {
   async getAll(): Promise<IAppointment[]> {
     const { data } = await axiosWithAuth.get<IAppointment[]>("/appointment");
@@ -18,9 +42,24 @@ export const appointmentService = {
     return data;
   },
 
-  async create(dto: ICreateAppointmentDto): Promise<IAppointment> {
+  async createPublic(dto: ICreateAppointmentDto): Promise<IAppointment> {
+    const fingerprint = getPublicAppointmentFingerprint();
+
+    const { data } = await axiosClassic.post<IAppointment>(
+      "/appointment/public",
+      dto,
+      {
+        headers: fingerprint
+          ? { "X-Client-Fingerprint": fingerprint }
+          : undefined,
+      }
+    );
+    return data;
+  },
+
+  async createAdmin(dto: ICreateAppointmentDto): Promise<IAppointment> {
     const { data } = await axiosWithAuth.post<IAppointment>(
-      "/appointment",
+      "/appointment/admin",
       dto
     );
     return data;

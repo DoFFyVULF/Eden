@@ -1,23 +1,21 @@
 "use client";
-
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Clock4,
   CheckCheck,
   Ban,
   Edit,
   Trash2,
-  MoreVertical,
   Phone,
   Scissors,
   User2,
   CalendarDays,
   Zap,
-  MapPin,
   Timer,
-  Eye,
+  X,
 } from "lucide-react";
+import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber";
 
 interface Appointment {
   id: string;
@@ -40,6 +38,9 @@ interface AppointmentItemProps {
   onComplete?: (id: string) => void;
   onCancel?: (id: string) => void;
   hideActions?: boolean;
+  variant?: "default" | "confirmWindow";
+  onConfirmAction?: (id: string) => void;
+  onRejectAction?: (id: string) => void;
 }
 
 const fmtDT = (s: string) => {
@@ -52,12 +53,6 @@ const fmtDT = (s: string) => {
     hour: "2-digit",
     minute: "2-digit",
   });
-};
-
-const fmtTime = (s: string) => {
-  const d = new Date(s);
-  if (isNaN(d.getTime())) return "—";
-  return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 };
 
 const getInitials = (n: string) =>
@@ -149,9 +144,11 @@ export default function AppointmentItem({
   onComplete,
   onCancel,
   hideActions = false,
+  variant = "default",
+  onConfirmAction,
+  onRejectAction,
 }: AppointmentItemProps) {
   const [isDark, setIsDark] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const check = () =>
@@ -168,6 +165,7 @@ export default function AppointmentItem({
   const st = STATUS_CFG[appointment.status as SK] ?? DEFAULT_CFG;
   const isActive = appointment.status === "Подтвержден";
   const isNew = appointment.status === "Новый";
+  const isConfirmWindow = variant === "confirmWindow";
 
   const handleComplete = () =>
     onComplete &&
@@ -182,13 +180,198 @@ export default function AppointmentItem({
     window.confirm("Удалить запись навсегда?") &&
     onDelete(appointment.id);
 
-  // Card styles
+  // Card styles for Default View
   const cardCls = isDark
     ? `bg-white/[0.06] border border-white/[0.1] backdrop-blur-xl hover:bg-white/[0.09] hover:border-white/[0.15] shadow-[0_4px_24px_rgba(0,0,0,0.2)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)] ${st.glowDark}`
     : "bg-white border border-gray-200/70 hover:border-gray-300/80 shadow-sm hover:shadow-md";
 
   const avatarGrad = `linear-gradient(135deg, ${st.gradFrom}, ${st.gradTo})`;
 
+  // ---------------------------------------------------------
+  // CONFIRM WINDOW VARIANT (REDESIGNED FOR ADAPTIVITY)
+  // ---------------------------------------------------------
+  if (isConfirmWindow) {
+    const confirmCardCls = isDark
+      ? "bg-slate-900/60 border border-white/10 backdrop-blur-md shadow-xl hover:border-white/20 transition-colors duration-300"
+      : "bg-white border border-slate-100 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-300";
+
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: 10, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className={`relative overflow-hidden rounded-3xl ${confirmCardCls}`}
+      >
+        {/* Top Gradient Line */}
+        <div
+          className="absolute inset-x-0 top-0 h-1"
+          style={{
+            background: `linear-gradient(90deg, ${st.gradFrom}, ${st.gradTo})`,
+          }}
+        />
+
+        <div className="p-5 sm:p-6">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+            
+            {/* Left Column: Avatar & Main Info */}
+            <div className="flex min-w-0 items-start gap-4 flex-1">
+              {/* Avatar with Status Dot */}
+              <div className="relative flex-shrink-0 group">
+                <div
+                  className="flex h-14 w-14 items-center justify-center rounded-2xl text-lg font-bold text-white shadow-md ring-2 ring-white/10"
+                  style={{ background: avatarGrad }}
+                >
+                  {getInitials(appointment.clientName)}
+                </div>
+                <div
+                  className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 bg-white dark:bg-slate-900"
+                  style={{ borderColor: isDark ? "#0f172a" : "#ffffff" }}
+                >
+                  <div
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: st.dot }}
+                  />
+                </div>
+              </div>
+
+              {/* Text Content */}
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3
+                    className={`text-lg font-bold leading-tight truncate max-w-[200px] sm:max-w-none ${
+                      isDark ? "text-white" : "text-slate-900"
+                    }`}
+                  >
+                    {appointment.clientName}
+                  </h3>
+                  
+                  {/* Status Badge */}
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                      isDark
+                        ? `${st.chipDark} ${st.textDark}`
+                        : `${st.chipLight} ${st.textLight}`
+                    }`}
+                  >
+                    <span
+                      className="h-1.5 w-1.5 rounded-full animate-pulse"
+                      style={{ backgroundColor: st.dot }}
+                    />
+                    {isNew ? "Ожидает" : st.label}
+                  </span>
+                </div>
+
+                {/* Service Name */}
+                <p
+                  className={`text-sm font-medium truncate ${
+                    isDark ? "text-slate-400" : "text-slate-500"
+                  }`}
+                >
+                  {appointment.service}
+                </p>
+
+                {/* Meta Data Grid */}
+                <div className="flex flex-wrap gap-3 pt-1">
+                   <InfoPill
+                    isDark={isDark}
+                    icon={<CalendarDays size={14} className={isDark ? "text-sky-400" : "text-sky-600"} />}
+                    label={fmtDT(appointment.rawDateTime)}
+                    className={isDark ? "bg-sky-500/10 border-sky-500/20 text-sky-200" : "bg-sky-50 border-sky-100 text-sky-700"}
+                  />
+                  <InfoPill
+                    isDark={isDark}
+                    icon={<Timer size={14} className={isDark ? "text-violet-400" : "text-violet-600"} />}
+                    label={`${appointment.duration} мин`}
+                    className={isDark ? "bg-violet-500/10 border-violet-500/20 text-violet-200" : "bg-violet-50 border-violet-100 text-violet-700"}
+                  />
+                </div>
+                
+                {/* Secondary Info (Master & Phone) */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-xs font-medium">
+                   <div className={`flex items-center gap-1.5 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                     <User2 size={12} />
+                     <span>{appointment.master}</span>
+                   </div>
+                   {appointment.clientPhone && (
+                     <div className={`flex items-center gap-1.5 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                       <Phone size={12} />
+                       <span>{formatPhoneNumber(appointment.clientPhone)}</span>
+                     </div>
+                   )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Price Block */}
+            <div
+              className={`flex flex-col items-end justify-between sm:min-w-[100px] ${
+                 isDark ? "text-white" : "text-slate-900"
+              }`}
+            >
+               <div className="text-right w-full sm:text-right sm:mt-0 mt-2">
+                 <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? "text-emerald-400/80" : "text-emerald-600"}`}>
+                   Стоимость
+                 </div>
+                 <div className="text-2xl font-black tracking-tight leading-none">
+                   {appointment.price}
+                 </div>
+               </div>
+            </div>
+          </div>
+
+          {/* Action Area / Footer */}
+          <div
+            className={`mt-6 flex flex-col-reverse sm:flex-row items-center justify-between gap-4 border-t pt-4 ${
+              isDark ? "border-white/10" : "border-slate-100"
+            }`}
+          >
+             <div className={`text-xs text-center sm:text-left w-full sm:w-auto ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                {isNew 
+                  ? "Проверьте детали и подтвердите запись." 
+                  : "Запись подтверждена и готова к работе."}
+             </div>
+
+            {isNew && (onConfirmAction || onRejectAction) && (
+              <div className="flex w-full sm:w-auto gap-3">
+                {onRejectAction && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => onRejectAction(appointment.id)}
+                    className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                      isDark
+                        ? "bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 border border-rose-500/20"
+                        : "bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100"
+                    }`}
+                  >
+                    <X size={16} />
+                    <span className="hidden xs:inline">Отклонить</span>
+                  </motion.button>
+                )}
+                {onConfirmAction && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => onConfirmAction(appointment.id)}
+                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all"
+                  >
+                    <CheckCheck size={16} />
+                    Подтвердить
+                  </motion.button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // ---------------------------------------------------------
+  // DEFAULT VIEW (Original logic preserved but cleaned up)
+  // ---------------------------------------------------------
   return (
     <motion.div
       layout
@@ -196,7 +379,7 @@ export default function AppointmentItem({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -8, scale: 0.98 }}
       transition={{ duration: 0.25, ease: "easeOut" }}
-      className={`relative rounded-2xl transition-all duration-300  ${cardCls}`}
+      className={`relative rounded-2xl transition-all duration-300 ${cardCls}`}
     >
       {/* Subtle top gradient line */}
       <div
@@ -205,7 +388,7 @@ export default function AppointmentItem({
           background: `linear-gradient(90deg, transparent, ${st.gradFrom}60, transparent)`,
         }}
       />
-
+      
       {/* NEW badge pulse */}
       {isNew && (
         <div className="absolute top-4 right-4">
@@ -247,7 +430,9 @@ export default function AppointmentItem({
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1.5">
               <h3
-                className={`text-xl font-bold leading-tight ${isDark ? "text-white/95" : "text-gray-900"}`}
+                className={`text-xl font-bold leading-tight ${
+                  isDark ? "text-white/95" : "text-gray-900"
+                }`}
               >
                 {appointment.clientName}
               </h3>
@@ -265,7 +450,9 @@ export default function AppointmentItem({
             {/* Time & duration */}
             <div className="flex flex-wrap items-center gap-4 mb-3">
               <div
-                className={`flex items-center gap-1.5 text-sm font-medium ${isDark ? "text-white/70" : "text-gray-600"}`}
+                className={`flex items-center gap-1.5 text-sm font-medium ${
+                  isDark ? "text-white/70" : "text-gray-600"
+                } `}
               >
                 <CalendarDays
                   size={14}
@@ -274,17 +461,21 @@ export default function AppointmentItem({
                 {fmtDT(appointment.rawDateTime)}
               </div>
               <div
-                className={`flex items-center gap-1.5 text-sm ${isDark ? "text-white/40" : "text-gray-400"}`}
+                className={`flex items-center gap-1.5 text-sm ${
+                  isDark ? "text-white/40" : "text-gray-400"
+                }`}
               >
                 <Timer size={13} />
                 {appointment.duration} мин
               </div>
               {appointment.clientPhone && (
                 <div
-                  className={`flex items-center gap-1.5 text-sm ${isDark ? "text-white/40" : "text-gray-400"}`}
+                  className={`flex items-center gap-1.5 text-sm ${
+                    isDark ? "text-white/40" : "text-gray-400"
+                  }`}
                 >
                   <Phone size={13} />
-                  {appointment.clientPhone}
+                  {formatPhoneNumber(appointment.clientPhone)}
                 </div>
               )}
             </div>
@@ -293,12 +484,16 @@ export default function AppointmentItem({
           {/* Price */}
           <div className="flex-shrink-0 text-right ml-2">
             <div
-              className={`text-2xl font-black leading-none ${isDark ? "text-white" : "text-gray-900"}`}
+              className={`text-2xl font-black leading-none ${
+                isDark ? "text-white" : "text-gray-900"
+              }`}
             >
               {appointment.price}
             </div>
             <div
-              className={`text-xs mt-1 ${isDark ? "text-white/40" : "text-gray-400"}`}
+              className={`text-xs mt-1 ${
+                isDark ? "text-white/40" : "text-gray-400"
+              }`}
             >
               стоимость
             </div>
@@ -337,29 +532,18 @@ export default function AppointmentItem({
                 : "bg-purple-50/80 border-purple-100 text-purple-800"
             }
           />
-          <InfoPill
-            isDark={isDark}
-            icon={
-              <MapPin
-                size={13}
-                className={isDark ? "text-cyan-400" : "text-cyan-600"}
-              />
-            }
-            label="Основной зал"
-            className={
-              isDark
-                ? "bg-cyan-500/10 border-cyan-400/15 text-white/75"
-                : "bg-cyan-50/80 border-cyan-100 text-cyan-800"
-            }
-          />
         </div>
 
         {/* ── FOOTER ── */}
         <div
-          className={`flex items-center justify-between mt-4 pt-4 border-t ${isDark ? "border-white/[0.07]" : "border-gray-100"}`}
+          className={`flex items-center justify-between mt-4 pt-4 border-t ${
+            isDark ? "border-white/[0.07]" : "border-gray-100"
+          }`}
         >
           <div
-            className={`flex items-center gap-4 text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}
+            className={`flex items-center gap-4 text-xs ${
+              isDark ? "text-white/30" : "text-gray-400"
+            }`}
           >
             <span className="flex items-center gap-1.5">
               <Zap size={12} className="opacity-60" />
@@ -441,6 +625,7 @@ function InfoPill({
   icon,
   label,
   className,
+  isDark,
 }: {
   icon: React.ReactNode;
   label: string;

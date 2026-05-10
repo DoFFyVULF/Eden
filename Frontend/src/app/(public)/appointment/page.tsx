@@ -19,8 +19,10 @@ import { AppointmentStatus } from "@/types/appointment.types";
 
 import BeautyCalendar from "@/app/components/ui/Beautycalendar";
 import NotificationWindow from "@/app/components/ui/public/appointment/NotificationWindow";
+import LimitExceededWindow from "@/app/components/ui/public/appointment/LimitExceededWindow";
 import ServiceCard from "../services/serviceCard";
 import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber";
+import { errorCatch } from "@/api/error";
 
 import { Loader2, CheckCircle2, Edit2, ChevronLeft, CalendarCheck } from "lucide-react";
 
@@ -58,6 +60,7 @@ function AppointmentContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [limitExceeded, setLimitExceeded] = useState(false);
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
@@ -180,12 +183,20 @@ function AppointmentContent() {
 
     console.log("Отправка DTO:", dto); // Посмотри в консоль перед ошибкой
 
-    await appointmentService.create(dto);
+    await appointmentService.createPublic(dto);
     setSuccess(true);
   } catch (err: any) {
-    // ВАЖНО: Посмотри детали ошибки в консоли
-    console.error("Ошибка 400 детали:", err?.response?.data); 
-    alert(`Ошибка: ${err?.response?.data?.message || "Проверьте введенные данные"}`);
+    console.error("Ошибка записи:", err?.response?.data);
+
+    if (
+      err?.response?.status === 429 &&
+      err?.response?.data?.code === "PUBLIC_APPOINTMENT_LIMIT_EXCEEDED"
+    ) {
+      setLimitExceeded(true);
+      return;
+    }
+
+    alert(`Ошибка: ${errorCatch(err) || "Проверьте введенные данные"}`);
   } finally {
     setSubmitting(false);
   }
@@ -336,6 +347,10 @@ function AppointmentContent() {
           appointmentTime={selectedAppointment.time}
           appointmentMaster={`${currentMaster.surname} ${currentMaster.name}`}
         />
+      )}
+
+      {limitExceeded && (
+        <LimitExceededWindow onClose={() => setLimitExceeded(false)} />
       )}
     </div>
   );

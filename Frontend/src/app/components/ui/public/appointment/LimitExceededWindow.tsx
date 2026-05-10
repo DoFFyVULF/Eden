@@ -4,29 +4,11 @@ import { X, AlertCircle } from "lucide-react";
 
 interface LimitExceededWindowProps {
   onClose: () => void;
-  type: "phone" | "ip";
 }
 
 export default function LimitExceededWindow({
-  onClose,
-  type
+  onClose
 }: LimitExceededWindowProps) {
-  const getTitle = () => {
-    if (type === "phone") {
-      return "Превышен лимит заявок";
-    } else {
-      return "Слишком много заявок";
-    }
-  };
-
-  const getMessage = () => {
-    if (type === "phone") {
-      return "Вы можете оставить не более 2 заявок в течение 10 минут. Пожалуйста, подождите немного и попробуйте снова.";
-    } else {
-      return "С одного IP-адреса можно оставить не более 2 заявок в течение 10 минут. Пожалуйста, подождите немного и попробуйте снова.";
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
       <div className="relative w-full max-w-md bg-[#0e0e0e] border border-[#C8A97E]/20 rounded-[2.5rem] p-8 shadow-[0_0_60px_-15px_rgba(200,169,126,0.3)] animate-in fade-in zoom-in-95 duration-300">
@@ -46,10 +28,10 @@ export default function LimitExceededWindow({
         {/* Title */}
         <div className="text-center mb-8">
           <h2 className="text-2xl font-light text-[#F0EBE3] mb-2" style={{ fontFamily: "serif" }}>
-            {getTitle()}
+            Превышен лимит записей
           </h2>
           <p className="text-sm text-[#6B6560]">
-            {getMessage()}
+            Нельзя записаться больше 2-х раз за полчаса. Пожалуйста, позвоните администратору для оформления записи.
           </p>
         </div>
 

@@ -28,6 +28,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     ScheduleModule.forRoot(),
     AppointmentHistoryModule,
     AnalyticsModule,
+
   ]
 })
 export class AppModule {}

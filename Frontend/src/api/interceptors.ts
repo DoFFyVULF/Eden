@@ -6,8 +6,11 @@ import axios, { CreateAxiosDefaults } from "axios";
 import { errorCatch } from "./error";
 import { authService } from "@/services/auth/auth.service";
 
+const apiBaseUrl =
+  process.env.NEXT_PUBLIC_API_URL?.trim() || "http://localhost:4200/api";
+
 const options: CreateAxiosDefaults = {
-  baseURL: "http://localhost:4200/api",
+  baseURL: apiBaseUrl,
   headers: {
     "Content-Type": "application/json",
   },

@@ -1,28 +1,64 @@
 import {
   Injectable,
   NotFoundException,
-  BadRequestException
+  BadRequestException,
+  HttpException,
+  HttpStatus
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { AppointmentDto } from './dto/appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { AppointmentStatus } from 'generated/prisma/enums';
+import { AppointmentStreamService } from './appointment-stream.service';
+
+export interface PublicAppointmentMetadata {
+  clientIp?: string;
+  clientFingerprint?: string;
+}
 
 @Injectable()
 export class AppointmentService {
-  constructor(private prisma: PrismaService) {}
+  private static readonly PUBLIC_APPOINTMENT_LIMIT = 2;
+  private static readonly PUBLIC_APPOINTMENT_WINDOW_MINUTES = 30;
 
-  async create(dto: AppointmentDto) {
+  constructor(
+    private prisma: PrismaService,
+    private streamService: AppointmentStreamService
+  ) {}
+
+  async createPublic(
+    dto: AppointmentDto,
+    metadata: PublicAppointmentMetadata
+  ) {
     await this.ensureMasterExists(dto.masterId);
     await this.ensureServiceExists(dto.serviceId);
-
+    await this.ensurePublicBookingLimit(dto.clientPhone, metadata);
     await this.ensureTimeNotTaken(dto.masterId, dto.appointmentTime);
 
-    return this.prisma.appointment.create({
+    return this.createAppointment(dto, metadata);
+  }
+
+  async createAdmin(dto: AppointmentDto) {
+    await this.ensureMasterExists(dto.masterId);
+    await this.ensureServiceExists(dto.serviceId);
+    await this.ensureTimeNotTaken(dto.masterId, dto.appointmentTime);
+
+    return this.createAppointment(dto);
+  }
+
+  private async createAppointment(
+    dto: AppointmentDto,
+    metadata?: PublicAppointmentMetadata
+  ) {
+    const normalizedPhone = this.normalizePhone(dto.clientPhone);
+
+    const newAppointment = await this.prisma.appointment.create({
       data: {
         clientSurname: dto.clientSurname,
         clientName: dto.clientName,
-        clientPhone: dto.clientPhone,
+        clientPhone: normalizedPhone,
+        clientIp: metadata?.clientIp,
+        clientFingerprint: metadata?.clientFingerprint,
         master: { connect: { id: dto.masterId } },
         service: { connect: { id: dto.serviceId } },
         appointmentTime: new Date(dto.appointmentTime),
@@ -34,6 +70,9 @@ export class AppointmentService {
         service: true
       }
     });
+
+    this.streamService.emitNewAppointment(newAppointment);
+    return newAppointment;
   }
 
   async findAll() {
@@ -220,5 +259,81 @@ export class AppointmentService {
         `На ${time} мастер уже занят активной записью`
       );
     }
+  }
+
+  private async ensurePublicBookingLimit(
+    clientPhone: string,
+    metadata: PublicAppointmentMetadata
+  ) {
+    const normalizedPhone = this.normalizePhone(clientPhone);
+    const windowStart = new Date(
+      Date.now() -
+        AppointmentService.PUBLIC_APPOINTMENT_WINDOW_MINUTES * 60 * 1000
+    );
+
+    const [phoneCount, fingerprintCount, ipCount] = await Promise.all([
+      this.prisma.appointment.count({
+        where: {
+          clientPhone: normalizedPhone,
+          createdAt: {
+            gte: windowStart
+          }
+        }
+      }),
+      metadata.clientFingerprint
+        ? this.prisma.appointment.count({
+            where: {
+              clientFingerprint: metadata.clientFingerprint,
+              createdAt: {
+                gte: windowStart
+              }
+            }
+          })
+        : Promise.resolve(0),
+      metadata.clientIp
+        ? this.prisma.appointment.count({
+            where: {
+              clientIp: metadata.clientIp,
+              createdAt: {
+                gte: windowStart
+              }
+            }
+          })
+        : Promise.resolve(0)
+    ]);
+
+    if (
+      phoneCount < AppointmentService.PUBLIC_APPOINTMENT_LIMIT &&
+      fingerprintCount < AppointmentService.PUBLIC_APPOINTMENT_LIMIT &&
+      ipCount < AppointmentService.PUBLIC_APPOINTMENT_LIMIT
+    ) {
+      return;
+    }
+
+    const blockedBy = [
+      phoneCount >= AppointmentService.PUBLIC_APPOINTMENT_LIMIT
+        ? 'phone'
+        : null,
+      fingerprintCount >= AppointmentService.PUBLIC_APPOINTMENT_LIMIT
+        ? 'fingerprint'
+        : null,
+      ipCount >= AppointmentService.PUBLIC_APPOINTMENT_LIMIT ? 'ip' : null
+    ].filter(Boolean);
+
+    throw new HttpException(
+      {
+        message:
+          'Нельзя записаться больше 2-х раз за полчаса. Пожалуйста, позвоните администратору.',
+        code: 'PUBLIC_APPOINTMENT_LIMIT_EXCEEDED',
+        limit: AppointmentService.PUBLIC_APPOINTMENT_LIMIT,
+        windowMinutes: AppointmentService.PUBLIC_APPOINTMENT_WINDOW_MINUTES,
+        blockedBy
+      },
+      HttpStatus.TOO_MANY_REQUESTS
+    );
+  }
+
+  private normalizePhone(phone: string) {
+    return phone.replace(/\D/g, '');
   }
 }
