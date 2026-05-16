@@ -166,6 +166,7 @@ model Appointment {
   clientSurname        String               @map("client_surname")
   clientName           String               @map("client_name")
   clientPhone          String               @map("client_phone")
+  comment              String?
   clientIp             String?              @map("client_ip")
   clientFingerprint    String?              @map("client_fingerprint")
   master               Master               @relation(fields: [masterID], references: [id])

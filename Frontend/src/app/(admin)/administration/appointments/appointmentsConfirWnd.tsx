@@ -17,6 +17,7 @@ interface Appointment {
   duration: number;
   rawDateTime: string;
   clientPhone?: string;
+  comment?: string;
 }
 
 interface Props {

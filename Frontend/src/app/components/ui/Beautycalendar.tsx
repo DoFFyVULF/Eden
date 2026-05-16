@@ -16,11 +16,9 @@ import {
   parseISO,
 } from "date-fns";
 import { ru } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, CalendarDays, Clock3 } from "lucide-react";
 import { appointmentService } from "@/services/appointment/appointment.service";
 import { IAppointment } from "@/types/appointment.types";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface DaySchedule {
   workingHours: { start: string; end: string };
@@ -42,7 +40,7 @@ interface MasterScheduleItem {
 
 interface SelectedAppointment {
   masterId: number;
-  day: string; // 'yyyy-MM-dd'
+  day: string;
   time: string;
 }
 
@@ -54,36 +52,37 @@ interface BeautyCalendarProps {
   slotInterval?: number;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 const DOW_KEY = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 const WEEK_HEADERS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
-function generateSlots(start: string, end: string, interval: number): string[] {
-  if (!start || !end) return [];
-  
-  const toMin = (t: string) => {
-    const parts = t.split(":");
-    if (parts.length < 2) return 0;
-    const [h, m] = parts.map(Number);
-    return h * 60 + m;
-  };
-
-  const toLabel = (min: number) =>
-    `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
-
-  const slots: string[] = [];
-  let cur = toMin(start);
-  const endMin = toMin(end);
-
-  while (cur + interval <= endMin) {
-    slots.push(toLabel(cur));
-    cur += interval;
-  }
-  return slots;
+function formatDayLabel(date: Date) {
+  return format(date, "EEE", { locale: ru }).replace(".", "");
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+function generateSlots(start: string, end: string, interval: number): string[] {
+  if (!start || !end) return [];
+
+  const toMin = (time: string) => {
+    const parts = time.split(":");
+    if (parts.length < 2) return 0;
+    const [hours, minutes] = parts.map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const toLabel = (minutes: number) =>
+    `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+
+  const slots: string[] = [];
+  let current = toMin(start);
+  const endMin = toMin(end);
+
+  while (current + interval <= endMin) {
+    slots.push(toLabel(current));
+    current += interval;
+  }
+
+  return slots;
+}
 
 export default function BeautyCalendar({
   selectedMasterId,
@@ -95,39 +94,40 @@ export default function BeautyCalendar({
   const today = startOfDay(new Date());
   const [viewMonth, setViewMonth] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  
-  // Состояния для загрузки занятых слотов
   const [bookedAppointments, setBookedAppointments] = useState<IAppointment[]>([]);
   const [isLoadingBooked, setIsLoadingBooked] = useState(false);
 
-  // Загружаем занятые записи при смене даты или мастера
   useEffect(() => {
     const fetchBooked = async () => {
       if (!selectedDate || !selectedMasterId) return;
-      
+
       setIsLoadingBooked(true);
       try {
         const dateStr = format(selectedDate, "yyyy-MM-dd");
         const data = await appointmentService.getByDate(dateStr, selectedMasterId);
         setBookedAppointments(data);
-      } catch (e) {
-        console.error("Ошибка загрузки занятых слотов:", e);
+      } catch (error) {
+        console.error("Ошибка загрузки занятых слотов:", error);
       } finally {
         setIsLoadingBooked(false);
       }
     };
 
-    fetchBooked();
+    void fetchBooked();
   }, [selectedDate, selectedMasterId]);
 
   const days = useMemo(
-    () => eachDayOfInterval({ start: startOfMonth(viewMonth), end: endOfMonth(viewMonth) }),
-    [viewMonth]
+    () =>
+      eachDayOfInterval({
+        start: startOfMonth(viewMonth),
+        end: endOfMonth(viewMonth),
+      }),
+    [viewMonth],
   );
 
   const gridOffset = useMemo(() => {
-    const dow = getDay(startOfMonth(viewMonth));
-    return dow === 0 ? 6 : dow - 1;
+    const dayOfWeek = getDay(startOfMonth(viewMonth));
+    return dayOfWeek === 0 ? 6 : dayOfWeek - 1;
   }, [viewMonth]);
 
   const getSchedule = useCallback(
@@ -136,38 +136,39 @@ export default function BeautyCalendar({
       const key = DOW_KEY[getDay(date)];
       return selectedMasterSchedule.schedule[key] ?? null;
     },
-    [selectedMasterSchedule]
+    [selectedMasterSchedule],
   );
 
-  // Основная логика фильтрации времени
   const timeSlots = useMemo(() => {
     if (!selectedDate) return [];
-    const sch = getSchedule(selectedDate);
-    if (!sch) return [];
+    const schedule = getSchedule(selectedDate);
+    if (!schedule) return [];
 
-    // 1. Генерируем все возможные слоты по расписанию
-    const allSlots = generateSlots(sch.workingHours.start, sch.workingHours.end, slotInterval);
+    const allSlots = generateSlots(
+      schedule.workingHours.start,
+      schedule.workingHours.end,
+      slotInterval,
+    );
 
-    // 2. Получаем список уже занятых времен в формате "HH:mm"
     const bookedTimes = bookedAppointments
-      .filter(a => a.status !== "Отменен")
-      .map(a => {
-        const d = typeof a.appointmentTime === 'string' ? parseISO(a.appointmentTime) : new Date(a.appointmentTime);
-        return format(d, "HH:mm");
+      .filter((appointment) => appointment.status !== "Отменен")
+      .map((appointment) => {
+        const date =
+          typeof appointment.appointmentTime === "string"
+            ? parseISO(appointment.appointmentTime)
+            : new Date(appointment.appointmentTime);
+        return format(date, "HH:mm");
       });
 
     const now = new Date();
     const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
 
-    // 3. Фильтруем слоты
     return allSlots.filter((slot) => {
-      // Убираем, если слот уже занят в базе
       if (bookedTimes.includes(slot)) return false;
 
-      // Если сегодня — убираем прошедшее время (+15 мин запас)
       if (isToday(selectedDate)) {
-        const [h, m] = slot.split(":").map(Number);
-        const slotTotalMinutes = h * 60 + m;
+        const [hours, minutes] = slot.split(":").map(Number);
+        const slotTotalMinutes = hours * 60 + minutes;
         return slotTotalMinutes > currentTotalMinutes + 15;
       }
 
@@ -176,117 +177,252 @@ export default function BeautyCalendar({
   }, [selectedDate, getSchedule, slotInterval, bookedAppointments]);
 
   const selectedDateStr = selectedDate ? format(selectedDate, "yyyy-MM-dd") : "";
+  const selectedSchedule = selectedDate ? getSchedule(selectedDate) : null;
 
   return (
-    <div className="w-full text-[#F0EBE3]" style={{ fontFamily: "serif" }}>
-      {/* Навигация по месяцам */}
-      <div className="flex items-center justify-between mb-8 px-1">
-        <button
-          type="button"
-          onClick={() => { setViewMonth((m) => subMonths(m, 1)); setSelectedDate(null); }}
-          className="w-8 h-8 rounded-full flex items-center justify-center border border-white/8 text-[#6B6560] hover:border-[#C8A97E]/50 hover:text-[#C8A97E] transition-all"
-        >
-          <ChevronLeft className="w-3.5 h-3.5" />
-        </button>
-        <p className="text-xs font-semibold tracking-[0.2em] uppercase">
-          {format(viewMonth, "LLLL yyyy", { locale: ru })}
-        </p>
-        <button
-          type="button"
-          onClick={() => { setViewMonth((m) => addMonths(m, 1)); setSelectedDate(null); }}
-          className="w-8 h-8 rounded-full flex items-center justify-center border border-white/8 text-[#6B6560] hover:border-[#C8A97E]/50 hover:text-[#C8A97E] transition-all"
-        >
-          <ChevronRight className="w-3.5 h-3.5" />
-        </button>
+    <div className="w-full text-[color:var(--public-text)]">
+      <div className="flex flex-col gap-4 rounded-[28px] border border-[color:var(--public-border)] bg-[rgba(255,252,247,0.76)] p-5 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--public-text-faint)]">
+            Календарь записи
+          </p>
+          <h3
+            className="mt-2 text-3xl text-[color:var(--public-text)]"
+            style={{ fontFamily: "var(--font-public-display), serif" }}
+          >
+            Выберите удобный день
+          </h3>
+          <p className="mt-2 text-sm leading-7 text-[color:var(--public-text-soft)]">
+            Доступные даты и время показаны только для выбранного мастера.
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-[20px] bg-[rgba(245,236,224,0.72)] px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text-faint)]">
+              Формат
+            </p>
+            <p className="mt-2 text-sm text-[color:var(--public-text)]">Спокойный выбор даты и слота</p>
+          </div>
+          <div className="rounded-[20px] bg-[rgba(245,236,224,0.72)] px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text-faint)]">
+              Интервал
+            </p>
+            <p className="mt-2 text-sm text-[color:var(--public-text)]">{slotInterval} минут</p>
+          </div>
+        </div>
       </div>
 
-      {/* Заголовки дней недели */}
-      <div className="grid grid-cols-7 mb-1">
-        {WEEK_HEADERS.map((d) => (
-          <div key={d} className="text-center text-[9px] font-bold tracking-[0.15em] uppercase text-[#3D3A38] py-2">{d}</div>
-        ))}
-      </div>
+      <div className="mt-5 rounded-[32px] border border-[color:var(--public-border)] bg-[rgba(255,250,244,0.74)] p-4 shadow-[var(--public-shadow-soft)] sm:p-5 md:p-6">
+        <div className="mb-5 flex items-center justify-between gap-3 md:mb-6">
+          <button
+            type="button"
+            onClick={() => {
+              setViewMonth((month) => subMonths(month, 1));
+              setSelectedDate(null);
+            }}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[color:var(--public-border)] bg-[rgba(255,252,247,0.84)] text-[color:var(--public-text-soft)] hover:text-[color:var(--public-text)] md:h-11 md:w-11"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
 
-      {/* Сетка календаря */}
-      <div className="grid grid-cols-7 gap-1">
-        {Array.from({ length: gridOffset }).map((_, i) => (
-          <div key={`pad-${i}`} />
-        ))}
-
-        {days.map((day) => {
-          const isPast = isBefore(day, today) && !isToday(day);
-          const isTod = isToday(day);
-          const sch = getSchedule(day);
-          const isWorkDay = !!sch;
-          
-          const isTodayFinished = isTod && sch && (() => {
-            const now = new Date();
-            const [endH, endM] = sch.workingHours.end.split(":").map(Number);
-            return (now.getHours() * 60 + now.getMinutes()) >= (endH * 60 + endM - slotInterval);
-          })();
-
-          const disabled = !!(isPast || !isWorkDay || isTodayFinished);
-          const isSel = selectedDate ? isSameDay(day, selectedDate) : false;
-
-          return (
-            <button
-              key={day.toISOString()}
-              type="button"
-              disabled={disabled}
-              onClick={() => setSelectedDate(isSel ? null : day)}
-              className={[
-                "relative flex flex-col items-center justify-center aspect-square rounded-xl transition-all duration-200 select-none",
-                isSel
-                  ? "bg-[#C8A97E] shadow-[0_4px_20px_rgba(200,169,126,0.35)]"
-                  : isWorkDay && !disabled
-                  ? "border border-white/5 hover:border-[#C8A97E]/40 hover:bg-[#C8A97E]/8 cursor-pointer"
-                  : "cursor-default",
-                disabled ? "opacity-20" : "",
-              ].filter(Boolean).join(" ")}
+          <div className="min-w-0 flex-1 text-center">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[color:var(--public-text-faint)]">
+              Месяц
+            </p>
+            <p
+              className="mt-2 text-2xl capitalize text-[color:var(--public-text)] md:text-3xl"
+              style={{ fontFamily: "var(--font-public-display), serif" }}
             >
-              {isTod && !isSel && !disabled && (
-                <span className="absolute inset-0 rounded-xl ring-1 ring-[#C8A97E]/60 pointer-events-none" />
-              )}
-              <span className={`text-[13px] font-medium ${isSel ? "text-[#1a1208]" : isWorkDay && !disabled ? "text-[#F0EBE3]" : "text-[#3D3A38]"}`}>
-                {format(day, "d")}
-              </span>
-              {isWorkDay && sch && !disabled && (
-                <span className={`text-[8px] mt-[3px] font-medium ${isSel ? "text-[#6b5530]" : "text-[#6B6560]"}`}>
-                  {sch.workingHours.start.slice(0, 5)}–{sch.workingHours.end.slice(0, 5)}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Панель выбора времени */}
-      {selectedDate && (
-        <div className="mt-6 pt-6 border-t border-white/5 animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-baseline justify-between mb-4">
-            <p className="text-sm font-semibold text-[#F0EBE3] capitalize">
-              {format(selectedDate, "d MMMM, eeee", { locale: ru })}
+              {format(viewMonth, "LLLL yyyy", { locale: ru })}
             </p>
           </div>
 
+          <button
+            type="button"
+            onClick={() => {
+              setViewMonth((month) => addMonths(month, 1));
+              setSelectedDate(null);
+            }}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[color:var(--public-border)] bg-[rgba(255,252,247,0.84)] text-[color:var(--public-text-soft)] hover:text-[color:var(--public-text)] md:h-11 md:w-11"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mb-3 flex items-center justify-between md:hidden">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[color:var(--public-text-faint)]">
+            Доступные дни месяца
+          </p>
+          <p className="text-[10px] text-[color:var(--public-text-faint)]">
+            Листайте вправо
+          </p>
+        </div>
+
+        <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 md:hidden">
+          {days.map((day) => {
+            const isPast = isBefore(day, today) && !isToday(day);
+            const isCurrent = isToday(day);
+            const schedule = getSchedule(day);
+            const isWorkDay = Boolean(schedule);
+            const isTodayFinished =
+              isCurrent &&
+              schedule &&
+              (() => {
+                const now = new Date();
+                const [endHours, endMinutes] = schedule.workingHours.end.split(":").map(Number);
+                return now.getHours() * 60 + now.getMinutes() >= endHours * 60 + endMinutes - slotInterval;
+              })();
+            const disabled = Boolean(isPast || !isWorkDay || isTodayFinished);
+            const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
+
+            return (
+              <button
+                key={`mobile-${day.toISOString()}`}
+                type="button"
+                disabled={disabled}
+                onClick={() => setSelectedDate(isSelected ? null : day)}
+                className={`relative min-w-[92px] snap-start rounded-[24px] border px-3 py-4 text-left transition ${
+                  isSelected
+                    ? "border-[color:var(--public-border-strong)] bg-[linear-gradient(180deg,rgba(181,148,110,0.92),rgba(153,117,82,0.95))] text-[oklch(0.98_0.005_75)] shadow-[var(--public-shadow-soft)]"
+                    : isWorkDay && !disabled
+                      ? "border-[color:var(--public-border)] bg-[rgba(255,252,247,0.92)]"
+                      : "border-transparent bg-[rgba(232,225,217,0.38)] text-[color:var(--public-text-faint)]"
+                } ${disabled ? "opacity-45" : ""}`}
+              >
+                {isCurrent && !isSelected && !disabled && (
+                  <span className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-[color:var(--public-accent-strong)]" />
+                )}
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] opacity-75">
+                  {formatDayLabel(day)}
+                </span>
+                <span className="mt-2 block text-3xl leading-none font-semibold">
+                  {format(day, "d")}
+                </span>
+                <span className="mt-2 block text-xs capitalize opacity-80">
+                  {format(day, "LLLL", { locale: ru })}
+                </span>
+                {isWorkDay && schedule && !disabled && (
+                  <span className={`mt-3 block text-[10px] leading-4 ${isSelected ? "text-[rgba(255,248,240,0.82)]" : "text-[color:var(--public-text-soft)]"}`}>
+                    {schedule.workingHours.start.slice(0, 5)} - {schedule.workingHours.end.slice(0, 5)}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="hidden md:grid md:grid-cols-7 md:gap-2">
+          {WEEK_HEADERS.map((day) => (
+            <div
+              key={day}
+              className="pb-2 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[color:var(--public-text-faint)]"
+            >
+              {day}
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden md:grid md:grid-cols-7 md:gap-2">
+          {Array.from({ length: gridOffset }).map((_, index) => (
+            <div key={`pad-${index}`} />
+          ))}
+
+          {days.map((day) => {
+            const isPast = isBefore(day, today) && !isToday(day);
+            const isCurrent = isToday(day);
+            const schedule = getSchedule(day);
+            const isWorkDay = Boolean(schedule);
+
+            const isTodayFinished =
+              isCurrent &&
+              schedule &&
+              (() => {
+                const now = new Date();
+                const [endHours, endMinutes] = schedule.workingHours.end.split(":").map(Number);
+                return now.getHours() * 60 + now.getMinutes() >= endHours * 60 + endMinutes - slotInterval;
+              })();
+
+            const disabled = Boolean(isPast || !isWorkDay || isTodayFinished);
+            const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
+
+            return (
+              <button
+                key={day.toISOString()}
+                type="button"
+                disabled={disabled}
+                onClick={() => setSelectedDate(isSelected ? null : day)}
+                className={`relative aspect-square rounded-[22px] border p-2 text-left ${
+                  isSelected
+                    ? "border-[color:var(--public-border-strong)] bg-[linear-gradient(180deg,rgba(181,148,110,0.92),rgba(153,117,82,0.95))] text-[oklch(0.98_0.005_75)] shadow-[var(--public-shadow-soft)]"
+                    : isWorkDay && !disabled
+                      ? "border-[color:var(--public-border)] bg-[rgba(255,252,247,0.86)] hover:border-[color:var(--public-border-strong)] hover:bg-[rgba(252,247,241,0.98)]"
+                      : "border-transparent bg-[rgba(232,225,217,0.38)] text-[color:var(--public-text-faint)]"
+                } ${disabled ? "opacity-45" : ""}`}
+              >
+                {isCurrent && !isSelected && !disabled && (
+                  <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[color:var(--public-accent-strong)]" />
+                )}
+
+                <span className="block text-sm font-semibold">{format(day, "d")}</span>
+                {isWorkDay && schedule && !disabled && (
+                  <span className={`mt-2 block text-[10px] leading-4 ${isSelected ? "text-[rgba(255,248,240,0.82)]" : "text-[color:var(--public-text-soft)]"}`}>
+                    {schedule.workingHours.start.slice(0, 5)} - {schedule.workingHours.end.slice(0, 5)}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {selectedDate && (
+        <div className="mt-6 rounded-[30px] border border-[color:var(--public-border)] bg-[rgba(255,252,247,0.78)] p-5 shadow-[var(--public-shadow-soft)] md:p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-[rgba(241,232,220,0.74)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text-faint)]">
+                <CalendarDays className="h-3.5 w-3.5" />
+                Выбранная дата
+              </div>
+              <p
+                className="mt-3 text-2xl capitalize text-[color:var(--public-text)] md:text-3xl"
+                style={{ fontFamily: "var(--font-public-display), serif" }}
+              >
+                {format(selectedDate, "d MMMM, eeee", { locale: ru })}
+              </p>
+            </div>
+
+            {selectedSchedule && (
+              <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--public-border)] bg-[rgba(255,248,239,0.84)] px-4 py-2 text-sm text-[color:var(--public-text-soft)]">
+                <Clock3 className="h-4 w-4 text-[color:var(--public-accent-strong)]" />
+                {selectedSchedule.workingHours.start.slice(0, 5)} - {selectedSchedule.workingHours.end.slice(0, 5)}
+              </div>
+            )}
+          </div>
+
           {isLoadingBooked ? (
-            <div className="py-8 text-center flex flex-col items-center justify-center gap-2">
-              <Loader2 className="w-5 h-5 animate-spin text-[#C8A97E]" />
-              <p className="text-[10px] text-[#6B6560] uppercase tracking-widest">Проверка времени...</p>
+            <div className="flex flex-col items-center justify-center gap-3 py-12">
+              <Loader2 className="h-5 w-5 animate-spin text-[color:var(--public-accent-strong)]" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text-faint)]">
+                Проверяем доступное время
+              </p>
             </div>
           ) : timeSlots.length > 0 ? (
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {timeSlots.map((time) => {
-                const isActive = selectedAppointment?.day === selectedDateStr && selectedAppointment?.time === time;
+                const isActive =
+                  selectedAppointment?.day === selectedDateStr &&
+                  selectedAppointment?.time === time;
+
                 return (
                   <button
                     key={time}
                     type="button"
                     onClick={() => handleTimeClick(selectedMasterId, selectedDateStr, time)}
-                    className={`py-2.5 rounded-xl text-[12px] font-medium transition-all ${
+                    className={`min-h-[52px] rounded-2xl border px-3 py-3 text-sm font-semibold ${
                       isActive
-                        ? "bg-[#C8A97E] text-[#1a1208] shadow-[0_2px_12px_rgba(200,169,126,0.4)]"
-                        : "bg-[#111] border border-white/6 text-[#6B6560] hover:border-[#C8A97E]/50 hover:text-[#C8A97E]"
+                        ? "border-[color:var(--public-border-strong)] bg-[color:var(--public-accent)] text-[oklch(0.98_0.005_75)] shadow-[var(--public-shadow-soft)]"
+                        : "border-[color:var(--public-border)] bg-[rgba(255,252,247,0.86)] text-[color:var(--public-text)] hover:border-[color:var(--public-border-strong)] hover:bg-[rgba(252,247,241,0.98)]"
                     }`}
                   >
                     {time}
@@ -295,8 +431,16 @@ export default function BeautyCalendar({
               })}
             </div>
           ) : (
-            <div className="py-8 text-center bg-[#111] rounded-2xl border border-dashed border-white/5">
-              <p className="text-sm text-[#6B6560]">На этот день нет доступных окон</p>
+            <div className="mt-6 rounded-[24px] border border-dashed border-[color:var(--public-border)] bg-[rgba(247,239,230,0.58)] px-5 py-10 text-center">
+              <p
+                className="text-2xl text-[color:var(--public-text)]"
+                style={{ fontFamily: "var(--font-public-display), serif" }}
+              >
+                На этот день нет свободных окон
+              </p>
+              <p className="mt-3 text-sm leading-7 text-[color:var(--public-text-soft)]">
+                Попробуйте выбрать другую дату, чтобы увидеть доступные интервалы.
+              </p>
             </div>
           )}
         </div>

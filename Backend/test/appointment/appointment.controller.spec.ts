@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Test, TestingModule } from '@nestjs/testing';
+import { ForbiddenException } from '@nestjs/common';
 import { AppointmentController } from 'src/appointment/appointment.controller';
 import { AppointmentService } from 'src/appointment/appointment.service';
 import { AppointmentDto } from 'src/appointment/dto/appointment.dto';
@@ -99,6 +100,28 @@ describe('AppointmentController', () => {
         })
       ).toBe(result);
       expect(mockAppointmentService.createAdmin).toHaveBeenCalledWith(dto);
+    });
+
+    it('should throw when non-admin tries to create admin appointment', async () => {
+      const dto: AppointmentDto = {
+        clientSurname: 'Ivanov',
+        clientName: 'Ivan',
+        clientPhone: '+79001234567',
+        masterId: 1,
+        serviceId: 1,
+        appointmentTime: '2024-01-15T10:00:00Z',
+        price: 1000,
+      };
+
+      expect(() =>
+        controller.createAdmin(dto, {
+          id: 2,
+          name: 'Master',
+          role: 'master' as any,
+          isActive: true,
+        })
+      ).toThrow(ForbiddenException);
+      expect(mockAppointmentService.createAdmin).not.toHaveBeenCalled();
     });
   });
 

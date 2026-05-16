@@ -10,15 +10,25 @@ import {
 } from 'class-validator';
 import { AppointmentStatus } from 'generated/prisma/enums';
 
+const PERSON_NAME_PATTERN = /^[A-Za-zА-Яа-яЁё]+(?:[ '-][A-Za-zА-Яа-яЁё]+)*$/u;
+
 export class UpdateAppointmentDto {
   @IsOptional()
   @IsString()
   @Length(1, 50)
+  @Matches(PERSON_NAME_PATTERN, {
+    message:
+      'Фамилия может содержать только буквы, пробел, дефис или апостроф'
+  })
   clientSurname?: string;
 
   @IsOptional()
   @IsString()
   @Length(1, 50)
+  @Matches(PERSON_NAME_PATTERN, {
+    message:
+      'Имя может содержать только буквы, пробел, дефис или апостроф'
+  })
   clientName?: string;
 
   @IsOptional()
@@ -48,4 +58,9 @@ export class UpdateAppointmentDto {
   @IsOptional()
   @IsEnum(AppointmentStatus)
   status?: AppointmentStatus;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 1000)
+  comment?: string;
 }

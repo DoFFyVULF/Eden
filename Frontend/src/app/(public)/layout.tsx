@@ -1,12 +1,13 @@
-import { M_PLUS_Rounded_1c } from "next/font/google";
+import type { Metadata } from "next";
+import { cormorant, inter } from "../layout";
 import Header from "../components/ui/public/header/Header";
 import Footer from "../components/ui/public/footer/Footer";
+import PageTransition from "./PageTransition";
 
-const mPlusRounded = M_PLUS_Rounded_1c({
-  weight: ["400", "700"],
-  subsets: ["latin", "cyrillic"],
-  variable: "--font-m-plus-rounded",
-});
+export const metadata: Metadata = {
+  title: "Эден",
+  description: "Салон красоты",
+};
 
 export default function PublicLayout({
   children,
@@ -15,10 +16,13 @@ export default function PublicLayout({
 }>) {
   return (
     <div
-      className={`${mPlusRounded.variable} antialiased flex flex-col min-h-screen bg-black`}
+      className={`${cormorant.variable} ${inter.variable} public-shell flex min-h-screen flex-col antialiased`}
     >
-      <Header />
-      <div className="flex-grow">{children}</div>
+      <Header hideOnScroll={false} />
+      
+      {/* ✨ Плавные переходы вынесены в отдельный клиентский компонент */}
+      <PageTransition>{children}</PageTransition>
+      
       <Footer />
     </div>
   );

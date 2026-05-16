@@ -1,25 +1,20 @@
-import type { Metadata } from "next";
-import { Pangolin } from "next/font/google";
-import { Poiret_One } from "next/font/google";
-import "./globals.css";
+import { Cormorant_Garamond, Inter } from "next/font/google";
+import '../styles/globals.css';
 
 
-const pangolin = Pangolin({
-  subsets: ["latin", "cyrillic"], 
-  weight: "400",
-  display: "swap",
+const cormorant = Cormorant_Garamond({
+  weight: ["400", "500", "600"],
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-public-display",
 });
 
-const poiter = Poiret_One({
-  subsets: ["latin", "cyrillic"], 
-  weight: "400",
-  display: "swap",
+const inter = Inter({
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-public-body",
 });
 
-export const metadata: Metadata = {
-  title: "Эден",
-  description: "Салон красоты",
-};
+
+export { cormorant, inter };
 
 export default function RootLayout({
   children,
@@ -29,7 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${poiter.className} antialiased flex flex-col min-h-screen bg-black`}
+        className={`${inter.className} ${cormorant.variable} ${inter.variable} public-body bg-[rgba(177,141,97,0.14)] antialiased flex flex-col min-h-screen`}
       >
         <main>
           {children}
