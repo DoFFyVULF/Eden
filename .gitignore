@@ -1,0 +1,11 @@
+.DS_Store
+
+Backend/.env
+Backend/dist/
+Backend/generated/
+Backend/coverage/
+Backend/node_modules/
+
+Frontend/.next/
+Frontend/node_modules/
+Frontend/tsconfig.tsbuildinfo

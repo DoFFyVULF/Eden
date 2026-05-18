@@ -67,7 +67,7 @@ import { ADMIN_ROUTES } from "@/app/lib/admin.routes";
 
 // ===== ТИПЫ (соответствуют DTO) =====
 
-export enum TimePeriod {
+enum TimePeriod {
   DAY = "day",
   WEEK = "week",
   MONTH = "month",
@@ -76,23 +76,23 @@ export enum TimePeriod {
   CUSTOM = "custom",
 }
 
-export interface RevenueByMonth {
+interface RevenueByMonth {
   month: string;
   revenue: number;
 }
 
-export interface RevenueByMaster {
+interface RevenueByMaster {
   masterId: number;
   masterName: string;
   revenue: number;
 }
 
-export interface ClientGrowth {
+interface ClientGrowth {
   month: string;
   clients: number;
 }
 
-export interface FinancialMetrics {
+interface FinancialMetrics {
   totalRevenue: number;
   monthlyIncome: number;
   revenueByMonth: RevenueByMonth[];
@@ -101,7 +101,7 @@ export interface FinancialMetrics {
   revenueGrowth: number;
 }
 
-export interface ClientMetrics {
+interface ClientMetrics {
   totalClients: number;
   newClients: number;
   returningClients: number;
@@ -111,7 +111,7 @@ export interface ClientMetrics {
   clientsByMonth: ClientGrowth[];
 }
 
-export interface AppointmentMetrics {
+interface AppointmentMetrics {
   totalAppointments: number;
   newAppointments: number;
   confirmedAppointments: number;
@@ -120,7 +120,7 @@ export interface AppointmentMetrics {
   conversionRate: number;
 }
 
-export interface MasterPerformance {
+interface MasterPerformance {
   masterId: number;
   masterName: string;
   appointmentsCount: number;
@@ -128,13 +128,13 @@ export interface MasterPerformance {
   averageRating?: number;
 }
 
-export interface MasterMetrics {
+interface MasterMetrics {
   mastersCount: number;
   averageLoad: number;
   topMasters: MasterPerformance[];
 }
 
-export interface PopularService {
+interface PopularService {
   serviceId: number;
   serviceName: string;
   appointmentsCount: number;
@@ -142,12 +142,12 @@ export interface PopularService {
   averagePrice: number;
 }
 
-export interface ServiceMetrics {
+interface ServiceMetrics {
   servicesCount: number;
   popularServices: PopularService[];
 }
 
-export interface KeyMetricsResponse {
+interface KeyMetricsResponse {
   period: TimePeriod;
   financial: FinancialMetrics;
   clients: ClientMetrics;

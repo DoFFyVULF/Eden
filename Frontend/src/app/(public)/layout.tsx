@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { cormorant, inter } from "../layout";
+import { cormorant, inter } from "../fonts";
 import Header from "../components/ui/public/header/Header";
 import Footer from "../components/ui/public/footer/Footer";
 import PageTransition from "./PageTransition";
