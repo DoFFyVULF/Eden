@@ -1,14 +1,14 @@
-import { axiosWithAuth } from "@/api/interceptors";
+import { axiosClassic, axiosWithAuth } from "@/api/interceptors";
 import { ICategory } from "@/types/category.types";
 
 export const categoryService = {
   async getAll(): Promise<ICategory[]> {
-    const { data } = await axiosWithAuth.get<ICategory[]>("/category");
+    const { data } = await axiosClassic.get<ICategory[]>("/category");
     return data;
   },
 
   async getById(id: number): Promise<ICategory> {
-    const { data } = await axiosWithAuth.get<ICategory>(`/category/${id}`);
+    const { data } = await axiosClassic.get<ICategory>(`/category/${id}`);
     return data;
   },
 

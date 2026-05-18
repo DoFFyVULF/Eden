@@ -1,19 +1,19 @@
-import { axiosWithAuth } from "@/api/interceptors";
+import { axiosClassic, axiosWithAuth } from "@/api/interceptors";
 import { IServicePrice } from "@/types/service-price.types";
 
 export const servicePriceService = {
   async getAll(): Promise<IServicePrice[]> {
-    const { data } = await axiosWithAuth.get<IServicePrice[]>("/service-price");
+    const { data } = await axiosClassic.get<IServicePrice[]>("/service-price");
     return data;
   },
 
   async getById(id: number): Promise<IServicePrice> {
-    const { data } = await axiosWithAuth.get<IServicePrice>(`/service-price/${id}`);
+    const { data } = await axiosClassic.get<IServicePrice>(`/service-price/${id}`);
     return data;
   },
 
   async getByMaster(masterId: number): Promise<IServicePrice[]> {
-    const { data } = await axiosWithAuth.get<IServicePrice[]>(
+    const { data } = await axiosClassic.get<IServicePrice[]>(
       `/service-price/master/${masterId}` 
     );
     return data;

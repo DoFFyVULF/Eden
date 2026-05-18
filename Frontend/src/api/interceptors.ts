@@ -3,11 +3,18 @@ import {
   removeFromStorage,
 } from "@/services/auth/auth-token.service";
 import axios, { CreateAxiosDefaults } from "axios";
-import { errorCatch } from "./error";
 import { authService } from "@/services/auth/auth.service";
 
-const apiBaseUrl =
+const browserApiBaseUrl =
   process.env.NEXT_PUBLIC_API_URL?.trim() || "http://localhost:4200/api";
+
+const serverApiBaseUrl =
+  process.env.INTERNAL_API_URL?.trim() ||
+  process.env.NEXT_PUBLIC_API_URL?.trim() ||
+  "http://backend:4200/api";
+
+const apiBaseUrl =
+  typeof window === "undefined" ? serverApiBaseUrl : browserApiBaseUrl;
 
 const options: CreateAxiosDefaults = {
   baseURL: apiBaseUrl,

@@ -1,14 +1,14 @@
-import { axiosWithAuth } from "@/api/interceptors";
+import { axiosClassic, axiosWithAuth } from "@/api/interceptors";
 import { IMaster } from "@/types/masters.type";
 
 export const masterService = {
   async getAll(): Promise<IMaster[]> {
-    const { data } = await axiosWithAuth.get<IMaster[]>("/master");
+    const { data } = await axiosClassic.get<IMaster[]>("/master");
     return data;
   },
 
   async getById(id: number): Promise<IMaster> {
-    const { data } = await axiosWithAuth.get<IMaster>(`/master/${id}`);
+    const { data } = await axiosClassic.get<IMaster>(`/master/${id}`);
     return data;
   },
 
@@ -16,7 +16,7 @@ export const masterService = {
   async getActiveMastersCount(): Promise<number> {
     try {
       // Получаем всех мастеров с сервера
-      const { data } = await axiosWithAuth.get<IMaster[]>("/master");
+      const { data } = await axiosClassic.get<IMaster[]>("/master");
 
       // Фильтруем активных на клиенте
       const activeMasters = data.filter((master) => master.isActive === true);

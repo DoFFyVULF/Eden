@@ -1,4 +1,4 @@
-import { axiosWithAuth } from "@/api/interceptors";
+import { axiosClassic, axiosWithAuth } from "@/api/interceptors";
 import type {
   CreateScheduleSuggestionDto,
   IMasterSchedule,
@@ -27,20 +27,20 @@ export const masterScheduleService = {
 
   async getAll(): Promise<IMasterSchedule[]> {
     const { data } =
-      await axiosWithAuth.get<IMasterSchedule[]>("/master-schedule");
+      await axiosClassic.get<IMasterSchedule[]>("/master-schedule");
     return data;
   },
 
   async getByMaster(masterId: number): Promise<IMasterSchedule[]> {
     const { data } =
-      await axiosWithAuth.get<IMasterSchedule[]>("/master-schedule");
+      await axiosClassic.get<IMasterSchedule[]>("/master-schedule");
     return data.filter(
       (s) => s.masterId === masterId || s.master?.id === masterId,
     );
   },
 
   async getById(id: number): Promise<IMasterSchedule> {
-    const { data } = await axiosWithAuth.get<IMasterSchedule>(
+    const { data } = await axiosClassic.get<IMasterSchedule>(
       `/master-schedule/${id}`,
     );
     return data;

@@ -1,19 +1,19 @@
-import { axiosWithAuth } from "@/api/interceptors";
+import { axiosClassic, axiosWithAuth } from "@/api/interceptors";
 import { IService } from "@/types/services.types";
 
 export const serviceService = {
   async getAll(): Promise<IService[]> {
-    const { data } = await axiosWithAuth.get<IService[]>("/service");
+    const { data } = await axiosClassic.get<IService[]>("/service");
     return data;
   },
 
   async getById(id: number): Promise<IService> {
-    const { data } = await axiosWithAuth.get<IService>(`/service/${id}`);
+    const { data } = await axiosClassic.get<IService>(`/service/${id}`);
     return data;
   },
 
   async getCount(): Promise<number> {
-    const { data } = await axiosWithAuth.get<IService[]>("/service");
+    const { data } = await axiosClassic.get<IService[]>("/service");
     
     const serviceCount = data.filter(service => service.isActive === true)
 
