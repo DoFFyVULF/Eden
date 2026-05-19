@@ -1,13 +1,12 @@
-import 'reflect-metadata'; 
+import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
-import { createDefaultAdmin } from './seed/admin.seed';
-import { PrismaService } from './prisma.service';
 import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  
   const frontendOrigins = (process.env.FRONTEND_ORIGIN ?? 'http://localhost:3000')
     .split(',')
     .map((origin) => origin.trim())
@@ -15,6 +14,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.use(cookieParser());
+  
   app.enableCors({
     origin: frontendOrigins,
     credentials: true,
@@ -30,10 +30,10 @@ async function bootstrap() {
     })
   );
 
-  const prisma = app.get(PrismaService);
-
-  await createDefaultAdmin(prisma);
-
+  // Сидирование удалено отсюда! Оно теперь в prisma/seed.ts
+  
   await app.listen(process.env.PORT ?? 4200);
+  console.log(`Application is running on: http://localhost:${process.env.PORT ?? 4200}`);
 }
+
 bootstrap();
