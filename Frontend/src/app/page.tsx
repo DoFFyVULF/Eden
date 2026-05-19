@@ -10,35 +10,9 @@ import { MapPin, Clock3, Phone, MoveRight, Sparkles } from "lucide-react";
 const items = [
   {
     id: "1",
-    img: "https://i.pinimg.com/1200x/0a/04/80/0a04807bed07b00f68234d274807f2a5.jpg",
+    img: "pic.jpg",
     width: 300,
     height: 400,
-  },
-  {
-    id: "2",
-    img: "https://i.pinimg.com/avif/736x/68/65/bc/6865bc1440bcf686458928bea8c05029.avf",
-    width: 400,
-    height: 400,
-  },
-  {
-    id: "3",
-    img: "https://i.pinimg.com/736x/05/93/19/059319aca81c993deb5401473545f30f.jpg",
-    height: 600,
-  },
-  {
-    id: "4",
-    img: "https://i.pinimg.com/736x/33/98/da/3398daa2dcfa867477698c0d22138db1.jpg",
-    height: 500,
-  },
-  {
-    id: "5",
-    img: "https://i.pinimg.com/736x/b0/07/df/b007df8f83f7f0cd1cac5ace06d1bd2e.jpg",
-    height: 400,
-  },
-  {
-    id: "6",
-    img: "https://i.pinimg.com/736x/33/a0/30/33a030bc2fc586b14fa8eac78f97f3d4.jpg",
-    height: 500,
   },
 ];
 
