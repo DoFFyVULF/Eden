@@ -47,6 +47,7 @@ interface Props {
     clientSurname: string;
     clientName: string;
     clientPhone: string;
+    comment?: string;
     masterId: number;
     serviceId: number;
     appointmentTime: string;
@@ -99,6 +100,7 @@ export default function NewAppointmentsWindow({
     clientSurname: "",
     clientName: "",
     clientPhone: "",
+    comment: "",
     service: "",
     time: "",
     master: "",
@@ -129,6 +131,7 @@ export default function NewAppointmentsWindow({
         clientSurname: initialData.clientSurname || "",
         clientName: initialData.clientName || "",
         clientPhone: formatPhoneNumber(initialData.clientPhone || ""),
+        comment: initialData.comment || "",
         master: String(initialData.masterId || ""),
         service: String(initialData.serviceId || ""),
         date: d.toISOString().split("T")[0],
@@ -359,6 +362,7 @@ export default function NewAppointmentsWindow({
           clientSurname: form.clientSurname.trim(),
           clientName: form.clientName.trim(),
           clientPhone: form.clientPhone.replace(/\D/g, ""),
+          comment: form.comment.trim() || undefined,
           masterId: Number(form.master),
           serviceId: Number(form.service),
           appointmentTime,
@@ -369,6 +373,7 @@ export default function NewAppointmentsWindow({
           clientSurname: form.clientSurname.trim(),
           clientName: form.clientName.trim(),
           clientPhone: form.clientPhone.replace(/\D/g, ""),
+          comment: form.comment.trim() || undefined,
           masterId: Number(form.master),
           serviceId: Number(form.service),
           appointmentTime,
@@ -637,6 +642,29 @@ export default function NewAppointmentsWindow({
                       className={inputCls()}
                     />
                   </FormField>
+
+                  <div className="col-span-2">
+                    <FormField
+                      label="Комментарий"
+                      icon={<Info size={14} />}
+                      isDark={isDark}
+                    >
+                      <textarea
+                        name="comment"
+                        value={form.comment}
+                        onChange={(e) =>
+                          setForm((p) => ({ ...p, comment: e.target.value }))
+                        }
+                        rows={4}
+                        placeholder="Пожелания клиента, детали по записи, важная информация"
+                        className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all resize-none ${
+                          isDark
+                            ? "bg-white/[0.07] border-white/[0.1] text-white/90 placeholder-white/25 focus:border-indigo-400/50 focus:bg-white/[0.09] focus:ring-1 focus:ring-indigo-400/20"
+                            : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
+                        }`}
+                      />
+                    </FormField>
+                  </div>
 
                   {/* Master */}
                   <FormField

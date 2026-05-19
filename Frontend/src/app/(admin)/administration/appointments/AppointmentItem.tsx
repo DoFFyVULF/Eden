@@ -14,6 +14,7 @@ import {
   Zap,
   Timer,
   X,
+  MessageSquareText,
 } from "lucide-react";
 import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber";
 
@@ -29,6 +30,7 @@ interface Appointment {
   duration: number;
   rawDateTime: string;
   clientPhone?: string;
+  comment?: string;
 }
 
 interface AppointmentItemProps {
@@ -287,6 +289,32 @@ export default function AppointmentItem({
                     className={isDark ? "bg-violet-500/10 border-violet-500/20 text-violet-200" : "bg-violet-50 border-violet-100 text-violet-700"}
                   />
                 </div>
+
+                {appointment.comment && (
+                  <div
+                    className={`mt-3 rounded-2xl border px-3 py-3 ${
+                      isDark
+                        ? "border-white/10 bg-white/[0.04]"
+                        : "border-slate-100 bg-slate-50/80"
+                    }`}
+                  >
+                    <div
+                      className={`mb-1.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] ${
+                        isDark ? "text-slate-400" : "text-slate-500"
+                      }`}
+                    >
+                      <MessageSquareText size={12} />
+                      Комментарий
+                    </div>
+                    <p
+                      className={`text-sm leading-6 ${
+                        isDark ? "text-slate-200" : "text-slate-700"
+                      }`}
+                    >
+                      {appointment.comment}
+                    </p>
+                  </div>
+                )}
                 
                 {/* Secondary Info (Master & Phone) */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-xs font-medium">
@@ -532,7 +560,50 @@ export default function AppointmentItem({
                 : "bg-purple-50/80 border-purple-100 text-purple-800"
             }
           />
+          {appointment.comment && (
+            <InfoPill
+              isDark={isDark}
+              icon={
+                <MessageSquareText
+                  size={13}
+                  className={isDark ? "text-amber-300" : "text-amber-600"}
+                />
+              }
+              label="Есть комментарий"
+              className={
+                isDark
+                  ? "bg-amber-500/10 border-amber-400/15 text-white/75"
+                  : "bg-amber-50/80 border-amber-100 text-amber-800"
+              }
+            />
+          )}
         </div>
+
+        {appointment.comment && (
+          <div
+            className={`mt-4 rounded-2xl border px-4 py-3 ${
+              isDark
+                ? "border-white/[0.08] bg-white/[0.04]"
+                : "border-gray-100 bg-gray-50/80"
+            }`}
+          >
+            <div
+              className={`mb-1.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] ${
+                isDark ? "text-white/35" : "text-gray-400"
+              }`}
+            >
+              <MessageSquareText size={12} />
+              Комментарий клиента
+            </div>
+            <p
+              className={`text-sm leading-6 ${
+                isDark ? "text-white/75" : "text-gray-700"
+              }`}
+            >
+              {appointment.comment}
+            </p>
+          </div>
+        )}
 
         {/* ── FOOTER ── */}
         <div

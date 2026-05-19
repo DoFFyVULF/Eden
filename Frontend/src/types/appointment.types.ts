@@ -27,6 +27,7 @@ export interface IAppointment {
   clientSurname: string;
   clientName: string;
   clientPhone: string;
+  comment?: string;
   appointmentTime: string; 
   price: number; 
   status: AppointmentStatus;
@@ -55,6 +56,7 @@ export interface IUpdateAppointmentDto {
   clientSurname?: string;
   clientName?: string;
   clientPhone?: string;
+  comment?: string;
   masterId?: number;
   serviceId?: number;
   appointmentTime?: string;

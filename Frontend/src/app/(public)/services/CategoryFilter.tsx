@@ -13,23 +13,21 @@ export default function CategoryFilter({ categories, selectedId, onSelect }: any
           <motion.button
             key={item.id ?? "all"}
             onClick={() => onSelect(item.id)}
-            whileTap={{ scale: 0.95 }}
-            className={`relative px-6 py-3 rounded-full text-[11px] font-bold uppercase tracking-[0.15em] transition-colors duration-300 ${
-              active ? "text-[#1a1208]" : "text-[#6B6560] hover:text-[#F0EBE3]"
+            whileTap={{ scale: 0.97 }}
+            className={`relative rounded-full px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.2em] ${
+              active
+                ? "text-[oklch(0.98_0.005_75)]"
+                : "border border-[color:var(--public-border)] bg-[rgba(255,251,245,0.72)] text-[color:var(--public-text-soft)] hover:text-[color:var(--public-text)]"
             }`}
           >
             {active && (
               <motion.span
                 layoutId="cat-pill"
-                className="absolute inset-0 rounded-full bg-[#C8A97E]"
-                style={{ boxShadow: "0 10px 25px -5px rgba(200,169,126,0.4)" }}
+                className="absolute inset-0 rounded-full bg-[color:var(--public-accent)] shadow-[var(--public-shadow-soft)]"
                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
               />
             )}
             <span className="relative z-10">{item.title}</span>
-            {!active && (
-               <span className="absolute inset-0 rounded-full border border-white/5 bg-white/[0.02]" />
-            )}
           </motion.button>
         );
       })}

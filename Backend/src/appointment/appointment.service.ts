@@ -51,12 +51,16 @@ export class AppointmentService {
     metadata?: PublicAppointmentMetadata
   ) {
     const normalizedPhone = this.normalizePhone(dto.clientPhone);
+    const normalizedSurname = this.normalizePersonName(dto.clientSurname);
+    const normalizedName = this.normalizePersonName(dto.clientName);
+    const normalizedComment = this.normalizeComment(dto.comment);
 
     const newAppointment = await this.prisma.appointment.create({
       data: {
-        clientSurname: dto.clientSurname,
-        clientName: dto.clientName,
+        clientSurname: normalizedSurname,
+        clientName: normalizedName,
         clientPhone: normalizedPhone,
+        comment: normalizedComment,
         clientIp: metadata?.clientIp,
         clientFingerprint: metadata?.clientFingerprint,
         master: { connect: { id: dto.masterId } },
@@ -179,9 +183,19 @@ export class AppointmentService {
     return this.prisma.appointment.update({
       where: { id },
       data: {
-        clientSurname: dto.clientSurname,
-        clientName: dto.clientName,
-        clientPhone: dto.clientPhone,
+        clientSurname: dto.clientSurname
+          ? this.normalizePersonName(dto.clientSurname)
+          : undefined,
+        clientName: dto.clientName
+          ? this.normalizePersonName(dto.clientName)
+          : undefined,
+        clientPhone: dto.clientPhone
+          ? this.normalizePhone(dto.clientPhone)
+          : undefined,
+        comment:
+          dto.comment !== undefined
+            ? this.normalizeComment(dto.comment)
+            : undefined,
         master: dto.masterId ? { connect: { id: dto.masterId } } : undefined,
         service: dto.serviceId ? { connect: { id: dto.serviceId } } : undefined,
         appointmentTime: dto.appointmentTime
@@ -335,5 +349,14 @@ export class AppointmentService {
 
   private normalizePhone(phone: string) {
     return phone.replace(/\D/g, '');
+  }
+
+  private normalizePersonName(value: string) {
+    return value.trim().replace(/\s+/g, ' ');
+  }
+
+  private normalizeComment(comment?: string) {
+    const normalized = comment?.trim();
+    return normalized ? normalized : undefined;
   }
 }

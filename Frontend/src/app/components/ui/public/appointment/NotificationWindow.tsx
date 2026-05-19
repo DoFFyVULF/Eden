@@ -1,9 +1,18 @@
 "use client";
 
-import { X, CheckCircle2, Calendar, Clock, User, Scissors, Phone } from "lucide-react";
+import { motion } from "framer-motion";
+import {
+  X,
+  CheckCircle2,
+  Calendar,
+  User,
+  Scissors,
+  Phone,
+  Sparkles,
+} from "lucide-react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber"; // Используем ваш путь
+import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber";
 
 interface NotificationWindowProps {
   onClose: () => void;
@@ -31,96 +40,123 @@ export default function NotificationWindow({
   });
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="relative w-full max-w-md bg-[#0e0e0e] border border-[#C8A97E]/20 rounded-[2.5rem] p-8 shadow-[0_0_60px_-15px_rgba(200,169,126,0.3)] animate-in fade-in zoom-in-95 duration-300">
-        
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-6 right-6 w-10 h-10 rounded-full border border-white/5 flex items-center justify-center text-[#6B6560] hover:text-[#C8A97E] hover:border-[#C8A97E]/30 transition-all duration-300 bg-white/5"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        {/* Success icon */}
-        <div className="w-20 h-20 rounded-full bg-[#C8A97E]/10 border border-[#C8A97E]/20 flex items-center justify-center mx-auto mb-6">
-          <CheckCircle2 className="w-10 h-10 text-[#C8A97E]" />
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-[rgba(38,23,12,0.42)] p-4 backdrop-blur-md">
+      <motion.div
+        initial={{ opacity: 0, y: 18, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 18, scale: 0.98 }}
+        transition={{ duration: 0.22 }}
+        className="relative w-full max-w-lg overflow-hidden rounded-[34px] border border-[color:var(--public-border)] bg-[rgba(255,252,247,0.98)] p-8 shadow-[0_32px_80px_rgba(56,35,15,0.22)]"
+      >
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute left-[8%] top-[8%] h-32 w-32 rounded-full bg-[rgba(177,141,97,0.12)] blur-[70px]" />
+          <div className="absolute bottom-[8%] right-[10%] h-36 w-36 rounded-full bg-[rgba(145,114,88,0.14)] blur-[85px]" />
         </div>
 
-        {/* Title */}
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-light text-[#F0EBE3] mb-2" style={{ fontFamily: "serif" }}>
+        <button
+          onClick={onClose}
+          className="absolute right-6 top-6 z-10 rounded-full border border-[color:var(--public-border)] bg-[rgba(255,251,245,0.76)] p-2 text-[color:var(--public-text-soft)] transition hover:text-[color:var(--public-text)]"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="relative z-10 mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-[rgba(177,141,97,0.24)] bg-[rgba(177,141,97,0.12)]">
+          <CheckCircle2 className="h-10 w-10 text-[color:var(--public-accent-strong)]" />
+        </div>
+
+        <div className="relative z-10 text-center">
+          <p className="inline-flex items-center gap-2 rounded-full border border-[color:var(--public-border)] bg-[rgba(255,251,245,0.72)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--public-text-soft)]">
+            <Sparkles className="h-3.5 w-3.5 text-[color:var(--public-accent-strong)]" />
+            Онлайн-запись оформлена
+          </p>
+          <h2
+            className="mt-5 text-4xl leading-[0.96] text-[color:var(--public-text)]"
+            style={{ fontFamily: "var(--font-public-display), serif" }}
+          >
             Запись подтверждена
           </h2>
-          <p className="text-xs uppercase tracking-[0.2em] text-[#6B6560]">
-            Ждём вас в Edén
+          <p className="mx-auto mt-4 max-w-md text-sm leading-7 text-[color:var(--public-text-soft)]">
+            Все детали сохранены. Если планы изменятся, администратор сможет быстро
+            помочь с переносом времени.
           </p>
         </div>
 
-        {/* Details card */}
-        <div className="bg-white/5 border border-white/5 rounded-3xl p-6 space-y-4 mb-8">
-          <div className="flex items-start gap-4">
-            <div className="mt-1 w-8 h-8 rounded-full bg-black flex items-center justify-center border border-white/5">
-                <Scissors className="w-4 h-4 text-[#C8A97E]" />
-            </div>
-            <div>
-                <p className="text-[10px] text-[#6B6560] uppercase tracking-widest mb-0.5">Услуга</p>
-                <p className="text-sm text-[#F0EBE3] font-medium">{serviceTitle}</p>
-            </div>
-          </div>
-          
-          <div className="flex items-start gap-4">
-            <div className="mt-1 w-8 h-8 rounded-full bg-black flex items-center justify-center border border-white/5">
-                <User className="w-4 h-4 text-[#C8A97E]" />
-            </div>
-            <div>
-                <p className="text-[10px] text-[#6B6560] uppercase tracking-widest mb-0.5">Мастер</p>
-                <p className="text-sm text-[#F0EBE3] font-medium">{appointmentMaster}</p>
-            </div>
-          </div>
-          
-          <div className="flex items-start gap-4">
-            <div className="mt-1 w-8 h-8 rounded-full bg-black flex items-center justify-center border border-white/5">
-                <Calendar className="w-4 h-4 text-[#C8A97E]" />
-            </div>
-            <div>
-                <p className="text-[10px] text-[#6B6560] uppercase tracking-widest mb-0.5">Дата и время</p>
-                <p className="text-sm text-[#F0EBE3] font-medium capitalize">
-                    {formattedDate} в {appointmentTime}
-                </p>
-            </div>
-          </div>
-
-          {clientPhone && (
+        <div className="relative z-10 mt-8 rounded-[30px] border border-[color:var(--public-border)] bg-[rgba(255,251,245,0.78)] p-6">
+          <div className="space-y-4">
             <div className="flex items-start gap-4">
-                <div className="mt-1 w-8 h-8 rounded-full bg-black flex items-center justify-center border border-white/5">
-                    <Phone className="w-4 h-4 text-[#C8A97E]" />
-                </div>
-                <div>
-                    <p className="text-[10px] text-[#6B6560] uppercase tracking-widest mb-0.5">Ваш телефон</p>
-                    <p className="text-sm text-[#F0EBE3] font-medium">{formatPhoneNumber(clientPhone)}</p>
-                </div>
+              <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--public-border)] bg-[rgba(255,255,255,0.72)]">
+                <Scissors className="h-4 w-4 text-[color:var(--public-accent-strong)]" />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text-faint)]">
+                  Услуга
+                </p>
+                <p className="mt-1 text-sm text-[color:var(--public-text)]">{serviceTitle}</p>
+              </div>
             </div>
-          )}
 
-          <div className="h-px bg-white/5 my-2" />
-          
-          <div className="flex items-center justify-between pt-2">
-            <span className="text-xs text-[#6B6560] uppercase tracking-widest">К оплате</span>
-            <span className="text-xl font-bold text-[#C8A97E]">
+            <div className="flex items-start gap-4">
+              <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--public-border)] bg-[rgba(255,255,255,0.72)]">
+                <User className="h-4 w-4 text-[color:var(--public-accent-strong)]" />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text-faint)]">
+                  Мастер
+                </p>
+                <p className="mt-1 text-sm text-[color:var(--public-text)]">{appointmentMaster}</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--public-border)] bg-[rgba(255,255,255,0.72)]">
+                <Calendar className="h-4 w-4 text-[color:var(--public-accent-strong)]" />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text-faint)]">
+                  Дата и время
+                </p>
+                <p className="mt-1 text-sm capitalize text-[color:var(--public-text)]">
+                  {formattedDate} в {appointmentTime}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--public-border)] bg-[rgba(255,255,255,0.72)]">
+                <Phone className="h-4 w-4 text-[color:var(--public-accent-strong)]" />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text-faint)]">
+                  Контакт
+                </p>
+                <div>
+                  <p className="mt-1 text-sm text-[color:var(--public-text)]">
+                    {clientPhone ? formatPhoneNumber(clientPhone) : "Номер сохранён в записи"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="my-5 h-px bg-[color:var(--public-border)]" />
+
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text-faint)]">
+              К оплате
+            </span>
+            <span className="text-2xl font-semibold text-[color:var(--public-accent-strong)]">
               {servicePrice.toLocaleString("ru-RU")} ₽
             </span>
           </div>
         </div>
 
-        {/* Action button */}
         <button
           onClick={onClose}
-          className="w-full py-5 rounded-2xl text-sm font-bold uppercase tracking-[0.2em] bg-[#C8A97E] text-[#1a1208] hover:bg-[#d4b88e] transition-all duration-300 shadow-[0_10px_30px_-10px_rgba(200,169,126,0.4)] active:scale-[0.98]"
+          className="relative z-10 mt-8 flex w-full items-center justify-center gap-3 rounded-2xl bg-[color:var(--public-accent)] px-5 py-4 text-base font-semibold text-[oklch(0.98_0.005_75)] shadow-[var(--public-shadow-soft)] transition hover:bg-[color:var(--public-accent-strong)]"
         >
           Готово
         </button>
-      </div>
+      </motion.div>
     </div>
   );
 }

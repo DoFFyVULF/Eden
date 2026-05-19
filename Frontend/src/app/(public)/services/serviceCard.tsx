@@ -1,155 +1,167 @@
 "use client";
 
 import { useState } from "react";
-import { motion, Variants, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 import Link from "next/link";
-import { Clock, MoveUpRight, X, CalendarCheck } from "lucide-react";
+import { Clock3, MoveUpRight, X, CalendarCheck } from "lucide-react";
 import { IService } from "@/types/services.types";
 import { routes } from "@/app/providers/routes";
 import { usePathname } from "next/navigation";
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    transition: { duration: 0.5, ease: "easeOut" } 
-  }
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, ease: "easeOut" },
+  },
 };
 
-export default function ServiceCard({ service, price }: { service: IService; price?: number }) {
+export default function ServiceCard({
+  service,
+  price,
+}: {
+  service: IService;
+  price?: number;
+}) {
   const pathname = usePathname();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const displayPrice = price !== undefined ? `${price.toLocaleString("ru-RU")} ₽` : "По запросу";
+  const displayPrice =
+    price !== undefined ? `${price.toLocaleString("ru-RU")} ₽` : "По запросу";
 
   return (
     <>
       <motion.div variants={itemVariants} layout className="h-full">
-        {/* Вместо Link теперь используем div с обработчиком клика */}
-        <div 
+        <div
           onClick={() => setIsModalOpen(true)}
           className="group block h-full cursor-pointer outline-none"
         >
-          <article className="relative h-full flex flex-col overflow-hidden rounded-3xl bg-[#0e0e0e] border border-white/5 hover:border-[#C8A97E]/30 transition-all duration-500 hover:shadow-[0_20px_40px_-20px_rgba(200,169,126,0.25)]">
-            
-            {/* Image Section */}
-            <div className="relative h-56 overflow-hidden bg-[#111]">
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0e0e0e] via-transparent to-transparent z-10" />
+          <article className="public-panel h-full overflow-hidden rounded-[30px]">
+            <div className="relative h-56 overflow-hidden bg-[rgba(232,223,212,0.52)]">
               {service.img ? (
-                <img 
-                  src={service.img} 
-                  className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" 
-                  alt={service.title} 
+                <img
+                  src={service.img}
+                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  alt={service.title}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-4xl font-serif text-[#1a1a1a] uppercase">
+                <div
+                  className="flex h-full w-full items-center justify-center text-6xl text-[color:var(--public-text-faint)]"
+                  style={{ fontFamily: "var(--font-public-display), serif" }}
+                >
                   {service.title[0]}
                 </div>
               )}
-              
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,251,245,0.02),rgba(94,71,53,0.22))]" />
+
               {service.category && (
-                <div className="absolute top-4 left-4 z-20">
-                  <span className="px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold uppercase tracking-widest text-[#C8A97E]">
-                    {service.category.title}
-                  </span>
-                </div>
+                <span className="absolute left-4 top-4 rounded-full border border-[rgba(255,250,244,0.45)] bg-[rgba(251,246,239,0.82)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[color:var(--public-text-soft)]">
+                  {service.category.title}
+                </span>
               )}
             </div>
 
-            {/* Content Section */}
-            <div className="p-6 flex flex-col flex-grow">
-              <h3 className="text-lg font-medium text-[#F0EBE3] mb-3 group-hover:text-[#C8A97E] transition-colors line-clamp-1">
-                {service.title}
-              </h3>
-              <p className="text-sm text-[#6B6560] line-clamp-2 mb-6 leading-relaxed">
-                {service.description || "Премиальный уход и внимание к каждой детали вашего образа."}
+            <div className="flex h-[calc(100%-14rem)] flex-col p-6">
+              <div className="flex items-start justify-between gap-4">
+                <h3
+                  className="text-2xl leading-tight text-[color:var(--public-text)]"
+                  style={{ fontFamily: "var(--font-public-display), serif" }}
+                >
+                  {service.title}
+                </h3>
+                <div className="rounded-full bg-[rgba(255,250,244,0.78)] p-2 text-[color:var(--public-text-soft)] transition-colors group-hover:text-[color:var(--public-accent-strong)]">
+                  <MoveUpRight className="h-4 w-4" />
+                </div>
+              </div>
+
+              <p className="mt-3 text-sm leading-7 text-[color:var(--public-text-soft)]">
+                {service.description ||
+                  "Выверенная техника, спокойный сервис и результат, который ощущается естественно."}
               </p>
 
-              <div className="mt-auto pt-5 border-t border-white/5 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[#6B6560]">
-                  <Clock className="w-4 h-4 text-[#C8A97E]/50" />
-                  <span className="text-xs">{service.duration} мин</span>
+              <div className="mt-auto flex items-end justify-between border-t border-[color:var(--public-border)] pt-5">
+                <div className="flex items-center gap-2 text-sm text-[color:var(--public-text-soft)]">
+                  <Clock3 className="h-4 w-4 text-[color:var(--public-accent-strong)]" />
+                  <span>{service.duration} мин</span>
                 </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-bold text-[#F0EBE3]">{displayPrice}</span>
-                  <div className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center group-hover:bg-[#C8A97E] group-hover:text-[#1a1208] transition-all">
-                    <MoveUpRight className="w-4 h-4" />
-                  </div>
-                </div>
+                <p className="text-base font-semibold text-[color:var(--public-text)]">
+                  {displayPrice}
+                </p>
               </div>
             </div>
           </article>
         </div>
       </motion.div>
 
-      {/* MODAL WINDOW */}
       <AnimatePresence>
-        {isModalOpen && pathname != routes.APPOINTMENT  &&(
+        {isModalOpen && pathname !== routes.APPOINTMENT && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsModalOpen(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-[rgba(83,64,46,0.34)] backdrop-blur-md"
             />
 
-            {/* Modal Content */}
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-2xl bg-[#0e0e0e] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl"
+              exit={{ opacity: 0, scale: 0.96, y: 20 }}
+              className="relative w-full max-w-4xl overflow-hidden rounded-[34px] border border-[color:var(--public-border)] bg-[rgba(251,246,239,0.98)] shadow-[var(--public-shadow)]"
             >
-              <button 
+              <button
                 onClick={() => setIsModalOpen(false)}
-                className="absolute top-6 right-6 z-30 p-2 bg-black/50 hover:bg-black text-white/70 hover:text-white rounded-full transition-all"
+                className="absolute right-5 top-5 z-30 rounded-full border border-[color:var(--public-border)] bg-[rgba(255,251,245,0.84)] p-2 text-[color:var(--public-text-soft)] hover:text-[color:var(--public-text)]"
               >
-                <X className="w-5 h-5" />
+                <X className="h-4 w-4" />
               </button>
 
-              <div className="flex flex-col md:flex-row">
-                {/* Modal Image */}
-                <div className="w-full md:w-1/2 h-64 md:h-auto bg-[#111] relative">
+              <div className="grid md:grid-cols-[1.05fr_0.95fr]">
+                <div className="relative min-h-[320px] bg-[rgba(233,223,210,0.48)]">
                   {service.img ? (
-                    <img src={service.img} className="w-full h-full object-cover" alt={service.title} />
+                    <img src={service.img} className="h-full w-full object-cover" alt={service.title} />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-6xl font-serif text-[#1a1a1a] uppercase">
+                    <div
+                      className="flex h-full w-full items-center justify-center text-7xl text-[color:var(--public-text-faint)]"
+                      style={{ fontFamily: "var(--font-public-display), serif" }}
+                    >
                       {service.title[0]}
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#0e0e0e]/50 md:from-transparent to-transparent" />
                 </div>
 
-                {/* Modal Text */}
-                <div className="w-full md:w-1/2 p-8 md:p-10 flex flex-col">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#C8A97E] mb-4">
+                <div className="flex flex-col gap-4 p-8 md:p-10">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--public-text-faint)]">
                     {service.category?.title || "Услуга"}
                   </span>
-                  <h2 className="text-2xl md:text-3xl font-light text-[#F0EBE3] mb-4 leading-tight" style={{ fontFamily: "serif" }}>
+                  <h2
+                    className="mt-4 text-4xl leading-none text-[color:var(--public-text)]"
+                    style={{ fontFamily: "var(--font-public-display), serif" }}
+                  >
                     {service.title}
                   </h2>
-                  <p className="text-sm text-[#6B6560] leading-relaxed mb-8">
-                    {service.description || "Индивидуальный подход и премиальные материалы. Мы заботимся о том, чтобы каждый визит в наш салон приносил вам не только результат, но и удовольствие от процесса."}
+                  <p className="mt-5 text-sm leading-7 text-[color:var(--public-text-soft)]">
+                    {service.description ||
+                      "Индивидуальный темп, внимательная работа мастера и сервис, который помогает расслабиться и почувствовать результат уже в процессе."}
                   </p>
 
-                  <div className="space-y-4 mb-8">
-                    <div className="flex items-center justify-between text-sm border-b border-white/5 pb-2">
-                      <span className="text-[#3D3A38]">Длительность</span>
-                      <span className="text-[#F0EBE3]">{service.duration} минут</span>
+                  <div className="mt-8 space-y-4 rounded-[24px] border border-[color:var(--public-border)] bg-[rgba(255,252,247,0.72)] p-5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[color:var(--public-text-soft)]">Длительность</span>
+                      <span className="text-[color:var(--public-text)]">{service.duration} минут</span>
                     </div>
-                    <div className="flex items-center justify-between text-sm border-b border-white/5 pb-2">
-                      <span className="text-[#3D3A38]">Стоимость</span>
-                      <span className="text-[#C8A97E] font-bold">{displayPrice}</span>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[color:var(--public-text-soft)]">Стоимость</span>
+                      <span className="font-semibold text-[color:var(--public-accent-strong)]">{displayPrice}</span>
                     </div>
                   </div>
 
-                  <Link 
+                  <Link
                     href={`${routes.APPOINTMENT}?serviceId=${service.id}`}
-                    className="mt-auto flex items-center justify-center gap-3 w-full bg-[#C8A97E] text-[#1a1208] py-4 rounded-2xl font-bold hover:shadow-[0_10px_25px_-5px_rgba(200,169,126,0.4)] transition-all active:scale-95"
+                    className="mt-auto flex items-center justify-center gap-3 rounded-2xl bg-[color:var(--public-accent)] px-5 py-4 text-sm font-semibold text-[oklch(0.98_0.005_75)] shadow-[var(--public-shadow-soft)] hover:bg-[color:var(--public-accent-strong)]"
                   >
-                    <CalendarCheck className="w-5 h-5" />
+                    <CalendarCheck className="h-5 w-5" />
                     Записаться онлайн
                   </Link>
                 </div>

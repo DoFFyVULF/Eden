@@ -27,6 +27,7 @@ const tektur = Tektur({
 
 const THEME_STORAGE_KEY = "app-theme";
 const ROUNDED_STORAGE_KEY = "app-rounded";
+const THEME_SETTINGS_EVENT = "theme-settings-changed";
 
 export default function AdminRootLayout({
   children,
@@ -37,30 +38,42 @@ export default function AdminRootLayout({
   const [isAuth, setIsAuth] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  // Принудительно включаем темную тему для теста
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(false);
   const [isRounded, setIsRounded] = useState(true);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    const syncThemeState = () => {
+      const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+      const savedRounded = localStorage.getItem(ROUNDED_STORAGE_KEY);
 
-    if (savedTheme !== null) {
-      setIsDark(savedTheme === "dark");
-    } else {
-      const systemDark = window.matchMedia(
-        "(prefers-color-scheme: dark)",
-      ).matches;
-      setIsDark(systemDark);
-    }
+      if (savedTheme === "dark") {
+        setIsDark(true);
+      } else if (savedTheme === "light") {
+        setIsDark(false);
+      } else {
+        setIsDark(
+          window.matchMedia("(prefers-color-scheme: dark)").matches,
+        );
+      }
 
-    const savedRounded = localStorage.getItem(ROUNDED_STORAGE_KEY);
-    if (savedRounded !== null) {
-      setIsRounded(savedRounded === "true");
-    }
+      if (savedRounded !== null) {
+        setIsRounded(savedRounded === "true");
+      }
+    };
+
+    syncThemeState();
+
+    window.addEventListener(THEME_SETTINGS_EVENT, syncThemeState);
+    window.addEventListener("storage", syncThemeState);
+
+    return () => {
+      window.removeEventListener(THEME_SETTINGS_EVENT, syncThemeState);
+      window.removeEventListener("storage", syncThemeState);
+    };
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(THEME_STORAGE_KEY, isDark ? 'dark' : '');
+    localStorage.setItem(THEME_STORAGE_KEY, isDark ? "dark" : "light");
   }, [isDark]);
 
   useEffect(() => {
@@ -106,7 +119,7 @@ export default function AdminRootLayout({
     return (
       // Убрали bg-классы, оставили только шрифт и dark класс
       <div
-        className={`${tektur.className} ${isDark ? "dark" : ""} min-h-screen flex items-center justify-center`}
+        className={`${tektur.className} ${isDark ? "dark" : ""} admin-theme-shell ${isDark ? "admin-theme-dark" : "admin-theme-light"} min-h-screen flex items-center justify-center`}
       >
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-blue-500 dark:border-purple-500 border-t-transparent rounded-full animate-spin" />
@@ -122,7 +135,7 @@ export default function AdminRootLayout({
     <QueryProvider>
       {/* ВАЖНО: Убрали все bg-gradient... отсюда. Фон теперь берет из body (globals.css) */}
       <div
-        className={`${tektur.className} ${isDark ? "dark" : ""} min-h-screen transition-colors duration-500`}
+        className={`${tektur.className} ${isDark ? "dark" : ""} admin-theme-shell ${isDark ? "admin-theme-dark" : "admin-theme-light"} min-h-screen transition-colors duration-500`}
       >
         {isAuth ? (
           <AdminAppointmentNotificationsProvider enabled={isAuth}>

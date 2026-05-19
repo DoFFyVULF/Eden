@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+:root {
+  --background: oklch(0.975 0.01 70);
+  --foreground: oklch(0.31 0.02 42);
+
+  --public-bg: oklch(0.958 0.012 72);
+  --public-bg-strong: oklch(0.938 0.015 70);
+  --public-surface: oklch(0.986 0.008 76 / 0.84);
+  --public-surface-strong: oklch(0.965 0.012 66);
+  --public-border: oklch(0.86 0.018 63 / 0.72);
+  --public-border-strong: oklch(0.73 0.036 56 / 0.9);
+  --public-text: oklch(0.31 0.02 42);
+  --public-text-soft: oklch(0.5 0.02 50);
+  --public-text-faint: oklch(0.62 0.018 55);
+  --public-accent: oklch(0.64 0.06 56);
+  --public-accent-strong: oklch(0.55 0.07 50);
+  --public-accent-soft: oklch(0.92 0.02 64);
+  --public-shadow: 0 24px 60px -34px rgba(97, 72, 49, 0.28);
+  --public-shadow-soft: 0 18px 40px -30px rgba(97, 72, 49, 0.18);
+  --public-radius-xl: 28px;
+  --public-radius-2xl: 36px;
+}
+
+.dark {
+  --background: oklch(0.18 0.02 250);
+  --foreground: oklch(0.96 0.01 90);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+@layer utilities {
+  .font-display {
+    font-family: var(--font-public-display), serif;
+  }
+ 
+  .font-public-display {
+    font-family: var(--font-public-display), serif;
+  }
+ 
+  .font-body {
+    font-family: var(--font-public-body), sans-serif;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(177, 141, 97, 0.14),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at right 18%,
+      rgba(158, 132, 102, 0.12),
+      transparent 28%
+    ),
+    linear-gradient(
+      180deg,
+      var(--public-bg) 0%,
+      oklch(0.947 0.012 74) 46%,
+      oklch(0.935 0.014 68) 100%
+    );
+  color: var(--foreground);
+  font-size: 16px;
+}
+
+a,
+button,
+input,
+textarea {
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    opacity 180ms ease;
+}
+
+::selection {
+  background: rgba(164, 128, 89, 0.22);
+  color: var(--public-text);
+}
+
+.container {
+  width: 100%;
+  max-width: 1400px;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+.glass-card {
+  background: var(--public-surface);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--public-border);
+  color: var(--public-text);
+}
+
+.public-shell {
+  color: var(--public-text);
+}
+
+.public-panel {
+  background: var(--public-surface);
+  border: 1px solid var(--public-border);
+  box-shadow: var(--public-shadow-soft);
+}
+
+.public-panel-strong {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 252, 247, 0.94),
+    rgba(244, 236, 226, 0.9)
+  );
+  border: 1px solid var(--public-border);
+  box-shadow: var(--public-shadow);
+}
+
+.public-pill {
+  background: rgba(255, 250, 244, 0.8);
+  border: 1px solid rgba(182, 151, 118, 0.3);
+}
+
+.public-body{ 
+  body {
+    background-color: rgba(177,141,97,0.14);
+  }
+}
+
+.admin-layout-body {
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease,
+    background 0.3s ease;
+}
+
+.admin-theme-shell {
+  min-height: 100vh;
+  color: var(--text-primary, #111827);
+}
+
+.admin-theme-shell.admin-theme-light {
+  background:
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.12), transparent 28%),
+    radial-gradient(circle at right 18%, rgba(167, 139, 250, 0.1), transparent 24%),
+    linear-gradient(135deg, #f8fafc, #ffffff, #eff6ff);
+  color: #111827;
+}
+
+.admin-theme-shell.admin-theme-dark {
+  background:
+    radial-gradient(circle at top left, rgba(99, 102, 241, 0.18), transparent 28%),
+    radial-gradient(circle at right 18%, rgba(168, 85, 247, 0.16), transparent 24%),
+    linear-gradient(135deg, #0f172a, #581c87, #0f172a);
+  color: #f3f4f6;
+}

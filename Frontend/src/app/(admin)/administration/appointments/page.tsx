@@ -160,7 +160,8 @@ export default function AdminAppointments() {
           `${a.clientSurname} ${a.clientName}`.toLowerCase().includes(q) ||
           a.service.title.toLowerCase().includes(q) ||
           `${a.master.surname} ${a.master.name}`.toLowerCase().includes(q) ||
-          a.clientPhone.includes(q),
+          a.clientPhone.includes(q) ||
+          a.comment?.toLowerCase().includes(q),
       );
     }
     if (dateFilter)
@@ -195,6 +196,7 @@ export default function AdminAppointments() {
     duration: a.service.duration,
     rawDateTime: a.appointmentTime,
     clientPhone: a.clientPhone,
+    comment: a.comment,
   });
 
   const handleConfirm = async (id: string) => {
@@ -774,6 +776,7 @@ export default function AdminAppointments() {
                     clientSurname: editingAppointment.clientSurname,
                     clientName: editingAppointment.clientName,
                     clientPhone: editingAppointment.clientPhone,
+                    comment: editingAppointment.comment,
                     masterId: editingAppointment.master.id,
                     serviceId: editingAppointment.service.id,
                     appointmentTime: editingAppointment.appointmentTime,

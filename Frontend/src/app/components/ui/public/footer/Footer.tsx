@@ -1,181 +1,149 @@
-'use client'
+"use client";
+
 import Link from "next/link";
 import { routes } from "@/app/providers/routes";
-import { Instagram, Facebook, Twitter, ArrowUp } from "lucide-react";
+import LegalDocumentModal from "@/app/components/ui/public/appointment/LegalDocumentModal";
+import {
+  privacyPolicySections,
+  publicOfferSections,
+} from "@/app/(public)/appointment/legalDocuments";
+import { ArrowUp, Instagram, Phone, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function Footer() {
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setShowScrollTop(window.scrollY > 500);
-    };
-    window.addEventListener("scroll", handleScroll);
+    const handleScroll = () => setShowScrollTop(window.scrollY > 500);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   return (
-    <footer className="relative bg-gradient-to-b from-[#080808] to-[#030303]">
-      {/* Decorative top border */}
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#C8A97E]/30 to-transparent" />
-      
-      {/* Main footer content */}
-      <div className="container mx-auto px-4 max-w-7xl pt-24 pb-12">
-        {/* Main grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 gap-y-16 mb-20">
-          
-          {/* Brand Section */}
-          <div className="lg:col-span-5 space-y-8">
-            <div className="space-y-4">
-              <h2 
-                className="text-7xl lg:text-8xl font-light tracking-tighter text-transparent"
-                style={{
-                  fontFamily: "var(--font-display, Georgia, serif)",
-                  WebkitTextStroke: "1px rgba(240,235,227,0.8)",
-                }}
-              >
-                ЭДЕН
-              </h2>
-              <p className="text-[#6B6560] text-sm leading-relaxed max-w-sm">
-                Пространство красоты нового поколения. С 2018 года создаём образы, 
-                которые вдохновляют и преображают.
-              </p>
-            </div>
-            
-            {/* Social Links */}
-            <div className="flex gap-3">
+     <footer className="relative overflow-hidden border-t border-[color:var(--public-border)]">
+
+       <div className="container mx-auto max-w-7xl px-4 pb-10 pt-20">
+        <div className="grid gap-14 lg:grid-cols-[1.3fr_0.8fr_1fr]">
+          <div>
+            <p
+              className="text-5xl leading-none tracking-[0.14em] text-[color:var(--public-text)] md:text-7xl"
+              style={{ fontFamily: "var(--font-public-display), serif" }}
+            >
+              ЭДЕН
+            </p>
+            <p className="mt-5 max-w-md text-sm leading-7 text-[color:var(--public-text-soft)]">
+              Пространство тихой роскоши, в котором красота ощущается как забота.
+              Без перегруза, без суеты, с вниманием к человеку и времени.
+            </p>
+
+            <div className="mt-7 flex gap-3">
               {[
-                { icon: Instagram, href: "#", label: "Instagram" },
-                { icon: Facebook, href: "#", label: "Facebook" },
-                { icon: Twitter, href: "#", label: "Twitter" },
-              ].map(({ icon: Icon, href, label }) => (
+                { href: "#", label: "Instagram", icon: Instagram },
+                { href: "tel:+73421234567", label: "Телефон", icon: Phone },
+                { href: "#", label: "Telegram", icon: Send },
+              ].map(({ href, label, icon: Icon }) => (
                 <Link
                   key={label}
                   href={href}
-                  className="group w-11 h-11 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:border-[#C8A97E]/40 hover:bg-[#C8A97E]/10 transition-all duration-300"
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--public-border)] bg-[rgba(255,252,247,0.72)] text-[color:var(--public-text-soft)] hover:border-[color:var(--public-border-strong)] hover:text-[color:var(--public-text)]"
                   aria-label={label}
                 >
-                  <Icon className="w-4 h-4 text-[#6B6560] group-hover:text-[#C8A97E] transition-colors" />
+                  <Icon className="h-4 w-4" />
                 </Link>
               ))}
             </div>
           </div>
 
-          {/* Navigation Links */}
-          <div className="lg:col-span-3">
-            <h3 className="text-[10px] text-[#6B6560] uppercase tracking-[0.25em] mb-6 font-semibold">
+          <div>
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--public-text-faint)]">
               Навигация
             </h3>
-            <ul className="space-y-4">
+            <div className="mt-6 space-y-3">
               {[
-                { name: "Главная", href: routes.HOME },
-                { name: "Услуги", href: routes.SERVICES },
-                { name: "Мастера", href: routes.APPOINTMENT },
-                { name: "Блог", href: "#" },
-                { name: "Контакты", href: "#contacts" },
+                { href: routes.HOME, label: "Главная" },
+                { href: routes.SERVICES, label: "Услуги" },
+                { href: routes.APPOINTMENT, label: "Онлайн-запись" },
               ].map((item) => (
-                <li key={item.name}>
-                  <Link
-                    href={item.href}
-                    className="text-[#6B6560] text-sm hover:text-[#C8A97E] transition-colors duration-200 group inline-flex items-center gap-2"
-                  >
-                    <span className="w-0 group-hover:w-4 h-px bg-[#C8A97E] transition-all duration-300" />
-                    {item.name}
-                  </Link>
-                </li>
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="block text-sm text-[color:var(--public-text-soft)] hover:text-[color:var(--public-text)]"
+                >
+                  {item.label}
+                </Link>
               ))}
-            </ul>
+            </div>
           </div>
 
-          {/* Contact Info */}
-          <div className="lg:col-span-4">
-            <h3 className="text-[10px] text-[#6B6560] uppercase tracking-[0.25em] mb-6 font-semibold">
+          <div>
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--public-text-faint)]">
               Контакты
             </h3>
-            <address className="not-italic space-y-6">
-              <div className="space-y-1">
-                <p className="text-[#6B6560] text-sm">Адрес</p>
-                <p className="text-[#F0EBE3] text-base leading-relaxed">
-                  г. Пермь, ул. Коронита, 15
-                  <br />
-                  <span className="text-[#6B6560] text-xs">Вход со двора, этаж 1</span>
-                </p>
+            <div className="mt-6 space-y-5 text-sm leading-7 text-[color:var(--public-text-soft)]">
+              <div>
+                <p className="text-[color:var(--public-text)]">г. Пермь, ул. Коронита, 15</p>
+                <p>Вход со двора, этаж 1</p>
               </div>
-              
-              <div className="space-y-1">
-                <p className="text-[#6B6560] text-sm">Телефон</p>
-                <a
-                  href="tel:+73421234567"
-                  className="text-[#F0EBE3] text-xl font-light hover:text-[#C8A97E] transition-colors block"
-                  style={{ fontFamily: "var(--font-display, Georgia, serif)" }}
-                >
+              <div>
+                <a href="tel:+73421234567" className="text-lg text-[color:var(--public-text)] hover:text-[color:var(--public-accent-strong)]">
                   +7 (342) 123-45-67
                 </a>
-                <p className="text-[#6B6560] text-xs">WhatsApp / Telegram</p>
+                <p>Ежедневно с 9:00 до 20:00</p>
               </div>
-              
-              <div className="space-y-1">
-                <p className="text-[#6B6560] text-sm">Email</p>
-                <a
-                  href="mailto:info@eden-salon.ru"
-                  className="text-[#F0EBE3] text-sm hover:text-[#C8A97E] transition-colors"
-                >
-                  info@eden-salon.ru
-                </a>
-              </div>
-            </address>
+            </div>
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="flex flex-col md:flex-row justify-between items-center pt-12 border-t border-white/5 gap-6">
-          <p className="text-[#3D3A38] text-xs">
-            © {new Date().getFullYear()} Салон красоты «Эден». Все права защищены.
-          </p>
-          
-          <div className="flex gap-8">
-            <Link
-              href="#"
-              className="text-[#3D3A38] text-xs hover:text-[#6B6560] transition-colors"
+        <div className="mt-14 flex flex-col gap-4 border-t border-[color:var(--public-border)] pt-6 text-xs text-[color:var(--public-text-faint)] md:flex-row md:items-center md:justify-between">
+          <p>© {new Date().getFullYear()} Салон красоты «Эден».</p>
+          <div className="flex gap-6">
+            <button
+              type="button"
+              onClick={() => setIsPrivacyModalOpen(true)}
+              className="hover:text-[color:var(--public-text-soft)]"
             >
               Политика конфиденциальности
-            </Link>
-            <Link
-              href="#"
-              className="text-[#3D3A38] text-xs hover:text-[#6B6560] transition-colors"
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsOfferModalOpen(true)}
+              className="hover:text-[color:var(--public-text-soft)]"
             >
               Публичная оферта
-            </Link>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Scroll to top button */}
       <button
-        onClick={scrollToTop}
-        className={`
-          fixed bottom-8 right-8 z-50
-          w-12 h-12 rounded-full
-          bg-[#C8A97E]/10 backdrop-blur-sm
-          border border-[#C8A97E]/30
-          flex items-center justify-center
-          hover:bg-[#C8A97E]/20
-          transition-all duration-300
-          hover:scale-110
-          ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}
-        `}
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        className={`fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full border border-[color:var(--public-border-strong)] bg-[rgba(253,249,243,0.9)] text-[color:var(--public-text)] shadow-[var(--public-shadow-soft)] ${
+          showScrollTop ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-6 opacity-0"
+        }`}
         aria-label="Наверх"
       >
-        <ArrowUp className="w-4 h-4 text-[#C8A97E]" />
+        <ArrowUp className="h-4 w-4" />
       </button>
 
-      {/* Decorative gradient blur */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-px bg-gradient-to-r from-transparent via-[#C8A97E]/20 to-transparent" />
+      <LegalDocumentModal
+        isOpen={isPrivacyModalOpen}
+        onClose={() => setIsPrivacyModalOpen(false)}
+        title="Политика конфиденциальности"
+        subtitle="Документ описывает, какие персональные данные собираются при онлайн-записи, зачем они нужны и как пользователь может управлять своими правами."
+        effectiveDate="14 мая 2026"
+        sections={privacyPolicySections}
+      />
+
+      <LegalDocumentModal
+        isOpen={isOfferModalOpen}
+        onClose={() => setIsOfferModalOpen(false)}
+        title="Публичная оферта"
+        subtitle="Документ фиксирует условия онлайн-записи, общие правила оказания услуг и базовые обязанности исполнителя и клиента."
+        effectiveDate="14 мая 2026"
+        sections={publicOfferSections}
+      />
     </footer>
   );
 }

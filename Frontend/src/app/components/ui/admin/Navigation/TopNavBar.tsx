@@ -50,6 +50,7 @@ type MenuItem = {
 
 const THEME_STORAGE_KEY = "app-theme";
 const ROUNDED_STORAGE_KEY = "app-rounded";
+const THEME_SETTINGS_EVENT = "theme-settings-changed";
 
 export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
   const [counts, setCounts] = useState<any>(null);
@@ -258,6 +259,8 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
         localStorage.setItem(THEME_STORAGE_KEY, "light");
       }
     }
+
+    window.dispatchEvent(new Event(THEME_SETTINGS_EVENT));
   };
 
   const handleNavbarSizeChange = (
@@ -272,6 +275,8 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
       setIsRounded(false);
       localStorage.setItem(ROUNDED_STORAGE_KEY, "false");
     }
+
+    window.dispatchEvent(new Event(THEME_SETTINGS_EVENT));
   };
 
   useEffect(() => {
