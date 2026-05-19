@@ -12,7 +12,7 @@ const items = [
     id: "1",
     img: "pic.jpg",
     width: 300,
-    height: 400,
+    height: 600,
   },
 ];
 
