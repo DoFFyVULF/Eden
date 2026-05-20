@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense, lazy } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { categoryService } from "@/services/category/category.service";
@@ -17,7 +17,7 @@ import { IServicePrice } from "@/types/service-price.types";
 import { IMasterSchedule } from "@/types/schedule.types";
 import { AppointmentStatus } from "@/types/appointment.types";
 
-import BeautyCalendar from "@/app/components/ui/Beautycalendar";
+const BeautyCalendar = lazy(() => import("@/app/components/ui/Beautycalendar"));
 import NotificationWindow from "@/app/components/ui/public/appointment/NotificationWindow";
 import LimitExceededWindow from "@/app/components/ui/public/appointment/LimitExceededWindow";
 import LegalDocumentModal from "@/app/components/ui/public/appointment/LegalDocumentModal";
@@ -25,10 +25,7 @@ import ConsentCheckbox from "@/app/components/ui/public/appointment/ConsentCheck
 import ServiceCard from "../services/serviceCard";
 import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber";
 import { errorCatch } from "@/api/error";
-import {
-  privacyPolicySections,
-  publicOfferSections,
-} from "./legalDocuments";
+import { privacyPolicySections, publicOfferSections } from "./legalDocuments";
 
 import {
   Loader2,
@@ -42,9 +39,7 @@ import {
 } from "lucide-react";
 
 const PERSON_NAME_REGEX = /^[A-Za-zА-Яа-яЁё]+(?:[ '-][A-Za-zА-Яа-яЁё]+)*$/u;
-
-const sanitizePersonName = (value: string) =>
-  value.replace(/[^A-Za-zА-Яа-яЁё\s'-]/gu, "");
+const sanitizePersonName = (value: string) => value.replace(/[^A-Za-zА-Яа-яЁё\s'-]/gu, "");
 
 function SelectionSummary({
   label,
@@ -123,8 +118,12 @@ function AppointmentContent() {
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
   const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
 
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
-  const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
+    null,
+  );
+  const [selectedServiceId, setSelectedServiceId] = useState<number | null>(
+    null,
+  );
   const [selectedMasterId, setSelectedMasterId] = useState<number | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
 
@@ -167,20 +166,30 @@ function AppointmentContent() {
 
       if (service) {
         setSelectedServiceId(serviceIdNum);
-        setSelectedCategoryId(service.categoryId || service.category?.id || null);
+        setSelectedCategoryId(
+          service.categoryId || service.category?.id || null,
+        );
       }
     }
   }, [preselectedServiceId, services]);
 
-  const currentCategory = categories.find((category) => category.id === selectedCategoryId);
-  const currentService = services.find((service) => service.id === selectedServiceId);
-  const currentMaster = masters.find((master) => master.id === selectedMasterId);
+  const currentCategory = categories.find(
+    (category) => category.id === selectedCategoryId,
+  );
+  const currentService = services.find(
+    (service) => service.id === selectedServiceId,
+  );
+  const currentMaster = masters.find(
+    (master) => master.id === selectedMasterId,
+  );
 
   const filteredServices = useMemo(
     () =>
       !selectedCategoryId
         ? []
-        : services.filter((service) => service.categoryId === selectedCategoryId),
+        : services.filter(
+            (service) => service.categoryId === selectedCategoryId,
+          ),
     [services, selectedCategoryId],
   );
 
@@ -194,7 +203,9 @@ function AppointmentContent() {
           price.isActive !== false,
       )
       .map((price) => Number(price.masterId ?? price.master?.id));
-    return masters.filter((master) => masterIdsFromPrices.includes(Number(master.id)));
+    return masters.filter((master) =>
+      masterIdsFromPrices.includes(Number(master.id)),
+    );
   }, [masters, prices, selectedServiceId]);
 
   const currentPrice = useMemo(() => {
@@ -213,7 +224,8 @@ function AppointmentContent() {
   const masterScheduleData = useMemo(() => {
     if (!selectedMasterId) return null;
     const masterSchedules = schedules.filter(
-      (schedule) => (schedule.masterId ?? schedule.master?.id) === selectedMasterId,
+      (schedule) =>
+        (schedule.masterId ?? schedule.master?.id) === selectedMasterId,
     );
     const dayKeys = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
     const schedule: any = {
@@ -393,8 +405,8 @@ function AppointmentContent() {
               Выберите услугу, мастера и удобное время без перегруза
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-8 text-[color:var(--public-text-soft)]">
-              Последовательный сценарий записи, где каждое решение понятно,
-              а календарь помогает выбрать слот без напряжения.
+              Последовательный сценарий записи, где каждое решение понятно, а
+              календарь помогает выбрать слот без напряжения.
             </p>
           </div>
 
@@ -413,7 +425,9 @@ function AppointmentContent() {
                   <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-[color:var(--public-text-faint)]">
                     {label}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-[color:var(--public-text)]">{value}</p>
+                  <p className="mt-2 text-sm leading-6 text-[color:var(--public-text)]">
+                    {value}
+                  </p>
                 </div>
               ))}
             </div>
@@ -491,10 +505,13 @@ function AppointmentContent() {
                   {filteredServices.map((service) => (
                     <div
                       key={service.id}
-                      onClick={() => setSelectedServiceId(service.id)}
                       className="cursor-pointer active:scale-[0.99]"
                     >
-                      <ServiceCard service={service} />
+                      <ServiceCard
+                        service={service}
+                        disableModal
+                        onClick={() => setSelectedServiceId(service.id)}
+                      />
                     </div>
                   ))}
                 </div>
@@ -522,7 +539,8 @@ function AppointmentContent() {
                   {availableMasters.map((master) => {
                     const priceObj = prices.find(
                       (price) =>
-                        (price.serviceId ?? price.service?.id) === selectedServiceId &&
+                        (price.serviceId ?? price.service?.id) ===
+                          selectedServiceId &&
                         (price.masterId ?? price.master?.id) === master.id,
                     );
 
@@ -540,7 +558,9 @@ function AppointmentContent() {
                         <div>
                           <p
                             className="text-3xl leading-none text-[color:var(--public-text)]"
-                            style={{ fontFamily: "var(--font-public-display), serif" }}
+                            style={{
+                              fontFamily: "var(--font-public-display), serif",
+                            }}
                           >
                             {master.surname} {master.name}
                           </p>
@@ -596,7 +616,9 @@ function AppointmentContent() {
                     <span>{currentPrice.toLocaleString()} ₽</span>
                   </div>
                   <div className="mt-4 flex flex-col gap-2 text-sm text-[color:var(--public-text)]">
-                    <span>{currentMaster?.surname} {currentMaster?.name}</span>
+                    <span>
+                      {currentMaster?.surname} {currentMaster?.name}
+                    </span>
                     <span className="text-[color:var(--public-text-soft)]">
                       {selectedAppointment.day}, {selectedAppointment.time}
                     </span>
@@ -616,7 +638,10 @@ function AppointmentContent() {
                   description="Минимум полей, спокойная форма и понятное подтверждение после отправки."
                 />
 
-                <form onSubmit={handleSubmit} className="public-panel rounded-[30px] p-6 md:p-7">
+                <form
+                  onSubmit={handleSubmit}
+                  className="public-panel rounded-[30px] p-6 md:p-7"
+                >
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <input
@@ -628,7 +653,9 @@ function AppointmentContent() {
                         className="w-full rounded-2xl border border-[color:var(--public-border)] bg-[rgba(255,252,247,0.82)] px-4 py-4 text-[color:var(--public-text)] outline-none placeholder:text-[color:var(--public-text-faint)] focus:border-[color:var(--public-border-strong)]"
                       />
                       {formErrors.lastName && (
-                        <p className="mt-2 text-xs text-red-500">{formErrors.lastName}</p>
+                        <p className="mt-2 text-xs text-red-500">
+                          {formErrors.lastName}
+                        </p>
                       )}
                     </div>
                     <div>
@@ -641,7 +668,9 @@ function AppointmentContent() {
                         className="w-full rounded-2xl border border-[color:var(--public-border)] bg-[rgba(255,252,247,0.82)] px-4 py-4 text-[color:var(--public-text)] outline-none placeholder:text-[color:var(--public-text-faint)] focus:border-[color:var(--public-border-strong)]"
                       />
                       {formErrors.firstName && (
-                        <p className="mt-2 text-xs text-red-500">{formErrors.firstName}</p>
+                        <p className="mt-2 text-xs text-red-500">
+                          {formErrors.firstName}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -656,7 +685,9 @@ function AppointmentContent() {
                       className="mt-4 w-full rounded-2xl border border-[color:var(--public-border)] bg-[rgba(255,252,247,0.82)] px-4 py-4 text-[color:var(--public-text)] outline-none placeholder:text-[color:var(--public-text-faint)] focus:border-[color:var(--public-border-strong)]"
                     />
                     {formErrors.phone && (
-                      <p className="mt-2 text-xs text-red-500">{formErrors.phone}</p>
+                      <p className="mt-2 text-xs text-red-500">
+                        {formErrors.phone}
+                      </p>
                     )}
                   </div>
 
@@ -700,7 +731,9 @@ function AppointmentContent() {
                         </button>
                       </div>
                       {formErrors.consent && (
-                        <p className="mt-3 text-xs text-red-500">{formErrors.consent}</p>
+                        <p className="mt-3 text-xs text-red-500">
+                          {formErrors.consent}
+                        </p>
                       )}
                     </div>
                   </div>

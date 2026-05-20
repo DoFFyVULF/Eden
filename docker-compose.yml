@@ -4,9 +4,9 @@ services:
     container_name: eden-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-eden}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -19,35 +19,40 @@ services:
 
   backend:
     build:
-      context: ./Backend
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: eden-backend
     restart: unless-stopped
+    environment:
+      # Настройки базы данных
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Секреты и порты
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: ${BACKEND_PORT}
+      # ВАЖНО: Передаем адрес фронтенда для настройки CORS
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
+    ports:
+      - "${BACKEND_PORT}:${BACKEND_PORT}"
     depends_on:
       postgres:
         condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-eden}
-      JWT_SECRET: ${JWT_SECRET:-change-me}
-      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
-      PORT: ${BACKEND_PORT:-4200}
-      NODE_ENV: production
-    ports:
-      - "${BACKEND_PORT:-4200}:4200"
 
   frontend:
     build:
-      context: ./Frontend
+      context: ./frontend
+      dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4200/api}
+        # ВАЖНО: Передаем API URL внутрь сборки образа (Build time)
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: eden-frontend
     restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT}:3000"
+    environment:
+      # Дублируем для runtime (на всякий случай, хотя для NEXT_PUBLIC главное - args выше)
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     depends_on:
       - backend
-    environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4200/api}
-      NODE_ENV: production
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
 
 volumes:
   postgres_data:

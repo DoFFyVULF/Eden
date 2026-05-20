@@ -4,13 +4,37 @@ import Link from "next/link";
 import { routes } from "./providers/routes";
 import Header from "./components/ui/public/header/Header";
 import Footer from "./components/ui/public/footer/Footer";
-import Masonry from "./animations/Masonry/Masonry";
 import { MapPin, Clock3, Phone, MoveRight, Sparkles } from "lucide-react";
+import dynamic from 'next/dynamic';
+
+// 1. Ленивая загрузка тяжелой анимации Masonry.
+// ssr: false отключает рендеринг на сервере, что ускоряет отдачу HTML.
+const Masonry = dynamic(() => import('./animations/Masonry/Masonry'), {
+  loading: () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 h-[600px] animate-pulse bg-gray-100/5 rounded-xl">
+      <div className="h-full bg-gray-200/5 rounded-xl"></div>
+      <div className="h-full bg-gray-200/5 rounded-xl hidden md:block"></div>
+      <div className="h-full bg-gray-200/5 rounded-xl hidden lg:block"></div>
+    </div>
+  ),
+  ssr: false 
+});
+
+// 2. Ленивая загрузка Карты.
+// Карта загрузится только в браузере, не блокируя серверный рендеринг.
+const YandexMap = dynamic(() => import('./components/ui/public/yandexMap/YandexMap'), {
+  loading: () => (
+    <div className="w-full h-[380px] bg-gray-200/5 rounded-[30px] animate-pulse flex items-center justify-center text-xs text-gray-400">
+      Загрузка карты...
+    </div>
+  ),
+  ssr: false 
+});
 
 const items = [
   {
     id: "1",
-    img: "pic.jpg",
+    img: "/pic.jpg", // Убедитесь, что файл лежит в папке public
     width: 300,
     height: 600,
   },
@@ -21,6 +45,7 @@ export default function Home() {
     <div className="public-shell min-h-screen overflow-x-hidden">
       <Header />
 
+      {/* Фоновые декоративные элементы */}
       <div className="fixed inset-0 -z-10 pointer-events-none">
         <div className="absolute left-[8%] top-0 h-[32rem] w-[32rem] rounded-full bg-[rgba(177,141,97,0.14)] blur-[140px]" />
         <div className="absolute right-[10%] top-[18%] h-[24rem] w-[24rem] rounded-full bg-[rgba(145,114,88,0.12)] blur-[120px]" />
@@ -28,6 +53,7 @@ export default function Home() {
       </div>
 
       <main>
+        {/* Hero Section */}
         <section className="container mx-auto max-w-7xl px-4 pb-24 pt-32 md:pt-36">
           <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
             <div>
@@ -48,13 +74,13 @@ export default function Home() {
               <div className="mt-10 flex flex-col gap-4 sm:flex-row">
                 <Link
                   href={routes.APPOINTMENT}
-                  className="rounded-full bg-[color:var(--public-accent)] px-7 py-4 text-center text-sm font-semibold uppercase tracking-[0.18em] text-[oklch(0.98_0.005_75)] shadow-[var(--public-shadow-soft)] hover:bg-[color:var(--public-accent-strong)]"
+                  className="rounded-full bg-[color:var(--public-accent)] px-7 py-4 text-center text-sm font-semibold uppercase tracking-[0.18em] text-[oklch(0.98_0.005_75)] shadow-[var(--public-shadow-soft)] hover:bg-[color:var(--public-accent-strong)] transition-colors"
                 >
                   Записаться онлайн
                 </Link>
                 <Link
                   href={routes.SERVICES}
-                  className="rounded-full border border-[color:var(--public-border-strong)] bg-[rgba(255,251,245,0.68)] px-7 py-4 text-center text-sm font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text)] hover:bg-[rgba(255,248,239,0.95)]"
+                  className="rounded-full border border-[color:var(--public-border-strong)] bg-[rgba(255,251,245,0.68)] px-7 py-4 text-center text-sm font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text)] hover:bg-[rgba(255,248,239,0.95)] transition-colors"
                 >
                   Смотреть услуги
                 </Link>
@@ -102,6 +128,7 @@ export default function Home() {
           </div>
         </section>
 
+        {/* About Section */}
         <section className="container mx-auto max-w-7xl px-4 pb-24">
           <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
             <div>
@@ -139,8 +166,9 @@ export default function Home() {
             </div>
 
             <div className="public-panel overflow-hidden rounded-[38px] p-3">
-              <div className="relative h-[520px] overflow-hidden rounded-[30px]">
-             
+              <div className="relative h-[520px] overflow-hidden rounded-[30px] bg-gray-100">
+                {/* Если есть фото интерьера, раскомментируйте Image ниже */}
+                {/* <Image src="/interior.jpg" alt="Интерьер" fill className="object-cover" priority /> */}
                 <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,250,244,0.1),rgba(70,52,37,0.44))]" />
                 <div className="absolute bottom-0 left-0 right-0 p-7 text-[oklch(0.95_0.01_75)]">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] opacity-80">
@@ -155,6 +183,7 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Gallery Section */}
         <section className="container mx-auto max-w-7xl px-4 pb-24">
           <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
@@ -170,6 +199,7 @@ export default function Home() {
             </p>
           </div>
 
+          {/* Masonry загружается лениво */}
           <Masonry
             items={items}
             ease="sine.out"
@@ -183,6 +213,7 @@ export default function Home() {
           />
         </section>
 
+        {/* Links Section */}
         <section className="container mx-auto max-w-7xl px-4 pb-24">
           <div className="grid gap-5 md:grid-cols-2">
             {[
@@ -202,7 +233,7 @@ export default function Home() {
               <Link
                 key={item.href}
                 href={item.href}
-                className="public-panel group rounded-[34px] p-8 hover:border-[color:var(--public-border-strong)]"
+                className="public-panel group rounded-[34px] p-8 hover:border-[color:var(--public-border-strong)] transition-colors"
               >
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--public-text-faint)]">
                   Что дальше
@@ -222,6 +253,7 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Contacts Section */}
         <section id="contacts" className="container mx-auto max-w-7xl px-4 pb-32">
           <div className="public-panel-strong rounded-[40px] p-8 md:p-12">
             <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr]">
@@ -264,7 +296,7 @@ export default function Home() {
                           {label}
                         </p>
                         {href ? (
-                          <a href={href} className="mt-2 block text-[color:var(--public-text)] hover:text-[color:var(--public-accent-strong)]">
+                          <a href={href} className="mt-2 block text-[color:var(--public-text)] hover:text-[color:var(--public-accent-strong)] transition-colors">
                             {value}
                           </a>
                         ) : (
@@ -277,14 +309,9 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-[30px] border border-[color:var(--public-border)]">
-                <iframe
-                  src="https://yandex.ru/map-widget/v1/?ll=56.380499%2C58.108191&mode=poi&poi%5Bpoint%5D=56.380339%2C58.108049&poi%5Buri%5D=ymapsbm1%3A%2F%2Forg%3Foid%3D1074988062&utm_campaign=desktop&utm_medium=search&utm_source=maps&z=19.92"
-                  width="100%"
-                  height="100%"
-                  allowFullScreen
-                  style={{ minHeight: 380, filter: "grayscale(100%) sepia(18%) brightness(1.02)" }}
-                />
+              <div className="overflow-hidden rounded-[30px] border border-[color:var(--public-border)] h-[380px] md:h-[450px]">
+                {/* Карта загружается лениво через dynamic import */}
+                <YandexMap />
               </div>
             </div>
           </div>

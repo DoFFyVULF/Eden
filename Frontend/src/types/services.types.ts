@@ -6,6 +6,7 @@ export interface IService {
   img?: string | null; // Картинка с бэкенда
   duration: number;
   isActive: boolean;
+  price?: number | null; 
   categoryId: number;
   category?: { // Обычно категория приходит вложенной, если нет - фильтр сработает по ID
     id: number;
