@@ -56,7 +56,7 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
   Radar,
-} from "recharts";
+} from "@/app/components/charts";
 import { analyticsService } from "@/services/analytics/analytics.service";
 import { KeyMetricsResponse, TimePeriod } from "@/types/analytics.types";
 import { useAnalytics } from "@/hooks/useAnalytics";

@@ -1,4 +1,14 @@
 node_modules
 .next
+.git
 .env
-npm-debug.log
+.env.local
+.env.*.local
+npm-debug.log*
+*.md
+tsconfig.json
+tsconfig.tsbuildinfo
+next-env.d.ts
+tailwind.config.js
+postcss.config.mjs
+.DS_Store

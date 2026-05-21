@@ -5,6 +5,7 @@ import { Response } from 'express';
 @Injectable()
 export class AppointmentStreamService implements OnModuleDestroy {
   private clients = new Map<string, Response>();
+  private clientTimers = new Map<string, NodeJS.Timeout>();
   private heartbeatTimer = setInterval(() => {
     this.broadcast('ping', { timestamp: new Date().toISOString() });
   }, 25000);
@@ -12,11 +13,18 @@ export class AppointmentStreamService implements OnModuleDestroy {
   onModuleDestroy() {
     clearInterval(this.heartbeatTimer);
     this.clients.clear();
+    this.clientTimers.clear();
   }
 
   registerClient(response: Response) {
     const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     this.clients.set(clientId, response);
+
+    const timer = setTimeout(() => {
+      this.clients.delete(clientId);
+      response.end();
+    }, 30 * 60 * 1000);
+    this.clientTimers.set(clientId, timer);
 
     this.writeEvent(response, 'connected', {
       clientId,
@@ -27,6 +35,11 @@ export class AppointmentStreamService implements OnModuleDestroy {
   }
 
   removeClient(clientId: string) {
+    const timer = this.clientTimers.get(clientId);
+    if (timer) {
+      clearTimeout(timer);
+      this.clientTimers.delete(clientId);
+    }
     this.clients.delete(clientId);
   }
 

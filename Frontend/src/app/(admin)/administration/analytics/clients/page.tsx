@@ -61,7 +61,7 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
   Radar,
-} from "recharts";
+} from "@/app/components/charts";
 import { analyticsService } from "@/services/analytics/analytics.service";
 import { ADMIN_ROUTES } from "@/app/lib/admin.routes";
 

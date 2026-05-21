@@ -50,7 +50,7 @@ import {
   ScatterChart,
   Scatter,
   ZAxis,
-} from "recharts";
+} from "@/app/components/charts";
 import { analyticsService } from "@/services/analytics/analytics.service";
 import { KeyMetricsResponse, TimePeriod } from "@/types/analytics.types";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -1162,7 +1162,7 @@ function MatrixTab({
                 padding: "12px",
                 boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
               }}
-              formatter={(value: any, name?: string) => {
+              formatter={(value: any, name: any) => {
                 if (name === "Популярность") return [value, "Записей"];
                 if (name === "Выручка") return [formatCurrency(value), "Выручка"];
                 if (name === "Средняя цена")

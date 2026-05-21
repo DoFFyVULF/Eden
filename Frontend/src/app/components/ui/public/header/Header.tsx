@@ -7,7 +7,9 @@ import { Menu, X, ArrowUpRight } from "lucide-react";
 import { usePathname } from "next/navigation";
 import {
   AnimatePresence,
-  motion,
+  LazyMotion,
+  domAnimation,
+  m,
   type Variants,
   useScroll,
   useTransform,
@@ -166,11 +168,11 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
   }, [menuOpen]);
 
   return (
-    <>
+    <LazyMotion features={domAnimation}>
       {/* ═══════════════════════════════════════════════════════════ */}
       {/* HEADER                                                    */}
       {/* ═══════════════════════════════════════════════════════════ */}
-      <motion.header
+      <m.header
         className="fixed inset-x-0 top-0 z-50 px-4 pt-4 md:px-6"
         animate={{
           y: hidden ? -120 : 0,
@@ -181,7 +183,7 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
           ease: [0.22, 1, 0.36, 1],
         }}
       >
-        <motion.div
+        <m.div
           className="mx-auto flex max-w-7xl items-center justify-between rounded-full border px-5 py-3 md:px-7"
           style={{
             backgroundColor: useTransform(
@@ -212,7 +214,7 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
               const fromCenter = i === 0 ? -1 : 1;
 
               return (
-                <motion.div
+                <m.div
                   key={link.href}
                   className="relative"
                   initial={{ opacity: 0, x: fromCenter * 30, scale: 0.9 }}
@@ -235,7 +237,7 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
                   </Link>
 
                   {active && isMounted && (
-                    <motion.div
+                    <m.div
                       layoutId="activeNav"
                       className="absolute -bottom-2 left-1/2 h-px w-8 -translate-x-1/2"
                       initial={false}
@@ -246,7 +248,7 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
                         },
                       }}
                     >
-                      <motion.span
+                      <m.span
                         className="absolute inset-0 rounded-full bg-[rgba(150,117,84,0.58)]"
                         initial={{ scaleX: 0.9, opacity: 0 }}
                         animate={{ scaleX: 1, opacity: 1 }}
@@ -257,7 +259,7 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
                           mass: 0.7,
                         }}
                       />
-                      <motion.span
+                      <m.span
                         className="absolute inset-0 rounded-full bg-[rgba(170,135,96,0.25)] blur-[3px]"
                         initial={{ opacity: 0, scale: 0.85 }}
                         animate={{ opacity: 1, scale: 1.3 }}
@@ -267,7 +269,7 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
                           ease: [0.22, 1, 0.36, 1],
                         }}
                       />
-                      <motion.span
+                      <m.span
                         className="absolute inset-0 rounded-full bg-[rgba(150,117,84,0.15)]"
                         animate={{
                           scale: [1, 1.2, 1],
@@ -279,15 +281,15 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
                           ease: "easeInOut",
                         }}
                       />
-                    </motion.div>
+                    </m.div>
                   )}
-                </motion.div>
+                </m.div>
               );
             })}
           </nav>
 
           {/* Логотип */}
-          <motion.div
+          <m.div
             className="md:absolute md:left-1/2 md:-translate-x-1/2"
             initial={{ opacity: 0, scale: 0.7, y: -8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -298,7 +300,7 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
             }}
           >
             <Link href={routes.HOME} className="group relative block">
-              <motion.span
+              <m.span
                 className="block text-3xl leading-none tracking-[0.18em] text-[color:var(--public-text)] md:text-[2.15rem]"
                 style={{ fontFamily: "var(--font-public-display), serif" }}
                 whileHover={{ scale: 1.025 }}
@@ -306,18 +308,18 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
                 transition={{ duration: 0.18 }}
               >
                 ЭДЕН
-              </motion.span>
-              <motion.span
+              </m.span>
+              <m.span
                 className="absolute -bottom-1 left-1/2 h-px bg-[rgba(150,117,84,0.45)]"
                 initial={{ width: 0, x: "-50%" }}
                 whileHover={{ width: "60%", x: "-50%" }}
                 transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
               />
             </Link>
-          </motion.div>
+          </m.div>
 
           {/* Кнопка записи (десктоп) */}
-          <motion.div
+          <m.div
             className="hidden md:block"
             initial={{ opacity: 0, x: 30, scale: 0.9 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
@@ -331,7 +333,7 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
               href={routes.APPOINTMENT}
               className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-[rgba(156,123,90,0.2)] bg-[rgba(255,251,246,0.76)] px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--public-text)] shadow-[0_12px_24px_-22px_rgba(99,75,52,0.2)] transition-all duration-200 hover:border-[rgba(156,123,90,0.34)] hover:bg-[rgba(248,238,228,0.92)]"
             >
-              <motion.span
+              <m.span
                 className="absolute inset-0 bg-[rgba(170,135,96,0.08)]"
                 initial={{ x: "-100%" }}
                 whileHover={{ x: "100%" }}
@@ -339,10 +341,10 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
               />
               <span className="relative z-10">Записаться</span>
             </Link>
-          </motion.div>
+          </m.div>
 
           {/* 📱 Кнопка мобильного меню */}
-          <motion.button
+          <m.button
             aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((v) => !v)}
@@ -351,7 +353,7 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
           >
             <AnimatePresence mode="wait">
               {menuOpen ? (
-                <motion.div
+                <m.div
                   key="close"
                   initial={{ rotate: -90, opacity: 0 }}
                   animate={{ rotate: 0, opacity: 1 }}
@@ -359,9 +361,9 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
                   transition={{ duration: 0.2 }}
                 >
                   <X className="h-4 w-4" />
-                </motion.div>
+                </m.div>
               ) : (
-                <motion.div
+                <m.div
                   key="menu"
                   initial={{ rotate: 90, opacity: 0 }}
                   animate={{ rotate: 0, opacity: 1 }}
@@ -369,15 +371,15 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
                   transition={{ duration: 0.2 }}
                 >
                   <Menu className="h-4 w-4" />
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
-          </motion.button>
-        </motion.div>
-      </motion.header>
+          </m.button>
+        </m.div>
+      </m.header>
 
       {/* Индикатор прогресса скролла */}
-      <motion.div
+      <m.div
         className="fixed left-0 top-0 z-[60] h-[2px] origin-left bg-[rgba(170,135,96,0.6)]"
         style={{
           scaleX: useTransform(scrollY, [0, scrollableHeight || 1000], [0, 1]),
@@ -392,7 +394,7 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
         {menuOpen && (
           <>
             {/* Оверлей */}
-            <motion.div
+            <m.div
               variants={overlayVariants}
               initial="hidden"
               animate="visible"
@@ -402,7 +404,7 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
             />
 
             {/* Панель */}
-            <motion.div
+            <m.div
               ref={menuRef}
               variants={panelVariants}
               initial="hidden"
@@ -411,7 +413,7 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
               className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[360px] flex-col bg-[linear-gradient(165deg,rgba(252,248,242,0.98)_0%,rgba(245,236,225,0.98)_50%,rgba(238,228,216,0.97)_100%)] shadow-[-20px_0_60px_-20px_rgba(60,45,30,0.35)] md:hidden"
             >
               {/* Шапка меню */}
-              <motion.div
+              <m.div
                 variants={itemVariants}
                 className="flex items-center justify-between px-6 pt-6"
               >
@@ -426,34 +428,34 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
                     Меню
                   </p>
                 </div>
-                <motion.button
+                <m.button
                   whileTap={{ scale: 0.9 }}
                   onClick={() => setMenuOpen(false)}
                   className="flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(171,145,117,0.25)] bg-[rgba(255,250,244,0.8)] text-[color:var(--public-text)]"
                 >
                   <X className="h-4 w-4" />
-                </motion.button>
-              </motion.div>
+                </m.button>
+              </m.div>
 
               {/* Разделитель */}
-              <motion.div
+              <m.div
                 variants={dividerVariants}
                 className="mx-6 mt-6 h-px bg-[rgba(171,145,117,0.2)]"
               />
 
               {/* Навигация */}
               <nav className="mt-8 flex-1 px-6">
-                <motion.p
+                <m.p
                   variants={itemVariants}
                   className="mb-4 text-[10px] font-semibold uppercase tracking-[0.24em] text-[rgba(104,88,72,0.5)]"
                 >
                   Навигация
-                </motion.p>
+                </m.p>
                 <div className="space-y-1">
                   {NAV_LINKS.map((link, i) => {
                     const active = pathname === link.href;
                     return (
-                      <motion.div
+                      <m.div
                         key={link.href}
                         variants={itemVariants}
                         custom={i}
@@ -475,7 +477,7 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
                               {link.description}
                             </span>
                           </div>
-                          <motion.div
+                          <m.div
                             className={`flex h-8 w-8 items-center justify-center rounded-full border transition-all duration-300 ${
                               active
                                 ? "border-[rgba(150,117,84,0.3)] bg-[rgba(150,117,84,0.1)] text-[rgba(104,88,72,0.8)]"
@@ -485,22 +487,22 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
                             transition={{ duration: 0.2 }}
                           >
                             <ArrowUpRight className="h-3.5 w-3.5" />
-                          </motion.div>
+                          </m.div>
                         </Link>
-                      </motion.div>
+                      </m.div>
                     );
                   })}
                 </div>
               </nav>
 
               {/* Разделитель */}
-              <motion.div
+              <m.div
                 variants={dividerVariants}
                 className="mx-6 h-px bg-[rgba(171,145,117,0.2)]"
               />
 
               {/* Контакты в меню */}
-              <motion.div variants={itemVariants} className="px-6 py-6">
+              <m.div variants={itemVariants} className="px-6 py-6">
                 <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-[rgba(104,88,72,0.5)]">
                   Контакты
                 </p>
@@ -513,16 +515,16 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
                 <p className="mt-1 text-xs text-[rgba(104,88,72,0.6)]">
                   Ежедневно 9:00 – 20:00
                 </p>
-              </motion.div>
+              </m.div>
 
               {/* Кнопка CTA */}
-              <motion.div variants={itemVariants} className="px-6 pb-8">
+              <m.div variants={itemVariants} className="px-6 pb-8">
                 <Link
                   href={routes.APPOINTMENT}
                   onClick={() => setMenuOpen(false)}
                   className="group relative flex items-center justify-center gap-2 overflow-hidden rounded-2xl border border-[rgba(156,123,90,0.2)] bg-[rgba(255,251,246,0.9)] px-6 py-4 text-center text-sm font-semibold tracking-wide text-[color:var(--public-text)] shadow-[0_12px_30px_-20px_rgba(99,75,52,0.25)] transition-all duration-300 hover:border-[rgba(156,123,90,0.35)] hover:bg-[rgba(248,238,228,0.95)]"
                 >
-                  <motion.span
+                  <m.span
                     className="absolute inset-0 bg-[rgba(170,135,96,0.06)]"
                     initial={{ x: "-100%" }}
                     whileHover={{ x: "100%" }}
@@ -531,11 +533,11 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
                   <span className="relative z-10">Онлайн-запись</span>
                   <ArrowUpRight className="relative z-10 h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                 </Link>
-              </motion.div>
-            </motion.div>
+              </m.div>
+            </m.div>
           </>
         )}
       </AnimatePresence>
-    </>
+    </LazyMotion>
   );
 }

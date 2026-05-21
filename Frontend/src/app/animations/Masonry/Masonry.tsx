@@ -7,6 +7,7 @@ import React, {
   useState,
 } from "react";
 import { gsap } from "gsap";
+import Image from "next/image";
 import { X, Maximize2, ChevronLeft, ChevronRight } from "lucide-react";
 
 const useMedia = (
@@ -57,7 +58,7 @@ const preloadImages = async (urls: string[]): Promise<void> => {
     urls.map(
       (src) =>
         new Promise<void>((resolve) => {
-          const img = new Image();
+          const img = new window.Image();
           img.src = src;
           img.onload = img.onerror = () => resolve();
         }),
@@ -363,10 +364,14 @@ const Masonry: React.FC<MasonryProps> = ({
             onMouseEnter={(e) => handleMouseEnter(item.id, e.currentTarget)}
             onMouseLeave={(e) => handleMouseLeave(item.id, e.currentTarget)}
           >
-            <div
-              className="relative w-full h-full bg-cover bg-center rounded-[10px] shadow-[0px_10px_50px_-10px_rgba(0,0,0,0.2)] overflow-hidden"
-              style={{ backgroundImage: `url(${item.img})` }}
-            >
+            <div className="relative w-full h-full rounded-[10px] shadow-[0px_10px_50px_-10px_rgba(0,0,0,0.2)] overflow-hidden">
+              <Image
+                src={item.img}
+                alt={item.title || "Gallery image"}
+                fill
+                sizes="(max-width: 600px) 50vw, (max-width: 1000px) 33vw, (max-width: 1500px) 25vw, 20vw"
+                className="object-cover"
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <div className="absolute bottom-4 left-4 right-4">
                   {item.title && (

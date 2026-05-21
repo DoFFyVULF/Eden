@@ -22,16 +22,19 @@ export class AppointmentCronService {
       }
     });
 
-    for (const appt of appointments) {
-      const endTime = new Date(appt.appointmentTime);
-      endTime.setMinutes(endTime.getMinutes() + appt.service.duration);
+    const completedIds = appointments
+      .filter((appt) => {
+        const endTime = new Date(appt.appointmentTime);
+        endTime.setMinutes(endTime.getMinutes() + appt.service.duration);
+        return endTime < now;
+      })
+      .map((appt) => appt.id);
 
-      if (endTime < now) {
-        await this.prisma.appointment.update({
-          where: { id: appt.id },
-          data: { status: AppointmentStatus.Завершен }
-        });
-      }
+    if (completedIds.length > 0) {
+      await this.prisma.appointment.updateMany({
+        where: { id: { in: completedIds } },
+        data: { status: AppointmentStatus.Завершен }
+      });
     }
   }
 }
