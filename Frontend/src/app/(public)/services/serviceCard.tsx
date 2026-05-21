@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
+import dynamic from "next/dynamic";
+import { m, useReducedMotion } from "framer-motion";
 import { Clock3, MoveUpRight } from "lucide-react";
 import { IService } from "@/types/services.types";
-import ServiceModal from "./ServiceModal";
+
+const ServiceModal = dynamic(() => import("./ServiceModal"));
 
 interface ServiceCardProps {
   service: IService;
@@ -18,6 +20,7 @@ export default function ServiceCard({
   onClick,
 }: ServiceCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   // Безопасное получение цены
   const displayPrice = service.price
@@ -35,13 +38,11 @@ export default function ServiceCard({
 
   return (
     <>
-      <motion.div
-        layout
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        transition={{ duration: 0.3 }}
+      <m.div
         className="h-full"
+        initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: "easeOut" }}
       >
         <div
           onClick={handleCardClick}
@@ -96,7 +97,7 @@ export default function ServiceCard({
             </div>
           </article>
         </div>
-      </motion.div>
+      </m.div>
 
       {!disableModal && (
         <ServiceModal

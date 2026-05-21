@@ -12,6 +12,7 @@ import { StatsModule } from './stats/stats.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppointmentHistoryModule } from './appointment-history/appointment-history.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { PublicModule } from './public/public.module';
 
 @Module({
   imports: [
@@ -28,7 +29,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     ScheduleModule.forRoot(),
     AppointmentHistoryModule,
     AnalyticsModule,
-
+    PublicModule
   ]
 })
 export class AppModule {}

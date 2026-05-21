@@ -1,7 +1,7 @@
 "use client";
 
+import { LazyMotion, domAnimation, m, useReducedMotion } from "framer-motion";
 import { usePathname } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
 
 export default function PageTransition({
   children,
@@ -9,22 +9,19 @@ export default function PageTransition({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const reduceMotion = useReducedMotion();
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.main
+    <LazyMotion features={domAnimation}>
+      <m.main
         key={pathname}
         className="flex-1"
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6 }}
-        transition={{ 
-          duration: 0.28, 
-          ease: [0.22, 1, 0.36, 1] 
-        }}
+        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+        animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+        transition={{ duration: reduceMotion ? 0.12 : 0.2, ease: "easeOut" }}
       >
         {children}
-      </motion.main>
-    </AnimatePresence>
+      </m.main>
+    </LazyMotion>
   );
 }

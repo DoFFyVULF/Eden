@@ -1,23 +1,13 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { serviceService } from "@/services/service/service.service";
-import { masterService } from "@/services/master/master.service";
+import { LazyMotion, domAnimation, m, useReducedMotion } from "framer-motion";
+import { publicDataService } from "@/services/public/public-data.service";
 import { IService } from "@/types/services.types";
-import { IMaster } from "@/types/masters.type";
 import ServiceCard from "./serviceCard";
 import CategoryFilter from "./CategoryFilter";
 import { Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.06 },
-  },
-};
 
 function ServicesPageFallback() {
   return (
@@ -30,10 +20,14 @@ function ServicesPageFallback() {
 function ServicesPageContent() {
   const searchParams = useSearchParams();
   const preselectedServiceId = searchParams.get("serviceId");
+  const reduceMotion = useReducedMotion();
+  const initialData = publicDataService.getCachedServicesPageData();
 
-  const [services, setServices] = useState<IService[]>([]);
-  const [masters, setMasters] = useState<IMaster[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [services, setServices] = useState<IService[]>(initialData?.services ?? []);
+  const [activeMastersCount, setActiveMastersCount] = useState(
+    initialData?.activeMastersCount ?? 0,
+  );
+  const [loading, setLoading] = useState(!initialData);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
 
@@ -54,13 +48,26 @@ function ServicesPageContent() {
   }, [preselectedServiceId, services]);
 
   useEffect(() => {
-    Promise.all([serviceService.getAll(), masterService.getAll()])
-      .then(([servicesData, mastersData]) => {
-        setServices(servicesData.filter((service) => service.isActive));
-        setMasters(mastersData.filter((master) => master.isActive));
+    let cancelled = false;
+
+    publicDataService
+      .getServicesPageData()
+      .then((data) => {
+        if (cancelled) return;
+
+        setServices(data.services);
+        setActiveMastersCount(data.activeMastersCount);
       })
       .catch(console.error)
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const categories = useMemo(() => {
@@ -116,9 +123,9 @@ function ServicesPageContent() {
 
           <div className="public-panel-strong rounded-[32px] p-6">
             <div className="grid gap-5 sm:grid-cols-3">
-              {[
+                {[
                 { value: services.length, label: "Услуг" },
-                { value: masters.length, label: "Мастеров" },
+                { value: activeMastersCount, label: "Мастеров" },
                 { value: categories.length, label: "Направлений" },
               ].map((item) => (
                 <div key={item.label}>
@@ -151,15 +158,13 @@ function ServicesPageContent() {
           </div>
         )}
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={selectedCategoryId || "all"}
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            exit={{ opacity: 0, transition: { duration: 0.18 } }}
-            className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
-          >
+        <m.div
+          key={selectedCategoryId || "all"}
+          initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: "easeOut" }}
+          className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
+        >
             {filteredServices.length > 0 ? (
               filteredServices.map((service) => (
                 <ServiceCard key={service.id} service={service} />
@@ -177,8 +182,7 @@ function ServicesPageContent() {
                 </p>
               </div>
             )}
-          </motion.div>
-        </AnimatePresence>
+          </m.div>
       </section>
     </div>
   );
@@ -187,7 +191,9 @@ function ServicesPageContent() {
 export default function ServicesPage() {
   return (
     <Suspense fallback={<ServicesPageFallback />}>
-      <ServicesPageContent />
+      <LazyMotion features={domAnimation}>
+        <ServicesPageContent />
+      </LazyMotion>
     </Suspense>
   );
 }

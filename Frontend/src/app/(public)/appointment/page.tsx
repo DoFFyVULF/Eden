@@ -1,14 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense, lazy } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
+import dynamic from "next/dynamic";
+import { LazyMotion, domAnimation, m, useReducedMotion } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { categoryService } from "@/services/category/category.service";
-import { serviceService } from "@/services/service/service.service";
-import { masterService } from "@/services/master/master.service";
-import { servicePriceService } from "@/services/service-price/service-price.service";
-import { masterScheduleService } from "@/services/schedule/schedule.service";
 import { appointmentService } from "@/services/appointment/appointment.service";
+import { publicDataService } from "@/services/public/public-data.service";
 
 import { ICategory } from "@/types/category.types";
 import { IService } from "@/types/services.types";
@@ -17,10 +14,26 @@ import { IServicePrice } from "@/types/service-price.types";
 import { IMasterSchedule } from "@/types/schedule.types";
 import { AppointmentStatus } from "@/types/appointment.types";
 
-const BeautyCalendar = lazy(() => import("@/app/components/ui/Beautycalendar"));
-import NotificationWindow from "@/app/components/ui/public/appointment/NotificationWindow";
-import LimitExceededWindow from "@/app/components/ui/public/appointment/LimitExceededWindow";
-import LegalDocumentModal from "@/app/components/ui/public/appointment/LegalDocumentModal";
+const BeautyCalendar = dynamic(
+  () => import("@/app/components/ui/Beautycalendar"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex min-h-[20rem] items-center justify-center">
+        <Loader2 className="h-7 w-7 animate-spin text-[color:var(--public-accent-strong)]" />
+      </div>
+    ),
+  },
+);
+const NotificationWindow = dynamic(
+  () => import("@/app/components/ui/public/appointment/NotificationWindow"),
+);
+const LimitExceededWindow = dynamic(
+  () => import("@/app/components/ui/public/appointment/LimitExceededWindow"),
+);
+const LegalDocumentModal = dynamic(
+  () => import("@/app/components/ui/public/appointment/LegalDocumentModal"),
+);
 import ConsentCheckbox from "@/app/components/ui/public/appointment/ConsentCheckbox";
 import ServiceCard from "../services/serviceCard";
 import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber";
@@ -41,6 +54,30 @@ import {
 const PERSON_NAME_REGEX = /^[A-Za-zА-Яа-яЁё]+(?:[ '-][A-Za-zА-Яа-яЁё]+)*$/u;
 const sanitizePersonName = (value: string) => value.replace(/[^A-Za-zА-Яа-яЁё\s'-]/gu, "");
 
+function FadeSection({
+  children,
+  sectionKey,
+  className,
+}: {
+  children: React.ReactNode;
+  sectionKey: string;
+  className?: string;
+}) {
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <m.section
+      key={sectionKey}
+      className={className}
+      initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: "easeOut" }}
+    >
+      {children}
+    </m.section>
+  );
+}
+
 function SelectionSummary({
   label,
   value,
@@ -51,11 +88,7 @@ function SelectionSummary({
   onEdit: () => void;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="public-panel mx-auto mb-5 flex w-full max-w-2xl items-center justify-between rounded-[26px] px-5 py-4"
-    >
+    <div className="public-panel mx-auto mb-5 flex w-full max-w-2xl items-center justify-between rounded-[26px] px-5 py-4">
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[color:var(--public-text-faint)]">
           {label}
@@ -68,7 +101,7 @@ function SelectionSummary({
       >
         <Edit2 className="h-4 w-4" />
       </button>
-    </motion.div>
+    </div>
   );
 }
 
@@ -103,14 +136,22 @@ function AppointmentContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const preselectedServiceId = searchParams.get("serviceId");
+  const reduceMotion = useReducedMotion();
+  const initialData = publicDataService.getCachedAppointmentPageData();
 
-  const [categories, setCategories] = useState<ICategory[]>([]);
-  const [services, setServices] = useState<IService[]>([]);
-  const [masters, setMasters] = useState<IMaster[]>([]);
-  const [prices, setPrices] = useState<IServicePrice[]>([]);
-  const [schedules, setSchedules] = useState<IMasterSchedule[]>([]);
+  const [categories, setCategories] = useState<ICategory[]>(
+    initialData?.categories ?? [],
+  );
+  const [services, setServices] = useState<IService[]>(
+    initialData?.services ?? [],
+  );
+  const [masters, setMasters] = useState<IMaster[]>(initialData?.masters ?? []);
+  const [prices, setPrices] = useState<IServicePrice[]>(initialData?.prices ?? []);
+  const [schedules, setSchedules] = useState<IMasterSchedule[]>(
+    initialData?.schedules ?? [],
+  );
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialData);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [limitExceeded, setLimitExceeded] = useState(false);
@@ -141,22 +182,29 @@ function AppointmentContent() {
   });
 
   useEffect(() => {
-    Promise.all([
-      categoryService.getAll(),
-      serviceService.getAll(),
-      masterService.getAll(),
-      servicePriceService.getAll(),
-      masterScheduleService.getAll(),
-    ])
-      .then(([cats, servs, masts, priceList, scheds]) => {
-        setCategories(cats.filter((category) => category.isActive !== false));
-        setServices(servs.filter((service) => service.isActive));
-        setMasters(masts.filter((master) => master.isActive));
-        setPrices(priceList.filter((price) => price.isActive !== false));
-        setSchedules(scheds);
+    let cancelled = false;
+
+    publicDataService
+      .getAppointmentPageData()
+      .then((data) => {
+        if (cancelled) return;
+
+        setCategories(data.categories);
+        setServices(data.services);
+        setMasters(data.masters);
+        setPrices(data.prices);
+        setSchedules(data.schedules);
       })
       .catch(console.error)
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -435,36 +483,25 @@ function AppointmentContent() {
         </section>
 
         <div className="flex min-h-[2rem] justify-center">
-          <AnimatePresence>
-            {preselectedServiceId && !selectedAppointment && (
-              <motion.button
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                onClick={() => {
-                  window.history.replaceState(null, "", "/appointment");
-                  setSelectedServiceId(null);
-                  setSelectedCategoryId(null);
-                  setSelectedMasterId(null);
-                }}
-                className="mb-8 inline-flex items-center gap-2 rounded-full border border-[color:var(--public-border)] bg-[rgba(255,251,245,0.76)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text-soft)] hover:text-[color:var(--public-text)]"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Выбрать другую услугу
-              </motion.button>
-            )}
-          </AnimatePresence>
+          {preselectedServiceId && !selectedAppointment && (
+            <button
+              onClick={() => {
+                window.history.replaceState(null, "", "/appointment");
+                setSelectedServiceId(null);
+                setSelectedCategoryId(null);
+                setSelectedMasterId(null);
+              }}
+              className="mb-8 inline-flex items-center gap-2 rounded-full border border-[color:var(--public-border)] bg-[rgba(255,251,245,0.76)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text-soft)] hover:text-[color:var(--public-text)]"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Выбрать другую услугу
+            </button>
+          )}
         </div>
 
         <div className="relative">
-          <AnimatePresence mode="wait">
-            {!selectedCategoryId && (
-              <motion.section
-                key="step1"
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, x: -14 }}
-              >
+          {!selectedCategoryId && (
+            <FadeSection sectionKey="step1">
                 <StepIntro
                   eyebrow="Шаг 1"
                   title="Сначала выберите направление"
@@ -481,16 +518,11 @@ function AppointmentContent() {
                     </button>
                   ))}
                 </div>
-              </motion.section>
-            )}
+            </FadeSection>
+          )}
 
-            {selectedCategoryId && !selectedServiceId && (
-              <motion.section
-                key="step2"
-                initial={{ opacity: 0, x: 18 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -18 }}
-              >
+          {selectedCategoryId && !selectedServiceId && (
+            <FadeSection sectionKey="step2">
                 <SelectionSummary
                   label="Направление"
                   value={currentCategory?.title || ""}
@@ -515,16 +547,11 @@ function AppointmentContent() {
                     </div>
                   ))}
                 </div>
-              </motion.section>
-            )}
+            </FadeSection>
+          )}
 
-            {selectedServiceId && !selectedMasterId && (
-              <motion.section
-                key="step3"
-                initial={{ opacity: 0, x: 18 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -18 }}
-              >
+          {selectedServiceId && !selectedMasterId && (
+            <FadeSection sectionKey="step3">
                 <SelectionSummary
                   label="Услуга"
                   value={currentService?.title || ""}
@@ -575,16 +602,11 @@ function AppointmentContent() {
                     );
                   })}
                 </div>
-              </motion.section>
-            )}
+            </FadeSection>
+          )}
 
-            {selectedMasterId && !selectedAppointment && (
-              <motion.section
-                key="step4"
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, x: -18 }}
-              >
+          {selectedMasterId && !selectedAppointment && (
+            <FadeSection sectionKey="step4">
                 <SelectionSummary
                   label="Мастер"
                   value={`${currentMaster?.surname} ${currentMaster?.name}`}
@@ -600,16 +622,11 @@ function AppointmentContent() {
                     }
                   />
                 </div>
-              </motion.section>
-            )}
+            </FadeSection>
+          )}
 
-            {selectedAppointment && (
-              <motion.section
-                key="step5"
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mx-auto max-w-xl"
-              >
+          {selectedAppointment && (
+            <FadeSection sectionKey="step5" className="mx-auto max-w-xl">
                 <div className="public-panel-strong mb-8 rounded-[30px] p-6">
                   <div className="flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text-faint)]">
                     <span>{currentService?.title}</span>
@@ -756,9 +773,8 @@ function AppointmentContent() {
                     )}
                   </button>
                 </form>
-              </motion.section>
-            )}
-          </AnimatePresence>
+            </FadeSection>
+          )}
         </div>
       </div>
 
@@ -810,7 +826,9 @@ export default function AppointmentPage() {
         </div>
       }
     >
-      <AppointmentContent />
+      <LazyMotion features={domAnimation}>
+        <AppointmentContent />
+      </LazyMotion>
     </Suspense>
   );
 }
