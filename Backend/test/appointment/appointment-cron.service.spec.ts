@@ -8,7 +8,7 @@ describe('AppointmentCronService', () => {
   const prisma = {
     appointment: {
       findMany: jest.fn(),
-      update: jest.fn(),
+      updateMany: jest.fn(),
     },
   };
 
@@ -50,9 +50,9 @@ describe('AppointmentCronService', () => {
         service: true,
       },
     });
-    expect(prisma.appointment.update).toHaveBeenCalledTimes(1);
-    expect(prisma.appointment.update).toHaveBeenCalledWith({
-      where: { id: 1 },
+    expect(prisma.appointment.updateMany).toHaveBeenCalledTimes(1);
+    expect(prisma.appointment.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: [1] } },
       data: { status: AppointmentStatus.Завершен },
     });
   });

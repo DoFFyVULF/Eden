@@ -5,8 +5,27 @@ import Footer from "../components/ui/public/footer/Footer";
 import PageTransition from "./PageTransition";
 
 export const metadata: Metadata = {
-  title: "Эден",
-  description: "Салон красоты",
+  title: {
+    default: "Эден",
+    template: "%s | Эден",
+  },
+  description: "Салон красоты Эден в Перми. Услуги, цены, мастера. Аккуратная работа и заметный результат.",
+  openGraph: {
+    title: "Эден — салон красоты",
+    description: "Салон красоты Эден в Перми. Услуги, цены, мастера. Аккуратная работа и заметный результат.",
+    locale: "ru_RU",
+    type: "website",
+    siteName: "Эден",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Эден — салон красоты",
+    description: "Салон красоты Эден в Перми. Услуги, цены, мастера.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function PublicLayout({

@@ -5,11 +5,11 @@ import { routes } from "./providers/routes";
 import Header from "./components/ui/public/header/Header";
 import Footer from "./components/ui/public/footer/Footer";
 import { MapPin, Clock3, Phone, MoveRight, Sparkles } from "lucide-react";
-import dynamic from 'next/dynamic';
+import dynamic from "next/dynamic";
 
 // 1. Ленивая загрузка тяжелой анимации Masonry.
 // ssr: false отключает рендеринг на сервере, что ускоряет отдачу HTML.
-const Masonry = dynamic(() => import('./animations/Masonry/Masonry'), {
+const Masonry = dynamic(() => import("./animations/Masonry/Masonry"), {
   loading: () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 h-[600px] animate-pulse bg-gray-100/5 rounded-xl">
       <div className="h-full bg-gray-200/5 rounded-xl"></div>
@@ -17,20 +17,22 @@ const Masonry = dynamic(() => import('./animations/Masonry/Masonry'), {
       <div className="h-full bg-gray-200/5 rounded-xl hidden lg:block"></div>
     </div>
   ),
-  ssr: false 
+  ssr: false,
 });
 
 // 2. Ленивая загрузка Карты.
 // Карта загрузится только в браузере, не блокируя серверный рендеринг.
-const YandexMap = dynamic(() => import('./components/ui/public/yandexMap/YandexMap'), {
-  loading: () => (
-    <div className="w-full h-[380px] bg-gray-200/5 rounded-[30px] animate-pulse flex items-center justify-center text-xs text-gray-400">
-      Загрузка карты...
-    </div>
-  ),
-  ssr: false 
-});
-
+const YandexMap = dynamic(
+  () => import("./components/ui/public/yandexMap/YandexMap"),
+  {
+    loading: () => (
+      <div className="w-full h-[380px] bg-gray-200/5 rounded-[30px] animate-pulse flex items-center justify-center text-xs text-gray-400">
+        Загрузка карты...
+      </div>
+    ),
+    ssr: false,
+  },
+);
 const items = [
   {
     id: "1",
@@ -139,11 +141,11 @@ export default function Home() {
                 Уютное место без пафоса
               </h2>
               <p className="mt-6 text-base leading-8 text-[color:var(--public-text-soft)]">
-                Мы убрали всё лишнее: мягкий свет, приятные на ощупь материалы
-                и сервис, который помогает расслабиться и почувствовать себя
+                Мы убрали всё лишнее: мягкий свет, приятные на ощупь материалы и
+                сервис, который помогает расслабиться и почувствовать себя
                 уверенно.
               </p>
-
+              
               <div className="mt-8 grid gap-4 sm:grid-cols-3">
                 {[
                   ["40+", "постоянных клиентов"],
@@ -174,9 +176,7 @@ export default function Home() {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] opacity-80">
                     Атмосфера
                   </p>
-                  <p className="mt-3 text-3xl">
-                    Красота без перегруза
-                  </p>
+                  <p className="mt-3 text-3xl">Красота без перегруза</p>
                 </div>
               </div>
             </div>
@@ -195,7 +195,8 @@ export default function Home() {
               </h2>
             </div>
             <p className="max-w-md text-sm leading-7 text-[color:var(--public-text-soft)]">
-              Аккуратная работа и заметный результат. Без громких обещаний — только честный труд мастеров.
+              Аккуратная работа и заметный результат. Без громких обещаний —
+              только честный труд мастеров.
             </p>
           </div>
 
@@ -254,7 +255,10 @@ export default function Home() {
         </section>
 
         {/* Contacts Section */}
-        <section id="contacts" className="container mx-auto max-w-7xl px-4 pb-32">
+        <section
+          id="contacts"
+          className="container mx-auto max-w-7xl px-4 pb-32"
+        >
           <div className="public-panel-strong rounded-[40px] p-8 md:p-12">
             <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr]">
               <div>
@@ -296,13 +300,20 @@ export default function Home() {
                           {label}
                         </p>
                         {href ? (
-                          <a href={href} className="mt-2 block text-[color:var(--public-text)] hover:text-[color:var(--public-accent-strong)] transition-colors">
+                          <a
+                            href={href}
+                            className="mt-2 block text-[color:var(--public-text)] hover:text-[color:var(--public-accent-strong)] transition-colors"
+                          >
                             {value}
                           </a>
                         ) : (
-                          <p className="mt-2 text-[color:var(--public-text)]">{value}</p>
+                          <p className="mt-2 text-[color:var(--public-text)]">
+                            {value}
+                          </p>
                         )}
-                        <p className="mt-1 text-sm text-[color:var(--public-text-soft)]">{sub}</p>
+                        <p className="mt-1 text-sm text-[color:var(--public-text-soft)]">
+                          {sub}
+                        </p>
                       </div>
                     </div>
                   ))}

@@ -1,0 +1,11 @@
+# Robots.txt for Эден beauty salon
+User-agent: *
+Allow: /
+
+Sitemap: https://eden-perm.ru/sitemap.xml
+
+# Admin and internal routes — not for indexing
+Disallow: /administration
+Disallow: /master
+Disallow: /auth
+Disallow: /api

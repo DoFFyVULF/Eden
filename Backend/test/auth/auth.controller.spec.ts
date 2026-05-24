@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/unbound-method */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -17,7 +18,7 @@ describe('AuthController', () => {
     logout: jest.fn(),
     addRefreshTokenToResponse: jest.fn(),
     removeRefreshTokenToResponse: jest.fn(),
-    REFRESH_TOKEN_NAME: 'refreshToken',
+    REFRESH_TOKEN_NAME: 'refreshToken'
   };
 
   beforeEach(async () => {
@@ -26,9 +27,9 @@ describe('AuthController', () => {
       providers: [
         {
           provide: AuthService,
-          useValue: mockAuthService,
-        },
-      ],
+          useValue: mockAuthService
+        }
+      ]
     }).compile();
 
     controller = module.get<AuthController>(AuthController);
@@ -49,23 +50,26 @@ describe('AuthController', () => {
       const loginResponse = {
         user: { id: 1, login: 'testuser' },
         accessToken: 'access_token',
-        refreshToken: 'refresh_token',
+        refreshToken: 'refresh_token'
       };
 
       mockAuthService.login.mockResolvedValue(loginResponse);
 
       const mockRes = {
-        cookie: jest.fn(),
-      } as any;
+        cookie: jest.fn()
+      } as never;
 
       const result = await controller.login(dto, mockRes);
 
       expect(result).toEqual({
         user: { id: 1, login: 'testuser' },
-        accessToken: 'access_token',
+        accessToken: 'access_token'
       });
       expect(authService.login).toHaveBeenCalledWith(dto);
-      expect(authService.addRefreshTokenToResponse).toHaveBeenCalledWith(mockRes, 'refresh_token');
+      expect(authService.addRefreshTokenToResponse).toHaveBeenCalledWith(
+        mockRes,
+        'refresh_token'
+      );
     });
   });
 
@@ -73,18 +77,18 @@ describe('AuthController', () => {
     it('should return new tokens when refresh token is valid', async () => {
       const mockReq = {
         cookies: {
-          refreshToken: 'valid_refresh_token',
-        },
-      } as any;
+          refreshToken: 'valid_refresh_token'
+        }
+      } as never;
 
       const mockRes = {
-        cookie: jest.fn(),
-      } as any;
+        cookie: jest.fn()
+      } as never;
 
       const tokensResponse = {
         user: { id: 1, login: 'testuser' },
         accessToken: 'new_access_token',
-        refreshToken: 'new_refresh_token',
+        refreshToken: 'new_refresh_token'
       };
 
       mockAuthService.getNewTokens.mockResolvedValue(tokensResponse);
@@ -93,38 +97,47 @@ describe('AuthController', () => {
 
       expect(result).toEqual({
         user: { id: 1, login: 'testuser' },
-        accessToken: 'new_access_token',
+        accessToken: 'new_access_token'
       });
-      expect(authService.getNewTokens).toHaveBeenCalledWith('valid_refresh_token');
-      expect(authService.addRefreshTokenToResponse).toHaveBeenCalledWith(mockRes, 'new_refresh_token');
+      expect(authService.getNewTokens).toHaveBeenCalledWith(
+        'valid_refresh_token'
+      );
+      expect(authService.addRefreshTokenToResponse).toHaveBeenCalledWith(
+        mockRes,
+        'new_refresh_token'
+      );
     });
 
     it('should throw UnauthorizedException when refresh token is not present', async () => {
       const mockReq = {
-        cookies: {},
-      } as any;
+        cookies: {}
+      } as never;
 
       const mockRes = {
-        cookie: jest.fn(),
-      } as any;
+        cookie: jest.fn()
+      } as never;
 
       await expect(controller.getNewTokens(mockReq, mockRes)).rejects.toThrow(
         UnauthorizedException
       );
-      expect(authService.removeRefreshTokenToResponse).toHaveBeenCalledWith(mockRes);
+      expect(authService.removeRefreshTokenToResponse).toHaveBeenCalledWith(
+        mockRes
+      );
     });
   });
 
   describe('logout', () => {
     it('should clear refresh token cookie', async () => {
       const mockRes = {
-        cookie: jest.fn(),
-      } as any;
+        cookie: jest.fn()
+      } as never;
 
       const result = await controller.logout(mockRes);
 
       expect(result).toBe(true);
-      expect(authService.removeRefreshTokenToResponse).toHaveBeenCalledWith(mockRes);
+      expect(authService.removeRefreshTokenToResponse).toHaveBeenCalledWith(
+        mockRes
+      );
     });
   });
 

@@ -4,10 +4,6 @@ jest.mock('@nestjs/core', () => ({
   },
 }));
 
-jest.mock('../src/seed/admin.seed', () => ({
-  createDefaultAdmin: jest.fn().mockResolvedValue(undefined),
-}));
-
 jest.mock('cookie-parser', () => jest.fn(() => 'cookie-parser-middleware'));
 
 describe('main bootstrap', () => {
@@ -16,7 +12,6 @@ describe('main bootstrap', () => {
     use: jest.fn(),
     enableCors: jest.fn(),
     useGlobalPipes: jest.fn(),
-    get: jest.fn(),
     listen: jest.fn().mockResolvedValue(undefined),
   };
 
@@ -27,11 +22,9 @@ describe('main bootstrap', () => {
 
   it('should bootstrap application with expected setup', async () => {
     const { NestFactory } = await import('@nestjs/core');
-    const { createDefaultAdmin } = await import('../src/seed/admin.seed');
     const cookieParser = (await import('cookie-parser')).default;
 
     (NestFactory.create as jest.Mock).mockResolvedValue(mockApp);
-    mockApp.get.mockReturnValue({ token: 'prisma' });
 
     await import('../src/main');
     await new Promise(process.nextTick);
@@ -42,8 +35,6 @@ describe('main bootstrap', () => {
     expect(cookieParser).toHaveBeenCalled();
     expect(mockApp.enableCors).toHaveBeenCalled();
     expect(mockApp.useGlobalPipes).toHaveBeenCalled();
-    expect(mockApp.get).toHaveBeenCalled();
-    expect(createDefaultAdmin).toHaveBeenCalledWith({ token: 'prisma' });
     expect(mockApp.listen).toHaveBeenCalled();
   });
 });
