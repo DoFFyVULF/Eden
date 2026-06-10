@@ -47,10 +47,10 @@ import {
   Percent,
   Repeat,
 } from "lucide-react";
-import { analyticsService } from "@/services/analytics/analytics.service";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { TimePeriod, KeyMetricsResponse } from "@/types/analytics.types";
 import { ADMIN_ROUTES } from "@/app/lib/admin.routes";
+import { exportAnalyticsWorkbook } from "@/utils/excelExport";
 
 // Конфигурация карточек аналитики
 const analyticsCardsConfig = [
@@ -184,20 +184,17 @@ export default function AnalyticsPage() {
   };
 
   const handleExportReport = async () => {
+    if (!analyticsData) return;
+
     try {
-      const blob = await analyticsService.exportReport({
-        period: selectedPeriod,
+      await exportAnalyticsWorkbook({
+        data: analyticsData,
+        reportTitle: "Общая аналитика Eden",
+        filePrefix: "analytics-report",
+        periodLabel: getPeriodDisplayName(selectedPeriod),
       });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `analytics-report-${new Date().toISOString().split("T")[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
     } catch (err) {
-      alert("Ошибка при экспорте отчета");
+      alert("Ошибка при экспорте Excel-отчета");
       console.error("Ошибка экспорта:", err);
     }
   };

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { appointmentService } from "@/services/appointment/appointment.service";
 import { IAppointment, AppointmentStatus } from "@/types/appointment.types";
+import { exportAppointmentsHistoryWorkbook } from "@/utils/excelExport";
 import {
   Search,
   Filter,
@@ -389,30 +390,13 @@ export default function AppointmentsHistoryPage() {
     return sortOrder === "asc" ? "↑" : "↓";
   };
 
-  const exportToCSV = () => {
-    const headers = ["Дата", "Время", "Статус", "Клиент", "Телефон", "Услуга", "Мастер", "Цена"];
-    const rows = filteredAndSorted.map(a => [
-      formatDate(a.appointmentTime),
-      formatTime(a.appointmentTime),
-      a.status,
-      `${a.clientSurname} ${a.clientName}`,
-      a.clientPhone,
-      a.service.title,
-      `${a.master.surname} ${a.master.name}`,
-      `${(Number(a.price) || 0).toLocaleString('ru-RU')} ₽`
-    ]);
-    
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
-    ].join("\n");
-    
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `все_записи_${new Date().toISOString().split("T")[0]}.csv`);
-    link.click();
+  const exportToExcel = async () => {
+    try {
+      await exportAppointmentsHistoryWorkbook(filteredAndSorted);
+    } catch (err) {
+      alert("Ошибка при экспорте Excel-отчета");
+      console.error("Ошибка экспорта истории:", err);
+    }
   };
 
   const getStatusConfig = (status: AppointmentStatus) => {
@@ -550,7 +534,7 @@ export default function AppointmentsHistoryPage() {
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
-                onClick={exportToCSV}
+                onClick={exportToExcel}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 shadow-lg ${
                   isDark
                     ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-purple-500/25 hover:shadow-purple-500/40"
@@ -558,7 +542,7 @@ export default function AppointmentsHistoryPage() {
                 }`}
               >
                 <Download size={17} />
-                Экспорт CSV
+                Экспорт Excel
               </motion.button>
             </div>
           </div>

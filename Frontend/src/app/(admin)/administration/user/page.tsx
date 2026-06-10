@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { userService } from "@/services/user/user.service";
+import { UserRole, userService } from "@/services/user/user.service";
 import { masterService } from "@/services/master/master.service";
 import { IMaster } from "@/types/masters.type";
 import { IUser } from "@/types/user.types";
@@ -35,7 +35,12 @@ import {
 export default function MasterUsersPage() {
   const [masters, setMasters] = useState<IMaster[]>([]);
   const [users, setUsers] = useState<IUser[]>([]);
-  const [form, setForm] = useState({ login: "", password: "", masterId: "" });
+  const [form, setForm] = useState<{
+    login: string;
+    password: string;
+    masterId: string;
+    role: UserRole;
+  }>({ login: "", password: "", masterId: "", role: "master" });
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -126,30 +131,33 @@ export default function MasterUsersPage() {
       u.login.toLowerCase().includes(q) ||
       (u.role?.toLowerCase() || "").includes(q) ||
       (mastersLookup[String(u.masterId)]?.toLowerCase() || "").includes(q) ||
-      u.name.toLowerCase().includes(q)
+      (u.name?.toLowerCase() || "").includes(q)
     );
   }, [users, searchQuery, mastersLookup]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.login || !form.password || !form.masterId) {
+    if (!form.login || !form.password || (form.role === "master" && !form.masterId)) {
       alert("Заполните все поля");
       return;
     }
 
     const selectedMaster = masters.find(m => m.id === Number(form.masterId))
 
-    const fullname = selectedMaster ? `${selectedMaster.surname} ${selectedMaster.name}`.trim() : "";
+    const fullname = form.role === "master" && selectedMaster
+      ? `${selectedMaster.surname} ${selectedMaster.name}`.trim()
+      : "Администратор";
 
     try {
-      await userService.createMasterUser({
+      await userService.createUser({
         login: form.login,
         password: form.password,
-        masterId: Number(form.masterId),
+        role: form.role,
+        masterId: form.role === "master" ? Number(form.masterId) : undefined,
         name: fullname || '',
       });
 
-      setForm({ login: "", password: "", masterId: "" });
+      setForm({ login: "", password: "", masterId: "", role: "master" });
       await fetchAllData(false);
     } catch (err) {
       alert("Ошибка при создании");
@@ -541,7 +549,7 @@ export default function MasterUsersPage() {
                     Новый доступ
                   </h2>
                   <p className={`text-sm ${isDark ? "text-white/40" : "text-gray-500"}`}>
-                    Создать учетную запись мастера
+                    Создать учетную запись и назначить роль
                   </p>
                 </div>
               </div>
@@ -601,8 +609,8 @@ export default function MasterUsersPage() {
                   <label className={`text-sm font-semibold flex items-center gap-2 ${
                     isDark ? "text-white/70" : "text-gray-700"
                   }`}>
-                    <BadgeCheck className="w-4 h-4 text-gray-400" />
-                    Привязать к сотруднику
+                    <ShieldCheck className="w-4 h-4 text-gray-400" />
+                    Роль пользователя
                   </label>
                   <select
                     className={`w-full px-4 py-3.5 rounded-xl text-sm border outline-none appearance-none transition-all ${
@@ -610,17 +618,46 @@ export default function MasterUsersPage() {
                         ? "bg-white/[0.07] border-white/[0.1] text-white/90 focus:border-white/20"
                         : "bg-gray-50 border-gray-200 text-gray-700 focus:border-emerald-300 focus:bg-white"
                     }`}
-                    value={form.masterId}
-                    onChange={(e) => setForm({ ...form, masterId: e.target.value })}
+                    value={form.role}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        role: e.target.value as UserRole,
+                        masterId: e.target.value === "admin" ? "" : form.masterId,
+                      })
+                    }
                   >
-                    <option value="">Выберите мастера</option>
-                    {masters.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.surname} {m.name} {m.specialization && `(${m.specialization})`}
-                      </option>
-                    ))}
+                    <option value="master">Мастер</option>
+                    <option value="admin">Администратор</option>
                   </select>
                 </div>
+
+                {form.role === "master" && (
+                  <div className="space-y-2">
+                    <label className={`text-sm font-semibold flex items-center gap-2 ${
+                      isDark ? "text-white/70" : "text-gray-700"
+                    }`}>
+                      <BadgeCheck className="w-4 h-4 text-gray-400" />
+                      Привязать к сотруднику
+                    </label>
+                    <select
+                      className={`w-full px-4 py-3.5 rounded-xl text-sm border outline-none appearance-none transition-all ${
+                        isDark
+                          ? "bg-white/[0.07] border-white/[0.1] text-white/90 focus:border-white/20"
+                          : "bg-gray-50 border-gray-200 text-gray-700 focus:border-emerald-300 focus:bg-white"
+                      }`}
+                    value={form.masterId}
+                    onChange={(e) => setForm({ ...form, masterId: e.target.value })}
+                    >
+                      <option value="">Выберите мастера</option>
+                      {masters.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.surname} {m.name} {m.specialization && `(${m.specialization})`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <motion.button
                   type="submit"

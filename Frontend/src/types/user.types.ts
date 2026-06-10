@@ -2,8 +2,8 @@ export interface IUser {
   id: number;
   login: string;
   profileImg?: string;
-  masterId: number;
+  masterId?: number | null;
   role: 'master' | 'admin';
   isActive: boolean;
-  name: string;
+  name?: string;
 }

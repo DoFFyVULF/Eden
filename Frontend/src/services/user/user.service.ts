@@ -1,6 +1,8 @@
 import { axiosWithAuth } from "@/api/interceptors";
 import { IUser } from "@/types/user.types";
 
+export type UserRole = "master" | "admin";
+
 export const userService = {
   createMasterUser(data: {
     login: string;
@@ -12,6 +14,16 @@ export const userService = {
       ...data,
       role: "master",
     });
+  },
+
+  createUser(data: {
+    login: string;
+    password: string;
+    role: UserRole;
+    masterId?: number;
+    name?: string;
+  }) {
+    return axiosWithAuth.post<IUser>("/user", data);
   },
 
   getMe() {

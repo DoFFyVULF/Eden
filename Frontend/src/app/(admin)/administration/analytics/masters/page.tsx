@@ -61,6 +61,7 @@ import { analyticsService } from "@/services/analytics/analytics.service";
 import { KeyMetricsResponse, TimePeriod } from "@/types/analytics.types";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { ADMIN_ROUTES } from "@/app/lib/admin.routes";
+import { exportAnalyticsWorkbook } from "@/utils/excelExport";
 
 // Цветовая палитра
 const COLORS = {
@@ -131,20 +132,17 @@ export default function MastersAnalyticsPage() {
   };
 
   const handleExport = async () => {
+    if (!analyticsData) return;
+
     try {
-      const blob = await analyticsService.exportReport({
-        period: selectedPeriod,
+      await exportAnalyticsWorkbook({
+        data: analyticsData,
+        reportTitle: "Аналитика мастеров Eden",
+        filePrefix: "masters-report",
+        periodLabel: analyticsService.getPeriodDisplayName(selectedPeriod),
       });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `masters-report-${new Date().toISOString().split("T")[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
     } catch (err) {
-      alert("Ошибка при экспорте отчета");
+      alert("Ошибка при экспорте Excel-отчета");
     }
   };
 
