@@ -1,5 +1,5 @@
 import { IsOptional, IsEnum, IsArray, IsDateString, IsNumber } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum TimePeriod {
@@ -27,6 +27,7 @@ export class AnalyticsRequestDto {
   @IsDateString()
   endDate?: string;
 
+  @Transform(({ value }) => normalizeNumberArray(value))
   @ApiProperty({ type: [Number], required: false })
   @IsOptional()
   @IsArray()
@@ -34,10 +35,31 @@ export class AnalyticsRequestDto {
   @Type(() => Number)
   masterIds?: number[];
 
+  @Transform(({ value }) => normalizeNumberArray(value))
   @ApiProperty({ type: [Number], required: false })
   @IsOptional()
   @IsArray()
   @IsNumber({}, { each: true })
   @Type(() => Number)
   serviceIds?: number[];
+}
+
+function normalizeNumberArray(value: unknown) {
+  if (value == null || value === '') {
+    return undefined;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => Number(item));
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((item) => Number(item));
+  }
+
+  return value;
 }

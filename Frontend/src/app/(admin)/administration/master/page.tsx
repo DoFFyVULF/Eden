@@ -2298,9 +2298,10 @@ export default function Employees() {
         )}
       </div>
 
-      <AnimatePresence>
+      <AnimatePresence key="modals">
         {isCreateOpen && (
           <EmployeesCard
+            key="create-modal"
             isOpen={isCreateOpen}
             onClose={() => setIsCreateOpen(false)}
             onSubmit={handleCreate}
@@ -2308,6 +2309,7 @@ export default function Employees() {
         )}
         {isEditOpen && editMaster && (
           <EmployeesCard
+            key={`edit-modal-${editMaster.id}`}
             isOpen={isEditOpen}
             onClose={() => {
               setIsEditOpen(false);
@@ -2320,6 +2322,7 @@ export default function Employees() {
         )}
         {isVacOpen && (
           <VacationModal
+            key="vacation-modal"
             isOpen={isVacOpen}
             onClose={() => {
               setIsVacOpen(false);
@@ -2332,6 +2335,7 @@ export default function Employees() {
         )}
         {isTimeOffDetailsOpen && (
           <TimeOffDetailsModal
+            key="time-off-details-modal"
             isOpen={isTimeOffDetailsOpen}
             onClose={() => {
               setIsTimeOffDetailsOpen(false);
@@ -2354,6 +2358,7 @@ export default function Employees() {
         )}
         {isUpcomingModalOpen && upcomingModalMaster && (
           <UpcomingTimeOffsModal
+            key="upcoming-modal"
             isOpen={isUpcomingModalOpen}
             onClose={() => {
               setIsUpcomingModalOpen(false);
@@ -2376,6 +2381,7 @@ export default function Employees() {
           />
         )}
         <AdminConfirmModal
+          key="delete-confirm-modal"
           isOpen={masterToDelete !== null}
           isDark={isDark}
           title="Удалить сотрудника"

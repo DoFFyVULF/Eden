@@ -78,17 +78,6 @@ export class AnalyticsController {
   })
   @UsePipes(new ValidationPipe({ transform: true }))
   async getKeyMetrics(@Query() dto: AnalyticsRequestDto) {
-    // Преобразуем строки запросов в массивы чисел
-    const queryParams = dto as any;
-    
-    if (queryParams.masterIds && typeof queryParams.masterIds === 'string') {
-      dto.masterIds = queryParams.masterIds.split(',').map((id: string) => parseInt(id.trim(), 10));
-    }
-    
-    if (queryParams.serviceIds && typeof queryParams.serviceIds === 'string') {
-      dto.serviceIds = queryParams.serviceIds.split(',').map((id: string) => parseInt(id.trim(), 10));
-    }
-
     return this.analyticsService.getKeyMetrics(dto);
   }
 
@@ -166,17 +155,6 @@ export class AnalyticsController {
   })
   @UsePipes(new ValidationPipe({ transform: true }))
   async getFinancialReport(@Query() dto: AnalyticsRequestDto) {
-    // Преобразуем строки запросов в массивы чисел
-    const queryParams = dto as any;
-    
-    if (queryParams.masterIds && typeof queryParams.masterIds === 'string') {
-      dto.masterIds = queryParams.masterIds.split(',').map((id: string) => parseInt(id.trim(), 10));
-    }
-    
-    if (queryParams.serviceIds && typeof queryParams.serviceIds === 'string') {
-      dto.serviceIds = queryParams.serviceIds.split(',').map((id: string) => parseInt(id.trim(), 10));
-    }
-
     return this.analyticsService.getFinancialReport(dto);
   }
 

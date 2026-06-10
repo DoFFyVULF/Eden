@@ -8,6 +8,7 @@ import { masterService } from "@/services/master/master.service";
 import type { IMasterSchedule } from "@/types/schedule.types";
 import type { IUser } from "@/types/user.types";
 import type { IMaster } from "@/types/masters.type";
+import ScheduleSuggestionModal from "./ScheduleSuggestionModal";
 import {
   Calendar,
   Clock,
@@ -21,6 +22,7 @@ import {
   Watch,
   ArrowUpRight,
   Flame,
+  Sparkles,
 } from "lucide-react";
 
 const DAYS_OF_WEEK = [
@@ -41,6 +43,7 @@ export default function MasterSchedule() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<"weekly" | "specific">("weekly");
   const [isDark, setIsDark] = useState(false);
+  const [isSuggestionModalOpen, setIsSuggestionModalOpen] = useState(false);
 
   // Theme detection
   useEffect(() => {
@@ -255,6 +258,38 @@ export default function MasterSchedule() {
 
             {/* Right — actions */}
             <div className="flex gap-2.5 flex-wrap">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setIsSuggestionModalOpen(true)}
+                disabled={!currentUser?.masterId}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.1] text-white/70 hover:text-white hover:bg-white/[0.1] disabled:opacity-50"
+                    : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm disabled:opacity-50"
+                }`}
+              >
+                <Sparkles size={15} />
+                Предложить изменение
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => loadData(false)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.1] text-white/60 hover:text-white/80 hover:bg-white/[0.1]"
+                    : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
+                }`}
+              >
+                <RefreshCw
+                  size={15}
+                  className={isRefreshing ? "animate-spin" : ""}
+                />
+                Обновить
+              </motion.button>
+
               {/* View mode toggle */}
               <div
                 className={`flex rounded-xl overflow-hidden border ${
@@ -294,23 +329,6 @@ export default function MasterSchedule() {
                   Конкретные даты
                 </button>
               </div>
-
-              <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => loadData(false)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 ${
-                  isDark
-                    ? "bg-white/[0.07] border-white/[0.1] text-white/60 hover:text-white/80 hover:bg-white/[0.1]"
-                    : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
-                }`}
-              >
-                <RefreshCw
-                  size={15}
-                  className={isRefreshing ? "animate-spin" : ""}
-                />
-                Обновить
-              </motion.button>
             </div>
           </div>
         </motion.div>
@@ -916,6 +934,16 @@ export default function MasterSchedule() {
           </motion.div>
         )}
       </div>
+
+      {currentUser?.masterId && (
+        <ScheduleSuggestionModal
+          isOpen={isSuggestionModalOpen}
+          masterId={currentUser.masterId}
+          schedules={schedules}
+          onClose={() => setIsSuggestionModalOpen(false)}
+          onSuccess={() => loadData(false)}
+        />
+      )}
     </div>
   );
 }

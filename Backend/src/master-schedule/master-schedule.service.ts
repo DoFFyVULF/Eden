@@ -9,6 +9,7 @@ import { PrismaService } from 'src/prisma.service';
 import { MasterScheduleDto } from './dto/master-schedule.dto';
 import { UpdateMasterScheduleDto } from './dto/update-master-schedule.dto';
 import { MasterTimeOffDto, TimeOffType } from './dto/master-time-off.dto';
+import { CreateScheduleSuggestionDto } from './dto/schedule-suggestion.dto';
 
 export type MasterStatusInfo = {
   isOnTimeOff: boolean;
@@ -91,6 +92,143 @@ export class MasterScheduleService {
 
   async count(): Promise<number> {
     return this.prisma.masterSchedule.count();
+  }
+
+  async getSuggestions(masterId?: number) {
+    return this.prisma.masterScheduleSuggestion.findMany({
+      where: masterId
+        ? { masterId }
+        : {
+            status: 'pending'
+          },
+      include: {
+        master: true,
+        targetSchedule: true,
+        masterSchedule: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  async createSuggestion(dto: CreateScheduleSuggestionDto) {
+    await this.ensureMasterExists(dto.masterId);
+    this.validateTime(dto.startTime, dto.endTime);
+
+    if (dto.targetScheduleId) {
+      const targetSchedule = await this.prisma.masterSchedule.findUnique({
+        where: { id: dto.targetScheduleId }
+      });
+
+      if (!targetSchedule) {
+        throw new NotFoundException(
+          `Расписание с ID ${dto.targetScheduleId} не найдено`
+        );
+      }
+
+      if (targetSchedule.masterID !== dto.masterId) {
+        throw new BadRequestException(
+          'Нельзя изменить расписание другого мастера'
+        );
+      }
+    }
+
+    if (dto.dayOfWeek == null && !dto.date) {
+      throw new BadRequestException(
+        'Для разовой смены требуется указать дату'
+      );
+    }
+
+    return this.prisma.masterScheduleSuggestion.create({
+      data: {
+        masterId: dto.masterId,
+        targetScheduleId: dto.targetScheduleId ?? null,
+        dayOfWeek: dto.dayOfWeek ?? null,
+        date: dto.date ? new Date(dto.date) : null,
+        startTime: new Date(dto.startTime),
+        endTime: new Date(dto.endTime),
+        reason: dto.reason?.trim() || ''
+      },
+      include: {
+        master: true,
+        targetSchedule: true,
+        masterSchedule: true
+      }
+    });
+  }
+
+  async acceptSuggestion(id: number) {
+    const suggestion = await this.prisma.masterScheduleSuggestion.findUnique({
+      where: { id },
+      include: {
+        master: true,
+        targetSchedule: true
+      }
+    });
+
+    if (!suggestion) {
+      throw new NotFoundException(`Предложение с ID ${id} не найдено`);
+    }
+
+    if (suggestion.status !== 'pending') {
+      throw new BadRequestException('Предложение уже обработано');
+    }
+
+    const scheduleData = {
+      master: { connect: { id: suggestion.masterId } },
+      dayOfWeek: suggestion.dayOfWeek,
+      startTime: suggestion.startTime,
+      endTime: suggestion.endTime
+    };
+
+    const schedule = suggestion.targetScheduleId
+      ? await this.prisma.masterSchedule.update({
+          where: { id: suggestion.targetScheduleId },
+          data: scheduleData,
+          include: { master: true }
+        })
+      : await this.prisma.masterSchedule.create({
+          data: scheduleData,
+          include: { master: true }
+        });
+
+    return this.prisma.masterScheduleSuggestion.update({
+      where: { id },
+      data: {
+        status: 'accepted',
+        masterScheduleId: schedule.id
+      },
+      include: {
+        master: true,
+        targetSchedule: true,
+        masterSchedule: true
+      }
+    });
+  }
+
+  async rejectSuggestion(id: number) {
+    const suggestion = await this.prisma.masterScheduleSuggestion.findUnique({
+      where: { id }
+    });
+
+    if (!suggestion) {
+      throw new NotFoundException(`Предложение с ID ${id} не найдено`);
+    }
+
+    if (suggestion.status !== 'pending') {
+      throw new BadRequestException('Предложение уже обработано');
+    }
+
+    return this.prisma.masterScheduleSuggestion.update({
+      where: { id },
+      data: {
+        status: 'rejected'
+      },
+      include: {
+        master: true,
+        targetSchedule: true,
+        masterSchedule: true
+      }
+    });
   }
 
   // === Отпуска / Периоды недоступности ===

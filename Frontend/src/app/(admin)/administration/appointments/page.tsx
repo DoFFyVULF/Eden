@@ -597,11 +597,7 @@ export default function AdminAppointments() {
                 ? `${filtered.length} записей`
                 : `${filtered.length} из ${confirmed.length}`}
             </span>
-            <button
-              className={`flex items-center gap-1.5 font-medium transition-colors ${isDark ? "text-white/30 hover:text-white/50" : "text-gray-400 hover:text-gray-600"}`}
-            >
-              <Download size={13} /> Экспорт CSV
-            </button>
+    
           </div>
         )}
 

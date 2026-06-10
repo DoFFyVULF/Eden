@@ -49,6 +49,7 @@ export interface ClientMetrics {
   repeatClients: number;        // ← ДОБАВЛЕНО: клиенты с 2+ визитами в периоде
   retentionRate: number;
   repeatRate: number;          // ← ДОБАВЛЕНО: процент с повторными визитами
+  conversionToRegularRate: number;
   clientsByMonth: ClientGrowth[];
 }
 

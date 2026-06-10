@@ -106,7 +106,6 @@ export default function CreateCategoryModal({ isOpen, onClose, onSuccess }: Prop
                   </div>
                 </div>
                 <motion.button
-                  whileHover={{ scale: 1.1, rotate: 90 }} whileTap={{ scale: 0.9 }}
                   transition={{ duration: 0.18 }}
                   onClick={onClose}
                   className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white hover:bg-white/25 transition-colors"

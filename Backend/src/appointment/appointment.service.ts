@@ -33,22 +33,31 @@ export class AppointmentService {
     await this.ensureMasterExists(dto.masterId);
     await this.ensureServiceExists(dto.serviceId);
     await this.ensurePublicBookingLimit(dto.clientPhone, metadata);
-    await this.ensureTimeNotTaken(dto.masterId, dto.appointmentTime);
+    await this.ensureTimeNotTaken(
+      dto.masterId,
+      dto.serviceId,
+      dto.appointmentTime
+    );
 
-    return this.createAppointment(dto, metadata);
+    return this.createAppointment(dto, metadata, true);
   }
 
   async createAdmin(dto: AppointmentDto) {
     await this.ensureMasterExists(dto.masterId);
     await this.ensureServiceExists(dto.serviceId);
-    await this.ensureTimeNotTaken(dto.masterId, dto.appointmentTime);
+    await this.ensureTimeNotTaken(
+      dto.masterId,
+      dto.serviceId,
+      dto.appointmentTime
+    );
 
-    return this.createAppointment(dto);
+    return this.createAppointment(dto, undefined, false);
   }
 
   private async createAppointment(
     dto: AppointmentDto,
-    metadata?: PublicAppointmentMetadata
+    metadata?: PublicAppointmentMetadata,
+    emitNotification = false
   ) {
     const normalizedPhone = this.normalizePhone(dto.clientPhone);
     const normalizedSurname = this.normalizePersonName(dto.clientSurname);
@@ -75,7 +84,9 @@ export class AppointmentService {
       }
     });
 
-    this.streamService.emitNewAppointment(newAppointment);
+    if (emitNotification) {
+      this.streamService.emitNewAppointment(newAppointment);
+    }
     return newAppointment;
   }
 
@@ -121,19 +132,65 @@ export class AppointmentService {
       where.masterID = masterId;
     }
 
-    return this.prisma.appointment.findMany({
+    const appointments = await this.prisma.appointment.findMany({
       where,
-      // ВАЖНО: Выбираем только те поля, которые нужны календарю
-      select: {
-        id: true,
-        appointmentTime: true,
-        status: true,
-        masterID: true
-        // Мы НЕ включаем сюда clientPhone, clientName и т.д.
+      include: {
+        service: {
+          select: {
+            id: true,
+            title: true,
+            duration: true
+          }
+        }
       },
       orderBy: {
         appointmentTime: 'asc'
       }
+    });
+
+    if (appointments.length === 0) {
+      return appointments;
+    }
+
+    const masterIds = [...new Set(appointments.map((item) => item.masterID))];
+    const serviceIds = [...new Set(appointments.map((item) => item.serviceId))];
+
+    const servicePrices = await this.prisma.servicePrice.findMany({
+      where: {
+        masterID: { in: masterIds },
+        serviceId: { in: serviceIds }
+      },
+      select: {
+        masterID: true,
+        serviceId: true,
+        durationOverride: true
+      }
+    });
+
+    const durationMap = new Map<string, number>();
+    servicePrices.forEach((item) => {
+      if (item.durationOverride == null) {
+        return;
+      }
+
+      durationMap.set(
+        `${item.masterID}-${item.serviceId}`,
+        Number(item.durationOverride)
+      );
+    });
+
+    return appointments.map((appointment) => {
+      const duration =
+        durationMap.get(`${appointment.masterID}-${appointment.serviceId}`) ??
+        appointment.service.duration;
+
+      return {
+        ...appointment,
+        service: {
+          ...appointment.service,
+          duration
+        }
+      };
     });
   }
 
@@ -156,28 +213,13 @@ export class AppointmentService {
       await this.ensureServiceExists(dto.serviceId);
     }
 
-    if (dto.appointmentTime || dto.masterId) {
+    if (dto.appointmentTime || dto.masterId || dto.serviceId) {
       const masterId = dto.masterId ?? existing.masterID;
+      const serviceId = dto.serviceId ?? existing.serviceId;
       const appointmentTime =
         dto.appointmentTime ?? existing.appointmentTime.toISOString();
 
-      // Проверяем конфликты, исключая текущую запись и игнорируя отмененные/завершенные
-      const conflictingAppointment = await this.prisma.appointment.findFirst({
-        where: {
-          masterID: masterId,
-          appointmentTime: new Date(appointmentTime),
-          id: { not: id },
-          status: {
-            notIn: [AppointmentStatus.Отменен, AppointmentStatus.Завершен]
-          }
-        }
-      });
-
-      if (conflictingAppointment) {
-        throw new BadRequestException(
-          `На это время мастер уже занят другой записью`
-        );
-      }
+      await this.ensureTimeNotTaken(masterId, serviceId, appointmentTime, id);
     }
 
     return this.prisma.appointment.update({
@@ -257,22 +299,105 @@ export class AppointmentService {
     }
   }
 
-  private async ensureTimeNotTaken(masterId: number, time: string) {
-    const existing = await this.prisma.appointment.findFirst({
+  private async ensureTimeNotTaken(
+    masterId: number,
+    serviceId: number,
+    time: string,
+    excludeAppointmentId?: number
+  ) {
+    const requestedStart = new Date(time);
+    const requestedDuration = await this.getAppointmentDurationMinutes(
+      masterId,
+      serviceId
+    );
+    const requestedEnd = new Date(
+      requestedStart.getTime() + requestedDuration * 60 * 1000
+    );
+
+    const dayStart = new Date(requestedStart);
+    dayStart.setHours(0, 0, 0, 0);
+
+    const dayEnd = new Date(requestedStart);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const existingAppointments = await this.prisma.appointment.findMany({
       where: {
         masterID: masterId,
-        appointmentTime: new Date(time),
+        appointmentTime: {
+          gte: dayStart,
+          lte: dayEnd
+        },
+        ...(excludeAppointmentId
+          ? {
+              id: { not: excludeAppointmentId }
+            }
+          : {}),
         status: {
           notIn: [AppointmentStatus.Отменен, AppointmentStatus.Завершен]
+        }
+      },
+      include: {
+        service: {
+          select: {
+            duration: true
+          }
         }
       }
     });
 
-    if (existing) {
-      throw new BadRequestException(
-        `На ${time} мастер уже занят активной записью`
+    for (const appointment of existingAppointments) {
+      const existingDuration = await this.getAppointmentDurationMinutes(
+        appointment.masterID,
+        appointment.serviceId,
+        appointment.service.duration
       );
+      const existingStart = new Date(appointment.appointmentTime);
+      const existingEnd = new Date(
+        existingStart.getTime() + existingDuration * 60 * 1000
+      );
+
+      if (requestedStart < existingEnd && requestedEnd > existingStart) {
+        throw new BadRequestException(
+          `На ${time} мастер уже занят активной записью`
+        );
+      }
     }
+  }
+
+  private async getAppointmentDurationMinutes(
+    masterId: number,
+    serviceId: number,
+    fallbackDuration?: number
+  ) {
+    const servicePrice = await this.prisma.servicePrice.findFirst({
+      where: {
+        masterID: masterId,
+        serviceId,
+        isActive: true
+      },
+      select: {
+        durationOverride: true
+      }
+    });
+
+    if (servicePrice?.durationOverride != null) {
+      return Number(servicePrice.durationOverride);
+    }
+
+    if (fallbackDuration != null) {
+      return fallbackDuration;
+    }
+
+    const service = await this.prisma.service.findUnique({
+      where: { id: serviceId },
+      select: { duration: true }
+    });
+
+    if (!service) {
+      throw new NotFoundException(`Услуга с ID ${serviceId} не найдена`);
+    }
+
+    return service.duration;
   }
 
   private async ensurePublicBookingLimit(

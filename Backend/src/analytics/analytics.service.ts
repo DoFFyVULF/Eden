@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
+import { Prisma } from 'generated/prisma/client';
 import { TimePeriod, AnalyticsRequestDto } from './dto/analytics-request.dto';
 import {
   KeyMetricsResponseDto,
@@ -18,7 +19,13 @@ import {
   endOfMonth,
   startOfWeek,
   endOfWeek,
+  startOfYear,
+  endOfYear,
   subMonths,
+  subDays,
+  subWeeks,
+  subQuarters,
+  subYears,
   format
 } from 'date-fns';
 import { AppointmentStatus } from 'generated/prisma/enums';
@@ -104,10 +111,7 @@ export class AnalyticsService {
   async getDashboardSummary(): Promise<AnalyticsSummaryResponseDto> {
     const now = new Date();
     const currentMonth = { start: startOfMonth(now), end: now };
-    const previousMonth = {
-      start: subMonths(startOfMonth(now), 1),
-      end: subMonths(endOfMonth(now), 1)
-    };
+    const previousMonth = this.getPreviousDateRange(currentMonth);
 
     const [
       currentMetrics,
@@ -115,14 +119,18 @@ export class AnalyticsService {
       mastersCount,
       servicesCount,
       clientMetrics,
-      appointmentMetrics
+      appointmentMetrics,
+      previousClientMetrics,
+      previousAppointmentMetrics
     ] = await Promise.all([
       this.getFinancialMetrics(currentMonth),
       this.getFinancialMetrics(previousMonth),
       this.prisma.master.count({ where: { isActive: true } }),
       this.prisma.service.count({ where: { isActive: true } }),
       this.getClientMetrics(currentMonth),
-      this.getAppointmentMetrics(currentMonth)
+      this.getAppointmentMetrics(currentMonth),
+      this.getClientMetrics(previousMonth),
+      this.getAppointmentMetrics(previousMonth)
     ]);
 
     return {
@@ -137,8 +145,23 @@ export class AnalyticsService {
               previousMetrics.totalRevenue) *
             100
           : 0,
-      clientGrowth: 15,
-      appointmentGrowth: 12
+      clientGrowth:
+        previousClientMetrics.totalClients > 0
+          ? ((clientMetrics.totalClients - previousClientMetrics.totalClients) /
+              previousClientMetrics.totalClients) *
+            100
+          : clientMetrics.totalClients > 0
+            ? 100
+            : 0,
+      appointmentGrowth:
+        previousAppointmentMetrics.totalAppointments > 0
+          ? ((appointmentMetrics.totalAppointments -
+              previousAppointmentMetrics.totalAppointments) /
+              previousAppointmentMetrics.totalAppointments) *
+            100
+          : appointmentMetrics.totalAppointments > 0
+            ? 100
+            : 0
     };
   }
 
@@ -320,6 +343,15 @@ export class AnalyticsService {
         serviceIds.length > 0 && { serviceId: { in: serviceIds } })
     };
 
+    const masterCondition = 
+      masterIds && masterIds.length > 0
+        ? Prisma.sql`AND master_id IN (${Prisma.join(masterIds)})`
+        : Prisma.empty;
+    const serviceCondition =
+      serviceIds && serviceIds.length > 0
+        ? Prisma.sql`AND service_id IN (${Prisma.join(serviceIds)})`
+        : Prisma.empty;
+
     const [appointments, byMonthRaw] = await Promise.all([
       this.prisma.appointment.findMany({
         where: whereClause,
@@ -343,6 +375,8 @@ export class AnalyticsService {
         WHERE "appointment_time" >= ${dateRange.start}
           AND "appointment_time" <= ${dateRange.end}
           AND status = 'Завершен'
+          ${masterCondition}
+          ${serviceCondition}
         GROUP BY TO_CHAR("appointment_time", 'YYYY-MM')
         ORDER BY month
       `
@@ -376,7 +410,7 @@ export class AnalyticsService {
       (sum, a) => sum + Number(a.price),
       0
     );
-    const currentMonth = format(dateRange.start, 'yyyy-MM');
+    const currentMonth = format(new Date(), 'yyyy-MM');
     const monthlyIncome =
       byMonth.find(m => m.month === currentMonth)?.revenue || 0;
 
@@ -568,11 +602,6 @@ export class AnalyticsService {
       {} as Record<string, number>
     );
 
-    // Логируем для отладки
-    console.log('Status counts:', statusCounts);
-    console.log('All statuses:', Object.keys(statusCounts));
-
-    // Определяем завершенные записи (проверяем разные варианты написания)
     const completedStatuses = [
       'Завершен',
       'Завершён',
@@ -612,7 +641,7 @@ export class AnalyticsService {
 
     // Новые записи — созданные в этом периоде
     const newAppointments = allAppointments.filter(
-      app => app.createdAt >= dateRange.start
+      app => app.createdAt >= dateRange.start && app.createdAt <= dateRange.end
     ).length;
 
     // Конверсия: завершенные / общее количество * 100
@@ -620,22 +649,6 @@ export class AnalyticsService {
       totalAppointments > 0
         ? (completedAppointments / totalAppointments) * 100
         : 0;
-
-    // Дополнительно считаем "эффективную конверсию"
-    // (исключая отмененные из знаменателя)
-    const effectiveAppointments = totalAppointments - cancelledAppointments;
-    const effectiveConversionRate =
-      effectiveAppointments > 0
-        ? (completedAppointments / effectiveAppointments) * 100
-        : 0;
-
-    console.log('Metrics:', {
-      totalAppointments,
-      completedAppointments,
-      cancelledAppointments,
-      conversionRate: conversionRate.toFixed(2) + '%',
-      effectiveConversionRate: effectiveConversionRate.toFixed(2) + '%'
-    });
 
     return {
       totalAppointments,
@@ -661,7 +674,8 @@ export class AnalyticsService {
           status: { in: this.COMPLETED_STATUS }
         },
         _count: { id: true },
-        _sum: { price: true }
+        _sum: { price: true },
+        orderBy: { _count: { id: 'desc' } }
       })
     ]);
 
@@ -678,10 +692,15 @@ export class AnalyticsService {
     });
 
     const topMasters = await Promise.all(topMastersPromises);
+    const totalCompletedAppointments = appointments.reduce(
+      (sum, item) => sum + item._count.id,
+      0
+    );
 
     return {
       mastersCount: masters,
-      averageLoad: 78,
+      averageLoad:
+        masters > 0 ? (totalCompletedAppointments / masters) * 100 : 0,
       topMasters
     };
   }
@@ -758,8 +777,8 @@ export class AnalyticsService {
 
     if (period === TimePeriod.CUSTOM && startDate && endDate) {
       return {
-        start: new Date(startDate),
-        end: new Date(endDate)
+        start: startOfDay(new Date(startDate)),
+        end: endOfDay(new Date(endDate))
       };
     }
 
@@ -795,6 +814,74 @@ export class AnalyticsService {
     }
 
     return { start, end };
+  }
+
+  private getPreviousDateRange(currentRange: {
+    start: Date;
+    end: Date;
+  }): { start: Date; end: Date } {
+    const duration = currentRange.end.getTime() - currentRange.start.getTime();
+
+    if (duration <= 24 * 60 * 60 * 1000) {
+      return {
+        start: subDays(currentRange.start, 1),
+        end: subDays(currentRange.end, 1)
+      };
+    }
+
+    const startMonth = currentRange.start.getMonth();
+    const endMonth = currentRange.end.getMonth();
+    const sameYear = currentRange.start.getFullYear() === currentRange.end.getFullYear();
+
+    if (
+      sameYear &&
+      startMonth === endMonth &&
+      currentRange.start.getDate() === 1
+    ) {
+      return {
+        start: subMonths(currentRange.start, 1),
+        end: subMonths(currentRange.end, 1)
+      };
+    }
+
+    const isWeekRange =
+      format(currentRange.start, 'i') === '1' &&
+      format(currentRange.end, 'i') === '7';
+
+    if (isWeekRange) {
+      return {
+        start: subWeeks(currentRange.start, 1),
+        end: subWeeks(currentRange.end, 1)
+      };
+    }
+
+    const isQuarterRange =
+      currentRange.start.getDate() === 1 &&
+      currentRange.end.getDate() >= 28 &&
+      Math.abs(endMonth - startMonth) >= 2;
+
+    if (isQuarterRange) {
+      return {
+        start: subQuarters(currentRange.start, 1),
+        end: subQuarters(currentRange.end, 1)
+      };
+    }
+
+    const isYearRange =
+      currentRange.start.getTime() === startOfYear(currentRange.start).getTime() &&
+      currentRange.end.getTime() === endOfYear(currentRange.end).getTime();
+
+    if (isYearRange) {
+      return {
+        start: subYears(currentRange.start, 1),
+        end: subYears(currentRange.end, 1)
+      };
+    }
+
+    return {
+      start: new Date(currentRange.start.getTime() - duration - 1),
+      end: new Date(currentRange.end.getTime() - duration - 1)
+    };
   }
 
   async getQuickStats() {

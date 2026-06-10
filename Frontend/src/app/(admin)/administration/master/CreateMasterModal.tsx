@@ -226,7 +226,6 @@ export function EmployeesCard({
                   </div>
                 </div>
                 <motion.button
-                  whileHover={{ scale: 1.1, rotate: 90 }}
                   whileTap={{ scale: 0.9 }}
                   transition={{ duration: 0.18 }}
                   onClick={close}

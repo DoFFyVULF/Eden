@@ -51,7 +51,11 @@ import {
   ComposedChart,
 } from "@/app/components/charts";
 import { analyticsService } from "@/services/analytics/analytics.service";
-import { KeyMetricsResponse, TimePeriod } from "@/types/analytics.types";
+import {
+  AnalyticsRequest,
+  KeyMetricsResponse,
+  TimePeriod,
+} from "@/types/analytics.types";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { ADMIN_ROUTES } from "@/app/lib/admin.routes";
 
@@ -62,6 +66,74 @@ const COLORS = {
   positive: "#10B981",
   negative: "#EF4444",
   neutral: "#6B7280",
+};
+
+const formatDateForQuery = (date: Date) => date.toISOString().split("T")[0];
+
+const getPreviousPeriodRequest = (period: TimePeriod): AnalyticsRequest => {
+  const now = new Date();
+
+  switch (period) {
+    case TimePeriod.DAY: {
+      const previousDay = new Date(now);
+      previousDay.setDate(now.getDate() - 1);
+      return {
+        period: TimePeriod.CUSTOM,
+        startDate: formatDateForQuery(previousDay),
+        endDate: formatDateForQuery(previousDay),
+      };
+    }
+    case TimePeriod.WEEK: {
+      const currentDay = (now.getDay() + 6) % 7;
+      const currentStart = new Date(now);
+      currentStart.setDate(now.getDate() - currentDay);
+      const previousStart = new Date(currentStart);
+      previousStart.setDate(currentStart.getDate() - 7);
+      const previousEnd = new Date(currentStart);
+      previousEnd.setDate(currentStart.getDate() - 1);
+      return {
+        period: TimePeriod.CUSTOM,
+        startDate: formatDateForQuery(previousStart),
+        endDate: formatDateForQuery(previousEnd),
+      };
+    }
+    case TimePeriod.MONTH: {
+      const previousStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const previousEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      return {
+        period: TimePeriod.CUSTOM,
+        startDate: formatDateForQuery(previousStart),
+        endDate: formatDateForQuery(previousEnd),
+      };
+    }
+    case TimePeriod.QUARTER: {
+      const currentQuarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+      const previousQuarterStart = new Date(
+        now.getFullYear(),
+        currentQuarterStartMonth - 3,
+        1,
+      );
+      const previousQuarterEnd = new Date(
+        now.getFullYear(),
+        currentQuarterStartMonth,
+        0,
+      );
+      return {
+        period: TimePeriod.CUSTOM,
+        startDate: formatDateForQuery(previousQuarterStart),
+        endDate: formatDateForQuery(previousQuarterEnd),
+      };
+    }
+    case TimePeriod.YEAR: {
+      return {
+        period: TimePeriod.CUSTOM,
+        startDate: `${now.getFullYear() - 1}-01-01`,
+        endDate: `${now.getFullYear() - 1}-12-31`,
+      };
+    }
+    default:
+      return { period: TimePeriod.MONTH };
+  }
 };
 
 export default function ComparisonAnalyticsPage() {
@@ -110,41 +182,14 @@ export default function ComparisonAnalyticsPage() {
     }
     setError(null);
     try {
-      // Загружаем данные текущего периода
-      const current = await analyticsService.getKeyMetrics({
-        period: selectedPeriod,
-      });
-      setCurrentData(current);
+      const [current, previous] = await Promise.all([
+        analyticsService.getKeyMetrics({
+          period: selectedPeriod,
+        }),
+        analyticsService.getKeyMetrics(getPreviousPeriodRequest(selectedPeriod)),
+      ]);
 
-      // Для простоты используем те же данные с небольшими изменениями
-      // В реальном приложении здесь был бы запрос предыдущего периода
-      const previous: KeyMetricsResponse = {
-        ...current,
-        financial: {
-          ...current.financial,
-          totalRevenue: current.financial.totalRevenue * 0.85,
-          monthlyIncome: current.financial.monthlyIncome * 0.85,
-          averageCheck: current.financial.averageCheck * 0.92,
-          revenueGrowth: -15,
-        },
-        clients: {
-          ...current.clients,
-          totalClients: Math.round(current.clients.totalClients * 0.88),
-          newClients: Math.round(current.clients.newClients * 0.75),
-          returningClients: Math.round(current.clients.returningClients * 0.90),
-          retentionRate: current.clients.retentionRate * 0.95,
-        },
-        appointments: {
-          ...current.appointments,
-          totalAppointments: Math.round(
-            current.appointments.totalAppointments * 0.87
-          ),
-          completedAppointments: Math.round(
-            current.appointments.completedAppointments * 0.85
-          ),
-          conversionRate: current.appointments.conversionRate * 0.93,
-        },
-      };
+      setCurrentData(current);
       setPreviousData(previous);
     } catch (err) {
       setError("Не удалось загрузить данные для сравнения");

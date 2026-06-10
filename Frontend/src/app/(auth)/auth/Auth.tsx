@@ -55,14 +55,7 @@ export function Auth() {
   const onSubmit: SubmitHandler<IAuthForm> = (data) => mutate(data);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 relative overflow-hidden">
-      {/* Декоративные элементы фона */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/30 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/30 rounded-full blur-3xl animate-pulse delay-1000" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl" />
-      </div>
-
+    <div className="min-h-screen flex items-center justify-center bg-white p-4 relative overflow-hidden">
       <motion.div
         initial={{ opacity: 0, y: 30, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -70,7 +63,7 @@ export function Auth() {
         className="relative w-full max-w-md"
       >
         {/* Карточка авторизации */}
-        <div className="bg-white/10 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 p-8 md:p-10">
+        <div className="bg-white rounded-3xl shadow-[0_24px_80px_rgba(15,23,42,0.12)] border border-gray-200 p-8 md:p-10">
           {/* Логотип / Заголовок */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -81,10 +74,10 @@ export function Auth() {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg mb-4">
               <ShieldCheck className="w-8 h-8 text-white" />
             </div>
-            <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
               Добро пожаловать
             </h2>
-            <p className="text-gray-300 text-sm">
+            <p className="text-gray-500 text-sm">
               Войдите в панель управления
             </p>
           </motion.div>
@@ -97,7 +90,7 @@ export function Auth() {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="flex items-center gap-2 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-200 text-sm"
+                  className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm"
                 >
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
                   <span>Неверный логин или пароль</span>
@@ -111,7 +104,7 @@ export function Auth() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <label className="block text-sm font-medium text-gray-200 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Логин
               </label>
               <div className="relative">
@@ -120,14 +113,14 @@ export function Auth() {
                   type="text"
                   placeholder="Введите ваш логин"
                   {...register("login", { required: "Введите логин" })}
-                  className="w-full pl-12 pr-4 py-3.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all duration-300"
+                  className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-indigo-500/15 focus:border-indigo-400 outline-none transition-all duration-300"
                 />
               </div>
               {errors.login && (
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="text-red-400 text-xs mt-1.5 flex items-center gap-1"
+                  className="text-red-500 text-xs mt-1.5 flex items-center gap-1"
                 >
                   <AlertCircle className="w-3 h-3" />
                   {errors.login.message}
@@ -141,7 +134,7 @@ export function Auth() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.4 }}
             >
-              <label className="block text-sm font-medium text-gray-200 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Пароль
               </label>
               <div className="relative">
@@ -150,14 +143,14 @@ export function Auth() {
                   type="password"
                   placeholder="Введите ваш пароль"
                   {...register("password", { required: "Введите пароль" })}
-                  className="w-full pl-12 pr-4 py-3.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all duration-300"
+                  className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-indigo-500/15 focus:border-indigo-400 outline-none transition-all duration-300"
                 />
               </div>
               {errors.password && (
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="text-red-400 text-xs mt-1.5 flex items-center gap-1"
+                  className="text-red-500 text-xs mt-1.5 flex items-center gap-1"
                 >
                   <AlertCircle className="w-3 h-3" />
                   {errors.password.message}
@@ -203,16 +196,13 @@ export function Auth() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}
-            className="mt-8 pt-6 border-t border-white/10 text-center"
+            className="mt-8 pt-6 border-t border-gray-100 text-center"
           >
             <p className="text-gray-400 text-xs">
               © {new Date().getFullYear()} Панель управления. Все права защищены.
             </p>
           </motion.div>
         </div>
-
-        {/* Декоративная подсветка */}
-        <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl blur opacity-20 -z-10" />
       </motion.div>
     </div>
   );

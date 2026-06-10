@@ -28,7 +28,7 @@ describe('AppointmentService', () => {
     price: 1000,
     status: AppointmentStatus.Новый,
     master: { id: 1, name: 'Master One' },
-    service: { id: 1, title: 'Haircut' },
+    service: { id: 1, title: 'Haircut', duration: 180 },
   };
 
   const mockMaster = {
@@ -39,6 +39,7 @@ describe('AppointmentService', () => {
   const mockService = {
     id: 1,
     title: 'Haircut',
+    duration: 180,
   };
 
   const mockAppointmentDto: AppointmentDto = {
@@ -79,6 +80,10 @@ describe('AppointmentService', () => {
             service: {
               findUnique: jest.fn(),
             },
+            servicePrice: {
+              findFirst: jest.fn(),
+              findMany: jest.fn(),
+            },
           },
         },
         {
@@ -105,7 +110,8 @@ describe('AppointmentService', () => {
       (prisma.master.findUnique as jest.Mock).mockResolvedValue(mockMaster);
       (prisma.service.findUnique as jest.Mock).mockResolvedValue(mockService);
       (prisma.appointment.count as jest.Mock).mockResolvedValue(0);
-      (prisma.appointment.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.servicePrice.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.appointment.findMany as jest.Mock).mockResolvedValue([]);
       (prisma.appointment.create as jest.Mock).mockResolvedValue(mockAppointment);
 
       const result = await service.createPublic(
@@ -180,7 +186,10 @@ describe('AppointmentService', () => {
         .mockResolvedValueOnce(0)
         .mockResolvedValueOnce(0)
         .mockResolvedValueOnce(0);
-      (prisma.appointment.findFirst as jest.Mock).mockResolvedValue(mockAppointment);
+      (prisma.servicePrice.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.appointment.findMany as jest.Mock).mockResolvedValue([
+        mockAppointment,
+      ]);
 
       await expect(
         service.createPublic(mockAppointmentDto, publicMetadata)
@@ -192,7 +201,8 @@ describe('AppointmentService', () => {
     it('should create admin appointment without rate limit check', async () => {
       (prisma.master.findUnique as jest.Mock).mockResolvedValue(mockMaster);
       (prisma.service.findUnique as jest.Mock).mockResolvedValue(mockService);
-      (prisma.appointment.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.servicePrice.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.appointment.findMany as jest.Mock).mockResolvedValue([]);
       (prisma.appointment.create as jest.Mock).mockResolvedValue(mockAppointment);
 
       const result = await service.createAdmin(mockAppointmentDto);
@@ -241,6 +251,7 @@ describe('AppointmentService', () => {
     it('should return appointments for date', async () => {
       const appointments = [mockAppointment];
       (prisma.appointment.findMany as jest.Mock).mockResolvedValue(appointments);
+      (prisma.servicePrice.findMany as jest.Mock).mockResolvedValue([]);
 
       const result = await service.findByDate('2024-01-15');
 
@@ -251,6 +262,7 @@ describe('AppointmentService', () => {
     it('should filter by masterId if provided', async () => {
       const appointments = [mockAppointment];
       (prisma.appointment.findMany as jest.Mock).mockResolvedValue(appointments);
+      (prisma.servicePrice.findMany as jest.Mock).mockResolvedValue([]);
 
       const result = await service.findByDate('2024-01-15', 1);
 
@@ -281,6 +293,7 @@ describe('AppointmentService', () => {
 
     it('should update appointment successfully', async () => {
       (prisma.appointment.findUnique as jest.Mock).mockResolvedValue(mockAppointment);
+      (prisma.servicePrice.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.appointment.update as jest.Mock).mockResolvedValue({
         ...mockAppointment,
         ...updateDto,

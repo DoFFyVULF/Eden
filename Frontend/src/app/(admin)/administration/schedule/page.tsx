@@ -4,14 +4,15 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { masterScheduleService } from "@/services/schedule/schedule.service";
 import { masterService } from "@/services/master/master.service";
-import type { IMasterSchedule } from "@/types/schedule.types";
+import type { IMasterSchedule, IScheduleSuggestion } from "@/types/schedule.types";
 import type { IMaster } from "@/types/masters.type";
 import AdminConfirmModal from "@/app/components/ui/admin/AdminConfirmModal";
 import ScheduleModal from "./ScheduleModal";
+import ScheduleSuggestionsModal from "./ScheduleSuggestionsModal";
 import {
   Trash2, Calendar, Clock, Plus, User, ChevronDown, ChevronUp,
   RefreshCw, CalendarDays, CalendarRange, Users, Activity,
-  SlidersHorizontal, Info, TrendingUp,
+  SlidersHorizontal, Info, TrendingUp, Sparkles,
 } from "lucide-react";
 
 const DAYS = [
@@ -40,6 +41,8 @@ export default function MasterSchedulePage() {
   const [isDark, setIsDark] = useState(false);
   const [scheduleToDelete, setScheduleToDelete] = useState<IMasterSchedule | null>(null);
   const [isDeletingSchedule, setIsDeletingSchedule] = useState(false);
+  const [suggestions, setSuggestions] = useState<IScheduleSuggestion[]>([]);
+  const [isSuggestionsModalOpen, setIsSuggestionsModalOpen] = useState(false);
 
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.classList.contains("dark"));
@@ -61,12 +64,14 @@ export default function MasterSchedulePage() {
   const fetchData = async (showLoader = true) => {
     showLoader ? setLoading(true) : setRefreshing(true);
     try {
-      const [sched, mast] = await Promise.all([
+      const [sched, mast, pendingSuggestions] = await Promise.all([
         masterScheduleService.getAll(),
         masterService.getAll(),
+        masterScheduleService.getSuggestions(),
       ]);
       setSchedules(sched);
       setMasters(mast.filter(m => m.isActive));
+      setSuggestions(pendingSuggestions.filter((item) => item.status === "pending"));
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   };
@@ -184,6 +189,24 @@ export default function MasterSchedulePage() {
               >
                 <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
                 Обновить
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                onClick={() => setIsSuggestionsModalOpen(true)}
+                className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+                  isDark
+                    ? "bg-white/[0.07] border-white/[0.1] text-white/70 hover:text-white hover:bg-white/[0.1]"
+                    : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm"
+                }`}
+              >
+                <Sparkles size={15} />
+                Предложения
+                {suggestions.length > 0 && (
+                  <span className="inline-flex min-w-6 justify-center rounded-full bg-amber-500 px-2 py-0.5 text-xs font-black text-white">
+                    {suggestions.length}
+                  </span>
+                )}
               </motion.button>
 
               <motion.button
@@ -674,6 +697,19 @@ export default function MasterSchedulePage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={() => { fetchData(false); setIsModalOpen(false); }}
+      />
+      <ScheduleSuggestionsModal
+        isOpen={isSuggestionsModalOpen}
+        suggestions={suggestions}
+        onClose={() => setIsSuggestionsModalOpen(false)}
+        onAccept={async (suggestionId) => {
+          await masterScheduleService.acceptSuggestion(suggestionId);
+          await fetchData(false);
+        }}
+        onReject={async (suggestionId) => {
+          await masterScheduleService.rejectSuggestion(suggestionId);
+          await fetchData(false);
+        }}
       />
       <AdminConfirmModal
         isOpen={scheduleToDelete !== null}
