@@ -8,6 +8,4 @@ npm-debug.log*
 *.md
 tsconfig.tsbuildinfo
 next-env.d.ts
-tailwind.config.js
-postcss.config.mjs
 .DS_Store
