@@ -83,7 +83,7 @@ export default function Footer() {
             </h3>
             <div className="mt-6 space-y-5 text-sm leading-7 text-[color:var(--public-text-soft)]">
               <div>
-                <p className="text-[color:var(--public-text)]">г. Пермь, ул. Коронита, 15</p>
+                <p className="text-[color:var(--public-text)]">г. Пермь, ул. Кронита, 15</p>
                 <p>Вход со двора, этаж 1</p>
               </div>
               <div>

@@ -12,7 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d eden"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -23,7 +23,11 @@ services:
       dockerfile: Dockerfile
     container_name: eden-backend
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
+      NODE_ENV: development
       # Настройки базы данных
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       # Секреты и порты
@@ -33,26 +37,25 @@ services:
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
-    depends_on:
-      postgres:
-        condition: service_healthy
+    # Применяем миграции при старте. Seed пока отключен, чтобы не ломать старт из-за отсутствия ts-node.
+    # Если нужны тестовые данные, их можно будет добавить позже через отдельный скрипт.
+    command: >
+      sh -c "npx prisma migrate deploy && node dist/main"
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # ВАЖНО: Передаем API URL внутрь сборки образа (Build time)
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: eden-frontend
     restart: unless-stopped
-    ports:
-      - "${FRONTEND_PORT}:3000"
-    environment:
-      # Дублируем для runtime (на всякий случай, хотя для NEXT_PUBLIC главное - args выше)
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     depends_on:
       - backend
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    ports:
+      - "${FRONTEND_PORT}:3000"
 
 volumes:
   postgres_data:

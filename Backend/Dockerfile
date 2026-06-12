@@ -6,7 +6,7 @@ RUN npm ci
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 
-# Define build-time and runtime environment variables for Prisma
+# Define build-time environment variables for Prisma
 ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/eden
 ENV DATABASE_URL=$DATABASE_URL
 
@@ -21,6 +21,7 @@ FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
+# Install only production dependencies
 COPY package*.json ./
 RUN npm ci --omit=dev
 
@@ -32,5 +33,5 @@ COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 
 EXPOSE 4200
 
-# Run migrations and start the server
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run seed && node dist/src/main.js"]
+# ВАЖНО: Запускаем скомпилированное приложение, а не npm скрипты, чтобы избежать ошибок с ts-node
+CMD ["node", "dist/src/main.js"]
