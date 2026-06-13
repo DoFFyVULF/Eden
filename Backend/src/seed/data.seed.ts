@@ -26,7 +26,7 @@ export async function seedData(prisma: PrismaService) {
 
   const categoryMap = Object.fromEntries(categories.map((c) => [c.title, c.id]));
 
-  const masters = await prisma.master.createManyAndReturn({
+  const masters = (await prisma.master.createManyAndReturn({
     data: [
       {
         surname: 'Иванова',
@@ -53,11 +53,11 @@ export async function seedData(prisma: PrismaService) {
         isActive: true,
       },
     ],
-  });
+  })) as { id: number; surname: string; name: string; middlename: string; specialization: string; phone: string; isActive: boolean }[];
 
   const [elena, anna, olga] = masters;
 
-  const services = await prisma.service.createManyAndReturn({
+  const services = (await prisma.service.createManyAndReturn({
     data: [
       {
         title: 'Женская стрижка',
@@ -116,7 +116,7 @@ export async function seedData(prisma: PrismaService) {
         categoryId: categoryMap['Укладка'],
       },
     ],
-  });
+  })) as { id: number; title: string; description: string | null; duration: number; img: string | null; isActive: boolean; categoryId: number }[];
 
   const [
     womenHaircut,
