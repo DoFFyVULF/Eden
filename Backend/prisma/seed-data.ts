@@ -4,7 +4,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient, Prisma } from '../generated/prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -206,7 +206,7 @@ async function seedData() {
 
   // --- Master Schedules ---
   // ✅ ИСПРАВЛЕНИЕ: Добавляем правильную типизацию для массива
-  const scheduleData: { masterID: number; dayOfWeek: number; startTime: Date; endTime: Date }[] = [];
+  const scheduleData: Prisma.MasterScheduleCreateManyInput[] = [];
   
   const baseDate = new Date('1970-01-01');
   
