@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ||
   process.env.FRONTEND_ORIGIN ||
-  "https://eden-perm.ru";
+  "https://eden-beauty.ru";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [

@@ -2,7 +2,7 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://eden-perm.ru/sitemap.xml
+Sitemap: https://eden-beauty.ru/sitemap.xml
 
 # Admin and internal routes — not for indexing
 Disallow: /administration
