@@ -34,7 +34,6 @@ services:
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
-    command: ["node", "dist/src/main.js"]
 
   frontend:
     build:

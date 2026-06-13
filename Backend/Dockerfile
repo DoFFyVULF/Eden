@@ -23,6 +23,9 @@ RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/generated ./generated
+COPY --from=build /app/generated ./dist/generated
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
 EXPOSE 4200
-CMD ["node", "dist/src/main.js"]
+CMD ["./docker-entrypoint.sh"]
