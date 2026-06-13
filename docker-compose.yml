@@ -27,20 +27,14 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      NODE_ENV: development
-      # Настройки базы данных
+      NODE_ENV: production
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      # Секреты и порты
       JWT_SECRET: ${JWT_SECRET}
       PORT: ${BACKEND_PORT}
-      # ВАЖНО: Передаем адрес фронтенда для настройки CORS
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
-    # Применяем миграции при старте. Seed пока отключен, чтобы не ломать старт из-за отсутствия ts-node.
-    # Если нужны тестовые данные, их можно будет добавить позже через отдельный скрипт.
-    command: >
-      sh -c "npx prisma migrate deploy && node dist/main"
+    command: ["node", "dist/src/main.js"]
 
   frontend:
     build:
