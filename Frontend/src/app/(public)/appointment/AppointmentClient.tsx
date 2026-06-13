@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from "react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { LazyMotion, domAnimation, m, useReducedMotion } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { appointmentService } from "@/services/appointment/appointment.service";
@@ -12,7 +13,14 @@ import { IService } from "@/types/services.types";
 import { IMaster } from "@/types/masters.type";
 import { IServicePrice } from "@/types/service-price.types";
 import { IMasterSchedule } from "@/types/schedule.types";
+import { IPublicAppointmentPageData } from "@/types/public-data.types";
 import { AppointmentStatus } from "@/types/appointment.types";
+
+interface ISelectedAppointment {
+  masterId: number;
+  day: string;
+  time: string;
+}
 
 const BeautyCalendar = dynamic(
   () => import("@/app/components/ui/Beautycalendar"),
@@ -31,14 +39,11 @@ const NotificationWindow = dynamic(
 const LimitExceededWindow = dynamic(
   () => import("@/app/components/ui/public/appointment/LimitExceededWindow"),
 );
-const LegalDocumentModal = dynamic(
-  () => import("@/app/components/ui/public/appointment/LegalDocumentModal"),
-);
 import ConsentCheckbox from "@/app/components/ui/public/appointment/ConsentCheckbox";
 import ServiceCard from "../services/serviceCard";
 import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber";
 import { errorCatch } from "@/api/error";
-import { privacyPolicySections, publicOfferSections } from "./legalDocuments";
+import { useLegalDocument } from "@/contexts/LegalDocumentContext";
 
 import {
   Loader2,
@@ -53,6 +58,8 @@ import {
 
 const PERSON_NAME_REGEX = /^[A-Za-zА-Яа-яЁё]+(?:[ '-][A-Za-zА-Яа-яЁё]+)*$/u;
 const sanitizePersonName = (value: string) => value.replace(/[^A-Za-zА-Яа-яЁё\s'-]/gu, "");
+
+interface ISelectedAppointment { masterId: number; day: string; time: string; }
 
 function FadeSection({
   children,
@@ -132,31 +139,32 @@ function StepIntro({
   );
 }
 
-function AppointmentContent() {
+interface AppointmentContentProps {
+  initialData: IPublicAppointmentPageData;
+}
+function AppointmentContent({ initialData }: AppointmentContentProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const preselectedServiceId = searchParams.get("serviceId");
   const reduceMotion = useReducedMotion();
 
-  // ВАЖНО: Всегда начинаем с пустых данных и loading = true
-  const [categories, setCategories] = useState<ICategory[]>([]);
-  const [services, setServices] = useState<IService[]>([]);
-  const [masters, setMasters] = useState<IMaster[]>([]);
-  const [prices, setPrices] = useState<IServicePrice[]>([]);
-  const [schedules, setSchedules] = useState<IMasterSchedule[]>([]);
+  const [categories, setCategories] = useState<ICategory[]>(initialData.categories);
+  const [services, setServices] = useState<IService[]>(initialData.services);
+  const [masters, setMasters] = useState<IMaster[]>(initialData.masters);
+  const [prices, setPrices] = useState<IServicePrice[]>(initialData.prices);
+  const [schedules, setSchedules] = useState<IMasterSchedule[]>(initialData.schedules);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [limitExceeded, setLimitExceeded] = useState(false);
   const [consentAccepted, setConsentAccepted] = useState(false);
-  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
-  const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+  const { openPrivacyPolicy, openPublicOffer } = useLegalDocument();
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
   const [selectedMasterId, setSelectedMasterId] = useState<number | null>(null);
-  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<ISelectedAppointment | null>(null);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -171,41 +179,21 @@ function AppointmentContent() {
     consent: "",
   });
 
-  // Загрузка данных ПОСЛЕ гидратации
   useEffect(() => {
+    setLoading(false);
     let cancelled = false;
-
-    // Сначала проверяем кэш
-    const initialData = publicDataService.getCachedAppointmentPageData();
-    if (initialData && !cancelled) {
-      setCategories(initialData.categories);
-      setServices(initialData.services);
-      setMasters(initialData.masters);
-      setPrices(initialData.prices);
-      setSchedules(initialData.schedules);
-      setLoading(false);
-    }
-
-    // Затем всегда делаем запрос для актуальности
     publicDataService
       .getAppointmentPageData()
       .then((data) => {
-        if (cancelled) return;
-
-        setCategories(data.categories);
-        setServices(data.services);
-        setMasters(data.masters);
-        setPrices(data.prices);
-        setSchedules(data.schedules);
-        setLoading(false);
-      })
-      .catch(console.error)
-      .finally(() => {
         if (!cancelled) {
-          setLoading(false);
+          setCategories(data.categories);
+          setServices(data.services);
+          setMasters(data.masters);
+          setPrices(data.prices);
+          setSchedules(data.schedules);
         }
-      });
-
+      })
+      .catch(console.error);
     return () => {
       cancelled = true;
     };
@@ -580,10 +568,12 @@ function AppointmentContent() {
                         onClick={() => setSelectedMasterId(master.id)}
                         className="public-panel flex items-center gap-4 rounded-[28px] p-5 text-left hover:border-[color:var(--public-border-strong)]"
                       >
-                        <img
+                        <Image
                           src={master.photo || "/avatar-placeholder.png"}
-                          className="h-20 w-20 rounded-full object-cover"
                           alt=""
+                          width={80}
+                          height={80}
+                          className="h-20 w-20 rounded-full object-cover"
                         />
                         <div>
                           <p
@@ -735,21 +725,21 @@ function AppointmentContent() {
                         caption="Перед отправкой формы можно открыть и прочитать политику конфиденциальности и публичную оферту."
                       />
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        <button
-                          type="button"
-                          onClick={() => setIsPrivacyModalOpen(true)}
-                          className="min-w-0 rounded-2xl border border-[color:var(--public-border)] px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--public-text-soft)] transition hover:text-[color:var(--public-text)]"
-                        >
-                          Политика конфиденциальности
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsOfferModalOpen(true)}
-                          className="min-w-0 rounded-2xl border border-[color:var(--public-border)] px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--public-text-soft)] transition hover:text-[color:var(--public-text)]"
-                        >
-                          Публичная оферта
-                        </button>
-                      </div>
+<button
+type="button"
+onClick={openPrivacyPolicy}
+className="min-w-0 rounded-2xl border border-[color:var(--public-border)] px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--public-text-soft)] transition hover:text-[color:var(--public-text)]"
+>
+          Политика конфиденциальности
+        </button>
+        <button
+          type="button"
+          onClick={openPublicOffer}
+          className="min-w-0 rounded-2xl border border-[color:var(--public-border)] px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--public-text-soft)] transition hover:text-[color:var(--public-text)]"
+        >
+          Публичная оферта
+        </button>
+      </div>
                       {formErrors.consent && (
                         <p className="mt-3 text-xs text-red-500">
                           {formErrors.consent}
@@ -799,28 +789,13 @@ function AppointmentContent() {
         <LimitExceededWindow onClose={() => setLimitExceeded(false)} />
       )}
 
-      <LegalDocumentModal
-        isOpen={isPrivacyModalOpen}
-        onClose={() => setIsPrivacyModalOpen(false)}
-        title="Политика конфиденциальности"
-        subtitle="Документ описывает, какие персональные данные собираются при онлайн-записи, зачем они нужны и как пользователь может управлять своими правами."
-        effectiveDate="14 мая 2026"
-        sections={privacyPolicySections}
-      />
-
-      <LegalDocumentModal
-        isOpen={isOfferModalOpen}
-        onClose={() => setIsOfferModalOpen(false)}
-        title="Публичная оферта"
-        subtitle="Документ фиксирует условия онлайн-записи, общие правила оказания услуг и базовые обязанности исполнителя и клиента."
-        effectiveDate="14 мая 2026"
-        sections={publicOfferSections}
-      />
-    </div>
+</div>
   );
 }
 
-export default function AppointmentClient() {
+export default function AppointmentClient(
+  props: { initialData: IPublicAppointmentPageData },
+) {
   return (
     <Suspense
       fallback={
@@ -830,7 +805,7 @@ export default function AppointmentClient() {
       }
     >
       <LazyMotion features={domAnimation}>
-        <AppointmentContent />
+        <AppointmentContent {...props} />
       </LazyMotion>
     </Suspense>
   );

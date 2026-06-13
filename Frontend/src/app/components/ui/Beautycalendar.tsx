@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   format,
   startOfMonth,
@@ -94,27 +94,39 @@ export default function BeautyCalendar({
   const today = startOfDay(new Date());
   const [viewMonth, setViewMonth] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [bookedAppointments, setBookedAppointments] = useState<IAppointment[]>([]);
-  const [isLoadingBooked, setIsLoadingBooked] = useState(false);
+const [bookedAppointments, setBookedAppointments] = useState<IAppointment[]>([]);
+const [isLoadingBooked, setIsLoadingBooked] = useState(false);
 
-  useEffect(() => {
-    const fetchBooked = async () => {
-      if (!selectedDate || !selectedMasterId) return;
+const bookedCacheRef = useRef<Map<string, { fetchedAt: number; data: IAppointment[] }>>(new Map());
+const BOOKED_CACHE_TTL = 2 * 60 * 1000;
 
-      setIsLoadingBooked(true);
-      try {
-        const dateStr = format(selectedDate, "yyyy-MM-dd");
-        const data = await appointmentService.getByDate(dateStr, selectedMasterId);
-        setBookedAppointments(data);
-      } catch (error) {
-        console.error("Ошибка загрузки занятых слотов:", error);
-      } finally {
-        setIsLoadingBooked(false);
-      }
-    };
+useEffect(() => {
+	bookedCacheRef.current.clear();
+}, [selectedMasterId]);
 
-    void fetchBooked();
-  }, [selectedDate, selectedMasterId]);
+useEffect(() => {
+	const fetchBooked = async () => {
+		if (!selectedDate || !selectedMasterId) return;
+		const dateStr = format(selectedDate, "yyyy-MM-dd");
+		const cacheKey = `${selectedMasterId}:${dateStr}`;
+		const cached = bookedCacheRef.current.get(cacheKey);
+		if (cached && Date.now() - cached.fetchedAt < BOOKED_CACHE_TTL) {
+			setBookedAppointments(cached.data);
+			return;
+		}
+		setIsLoadingBooked(true);
+		try {
+			const data = await appointmentService.getByDate(dateStr, selectedMasterId);
+			bookedCacheRef.current.set(cacheKey, { fetchedAt: Date.now(), data });
+			setBookedAppointments(data);
+		} catch (error) {
+			console.error("Ошибка загрузки занятых слотов:", error);
+		} finally {
+			setIsLoadingBooked(false);
+		}
+	};
+	void fetchBooked();
+}, [selectedDate, selectedMasterId]);
 
   const days = useMemo(
     () =>

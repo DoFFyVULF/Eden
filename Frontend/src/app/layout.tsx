@@ -1,15 +1,26 @@
 import type { Metadata, Viewport } from "next";
 import { cormorant, inter } from "./fonts";
 import "../styles/globals.css";
+import SwRegister from "@/components/SwRegister";
+import { LegalDocumentProvider } from "@/contexts/LegalDocumentContext";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.FRONTEND_ORIGIN || "http://localhost:3000";
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.FRONTEND_ORIGIN ||
+  "http://localhost:3000";
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#faf6f0" },
-    { media: "(prefers-color-scheme: dark)", color: "#1a1a1a" },
+    {
+      media: "(prefers-color-scheme: light)",
+      color: "#faf6f0",
+    },
+    {
+      media: "(prefers-color-scheme: dark)",
+      color: "#1a1a1a",
+    },
   ],
 };
 
@@ -20,7 +31,7 @@ export const metadata: Metadata = {
     template: "%s | Эден",
   },
   description:
-    "«Эден» — салон красоты в Перми. Уютное пространство без пафоса: стрижки, окрашивание, маникюр, педикюр, уходовые процедуры. Онлайн-запись, мастера с опытом.",
+    "Салон красоты Эден в Перми. Услуги, цены, мастера. Аккуратная работа и заметный результат.",
   applicationName: "Эден",
   keywords: [
     "салон красоты Пермь",
@@ -85,10 +96,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru">
+      <link rel="manifest" href="/manifest.webmanifest" />
       <body
         className={`${inter.className} ${cormorant.variable} ${inter.variable} public-body bg-[rgba(177,141,97,0.14)] antialiased flex flex-col min-h-screen`}
       >
-        <main>{children}</main>
+        <SwRegister />
+        <LegalDocumentProvider>
+          <main>{children}</main>
+        </LegalDocumentProvider>
       </body>
     </html>
   );

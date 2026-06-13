@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { LazyMotion, domAnimation, m, useReducedMotion } from "framer-motion";
 import { publicDataService } from "@/services/public/public-data.service";
 import { IService } from "@/types/services.types";
+import { IPublicServicesPageData } from "@/types/public-data.types";
 import ServiceCard from "./serviceCard";
 import CategoryFilter from "./CategoryFilter";
 import { Loader2 } from "lucide-react";
@@ -17,45 +18,30 @@ function ServicesPageFallback() {
   );
 }
 
-function ServicesPageContent() {
+function ServicesPageContent({ initialData }: { initialData: IPublicServicesPageData }) {
   const searchParams = useSearchParams();
   const preselectedServiceId = searchParams.get("serviceId");
   const reduceMotion = useReducedMotion();
-  
-  // ВАЖНО: Всегда начинаем с loading = true для идентичной гидратации
-  const [services, setServices] = useState<IService[]>([]);
-  const [activeMastersCount, setActiveMastersCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+
+  // Use initial data from server, no loading state needed
+  const [services, setServices] = useState<IService[]>(initialData.services);
+  const [activeMastersCount, setActiveMastersCount] = useState(initialData.activeMastersCount);
+  const [loading, setLoading] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
 
-  // Загрузка данных ПОСЛЕ гидратации
+  // Background refresh to keep data fresh (stale-while-revalidate)
   useEffect(() => {
     let cancelled = false;
 
-    // Сначала проверяем кэш
-    const initialData = publicDataService.getCachedServicesPageData();
-    if (initialData && !cancelled) {
-      setServices(initialData.services);
-      setActiveMastersCount(initialData.activeMastersCount);
-      setLoading(false);
-    }
-
-    // Затем всегда делаем запрос для актуальности
     publicDataService
       .getServicesPageData()
       .then((data) => {
         if (cancelled) return;
         setServices(data.services);
         setActiveMastersCount(data.activeMastersCount);
-        setLoading(false);
       })
-      .catch(console.error)
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
+      .catch(console.error);
 
     return () => {
       cancelled = true;
@@ -210,11 +196,11 @@ function ServicesPageContent() {
   );
 }
 
-export default function ServicesClient() {
+export default function ServicesClient(props: { initialData: IPublicServicesPageData }) {
   return (
     <Suspense fallback={<ServicesPageFallback />}>
       <LazyMotion features={domAnimation}>
-        <ServicesPageContent />
+        <ServicesPageContent {...props} />
       </LazyMotion>
     </Suspense>
   );

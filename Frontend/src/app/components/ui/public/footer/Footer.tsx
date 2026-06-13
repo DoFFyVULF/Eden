@@ -2,18 +2,13 @@
 
 import Link from "next/link";
 import { routes } from "@/app/providers/routes";
-import LegalDocumentModal from "@/app/components/ui/public/appointment/LegalDocumentModal";
-import {
-  privacyPolicySections,
-  publicOfferSections,
-} from "@/app/(public)/appointment/legalDocuments";
 import { ArrowUp, Instagram, Phone, Send } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useLegalDocument } from "@/contexts/LegalDocumentContext";
 
 export default function Footer() {
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
-  const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+const [showScrollTop, setShowScrollTop] = useState(false);
+const { openPrivacyPolicy, openPublicOffer } = useLegalDocument();
 
   useEffect(() => {
     const handleScroll = () => setShowScrollTop(window.scrollY > 500);
@@ -99,20 +94,20 @@ export default function Footer() {
         <div className="mt-14 flex flex-col gap-4 border-t border-[color:var(--public-border)] pt-6 text-xs text-[color:var(--public-text-faint)] md:flex-row md:items-center md:justify-between">
           <p>© {new Date().getFullYear()} Салон красоты «Эдэн».</p>
           <div className="flex gap-6">
-            <button
-              type="button"
-              onClick={() => setIsPrivacyModalOpen(true)}
-              className="hover:text-[color:var(--public-text-soft)]"
-            >
-              Политика конфиденциальности
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsOfferModalOpen(true)}
-              className="hover:text-[color:var(--public-text-soft)]"
-            >
-              Публичная оферта
-            </button>
+<button
+type="button"
+onClick={openPrivacyPolicy}
+className="hover:text-[color:var(--public-text-soft)]"
+>
+Политика конфиденциальности
+</button>
+<button
+type="button"
+onClick={openPublicOffer}
+className="hover:text-[color:var(--public-text-soft)]"
+>
+Публичная оферта
+</button>
           </div>
         </div>
       </div>
@@ -126,24 +121,6 @@ export default function Footer() {
       >
         <ArrowUp className="h-4 w-4" />
       </button>
-
-      <LegalDocumentModal
-        isOpen={isPrivacyModalOpen}
-        onClose={() => setIsPrivacyModalOpen(false)}
-        title="Политика конфиденциальности"
-        subtitle="Документ описывает, какие персональные данные собираются при онлайн-записи, зачем они нужны и как пользователь может управлять своими правами."
-        effectiveDate="14 мая 2026"
-        sections={privacyPolicySections}
-      />
-
-      <LegalDocumentModal
-        isOpen={isOfferModalOpen}
-        onClose={() => setIsOfferModalOpen(false)}
-        title="Публичная оферта"
-        subtitle="Документ фиксирует условия онлайн-записи, общие правила оказания услуг и базовые обязанности исполнителя и клиента."
-        effectiveDate="14 мая 2026"
-        sections={publicOfferSections}
-      />
-    </footer>
+</footer>
   );
 }

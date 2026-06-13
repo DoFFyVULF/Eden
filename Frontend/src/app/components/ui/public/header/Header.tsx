@@ -84,15 +84,27 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up");
   const [hidden, setHidden] = useState(false);
-  const [scrollableHeight, setScrollableHeight] = useState(0);
-  const [isMounted, setIsMounted] = useState(false);
+const [scrollableHeight, setScrollableHeight] = useState(0);
+const [isMounted, setIsMounted] = useState(false);
+const [isMobile, setIsMobile] = useState(() => {
+if (typeof window !== "undefined") return window.innerWidth < 768;
+return false;
+});
 
-  const menuRef = useRef<HTMLDivElement>(null);
+const menuRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+useEffect(() => {
+setIsMounted(true);
+}, []);
+
+useEffect(() => {
+const mql = window.matchMedia("(max-width: 767px)");
+const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+setIsMobile(mql.matches);
+mql.addEventListener("change", handler);
+return () => mql.removeEventListener("change", handler);
+}, []);
 
   const { scrollY } = useScroll();
 
@@ -105,22 +117,23 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
     ["0 0 0 0 rgba(99,75,52,0)", "0 18px 40px -28px rgba(99,75,52,0.18)"],
   );
 
-  useMotionValueEvent(scrollY, "change", (latest) => {
-    const direction = latest > lastScrollY.current ? "down" : "up";
+useMotionValueEvent(scrollY, "change", (latest) => {
+if (isMobile) return;
+const direction = latest > lastScrollY.current ? "down" : "up";
 
-    if (direction !== scrollDirection) {
-      setScrollDirection(direction);
-    }
+if (direction !== scrollDirection) {
+setScrollDirection(direction);
+}
 
-    if (hideOnScroll && direction === "down" && latest > 200) {
-      setHidden(true);
-    } else {
-      setHidden(false);
-    }
+if (hideOnScroll && direction === "down" && latest > 200) {
+setHidden(true);
+} else {
+setHidden(false);
+}
 
-    setScrolled(latest > 12);
-    lastScrollY.current = latest;
-  });
+setScrolled(latest > 12);
+lastScrollY.current = latest;
+});
 
   useEffect(() => {
     const calculateScrollableHeight = () => {
@@ -183,30 +196,29 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
           ease: [0.22, 1, 0.36, 1],
         }}
       >
-        <m.div
-          className="mx-auto flex max-w-7xl items-center justify-between rounded-full border px-5 py-3 md:px-7"
-          style={{
-            backgroundColor: useTransform(
-              headerBgOpacity,
-              (v) => `rgba(252, 248, 242, ${v})`,
-            ),
-            backdropFilter: useTransform(headerBlur, (v) => `blur(${v}px)`),
-            WebkitBackdropFilter: useTransform(
-              headerBlur,
-              (v) => `blur(${v}px)`,
-            ),
-            borderColor: useTransform(
-              headerBorderOpacity,
-              (v) => `rgba(171, 145, 117, ${v})`,
-            ),
-            boxShadow: headerShadow,
-          }}
-          animate={{
-            y: scrolled ? 0 : 2,
-            scale: scrolled ? 0.995 : 1,
-          }}
-          transition={{ duration: 0.24, ease: "easeOut" }}
-        >
+<m.div
+className="mx-auto flex max-w-7xl items-center justify-between rounded-full border px-5 py-3 md:px-7"
+style={{
+backgroundColor: isMobile
+? "rgba(252,248,242,0.88)"
+: useTransform(headerBgOpacity, (v) => `rgba(252, 248, 242, ${v})`),
+backdropFilter: isMobile ? "blur(16px)" : useTransform(headerBlur, (v) => `blur(${v}px)`),
+WebkitBackdropFilter: isMobile
+? "blur(16px)"
+: useTransform(headerBlur, (v) => `blur(${v}px)`),
+borderColor: isMobile
+? "rgba(171, 145, 117, 0.2)"
+: useTransform(headerBorderOpacity, (v) => `rgba(171, 145, 117, ${v})`),
+boxShadow: isMobile
+? "0 4px 20px -4px rgba(99,75,52,0.12)"
+: headerShadow,
+}}
+animate={{
+y: isMobile ? 0 : scrolled ? 0 : 2,
+scale: isMobile ? 1 : scrolled ? 0.995 : 1,
+transition: { duration: 0.24, ease: "easeOut" },
+}}
+>
           {/* Десктопная навигация */}
           <nav className="relative hidden items-center gap-7 md:flex">
             {NAV_LINKS.slice(0, 2).map((link, i) => {

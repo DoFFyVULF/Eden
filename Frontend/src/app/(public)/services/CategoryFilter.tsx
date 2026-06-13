@@ -1,6 +1,12 @@
 "use client";
 
-export default function CategoryFilter({ categories, selectedId, onSelect }: any) {
+interface CategoryFilterProps {
+  categories: { id: number; title: string }[];
+  selectedId: number | null;
+  onSelect: (id: number | null) => void;
+}
+
+export default function CategoryFilter({ categories, selectedId, onSelect }: CategoryFilterProps) {
   const all = [{ id: null, title: "Все услуги" }, ...categories];
 
   return (
