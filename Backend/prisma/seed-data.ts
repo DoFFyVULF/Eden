@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -204,21 +205,33 @@ async function seedData() {
   console.log(`✅ Created ${elenaPrices.length + mariyaPrices.length + annaPrices.length} service prices`);
 
   // --- Master Schedules ---
-  const createSchedule = (masterId: number, dayOfWeek: number, startH: number, endH: number) =>
-    prisma.masterSchedule.create({
-      data: {
-        masterID: masterId,
-        dayOfWeek,
-        startTime: new Date(`1970-01-01T${String(startH).padStart(2, '0')}:00:00`),
-        endTime: new Date(`1970-01-01T${String(endH).padStart(2, '0')}:00:00`),
-      },
-    });
-
-  for (let day = 1; day <= 6; day++) {
-    await createSchedule(masterElena.id, day, 9, 18);
-    await createSchedule(masterMariya.id, day, 10, 19);
-    await createSchedule(masterAnna.id, day, 9, 18);
+  // ✅ ИСПРАВЛЕНИЕ: Добавляем правильную типизацию для массива
+  const scheduleData: { masterID: number; dayOfWeek: number; startTime: Date; endTime: Date }[] = [];
+  
+  const baseDate = new Date('1970-01-01');
+  
+  for (const master of allMasters) {
+    for (let day = 1; day <= 6; day++) {
+      let startH = 9;
+      let endH = 18;
+      
+      if (master.id === masterMariya.id) {
+        startH = 10;
+        endH = 19;
+      }
+      
+      scheduleData.push({
+        masterID: master.id,
+        dayOfWeek: day,
+        startTime: new Date(baseDate.getTime() + day * 86400000 + startH * 3600000),
+        endTime: new Date(baseDate.getTime() + day * 86400000 + endH * 3600000),
+      });
+    }
   }
+
+  await prisma.masterSchedule.createMany({
+    data: scheduleData,
+  });
 
   console.log('✅ Created master schedules (Mon-Sat for each master)');
 

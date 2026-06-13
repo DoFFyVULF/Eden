@@ -149,7 +149,7 @@ export async function seedData(prisma: PrismaService) {
 
   const baseDate = new Date('2026-06-15T00:00:00');
 
-  const scheduleData = [];
+  const scheduleData: { masterID: number; dayOfWeek: number; startTime: Date; endTime: Date }[] = [];
   for (const master of masters) {
     for (let day = 1; day <= 5; day++) {
       scheduleData.push({
