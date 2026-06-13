@@ -47,6 +47,7 @@ services:
       - backend
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      INTERNAL_API_URL: http://backend:4200/api
     ports:
       - "${FRONTEND_PORT}:3000"
 

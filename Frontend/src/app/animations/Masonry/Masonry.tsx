@@ -206,7 +206,7 @@ const Masonry: React.FC<MasonryProps> = ({
     if (!imagesReady || !width) return;
 
     grid.forEach((item, index) => {
-      const selector = `[data-key="${item.id}"]`;
+      const selector = `[data-key="${item.id}-${index}"]`;
       const animProps = { x: item.x, y: item.y, width: item.w, height: item.h };
 
       if (!hasMounted.current) {
@@ -243,9 +243,9 @@ const Masonry: React.FC<MasonryProps> = ({
     hasMounted.current = true;
   }, [grid, imagesReady, stagger, animateFrom, blurToFocus, duration, ease, width]);
 
-  const handleMouseEnter = (id: string, element: HTMLElement) => {
+  const handleMouseEnter = (id: string, index: number, element: HTMLElement) => {
     if (scaleOnHover) {
-      gsap.to(`[data-key="${id}"]`, { scale: hoverScale, duration: 0.3, ease: "power2.out" });
+      gsap.to(`[data-key="${id}-${index}"]`, { scale: hoverScale, duration: 0.3, ease: "power2.out" });
     }
     if (colorShiftOnHover) {
       const overlay = element.querySelector(".color-overlay") as HTMLElement;
@@ -253,9 +253,9 @@ const Masonry: React.FC<MasonryProps> = ({
     }
   };
 
-  const handleMouseLeave = (id: string, element: HTMLElement) => {
+  const handleMouseLeave = (id: string, index: number, element: HTMLElement) => {
     if (scaleOnHover) {
-      gsap.to(`[data-key="${id}"]`, { scale: 1, duration: 0.3, ease: "power2.out" });
+      gsap.to(`[data-key="${id}-${index}"]`, { scale: 1, duration: 0.3, ease: "power2.out" });
     }
     if (colorShiftOnHover) {
       const overlay = element.querySelector(".color-overlay") as HTMLElement;
@@ -356,13 +356,13 @@ const Masonry: React.FC<MasonryProps> = ({
       >
         {grid.map((item, index) => (
           <div
-            key={item.id}
-            data-key={item.id}
+            key={`${item.id}-${index}`}
+            data-key={`${item.id}-${index}`}
             className="absolute box-content cursor-pointer group"
             style={{ willChange: "transform, width, height, opacity" }}
             onClick={() => openModal(item, index)}
-            onMouseEnter={(e) => handleMouseEnter(item.id, e.currentTarget)}
-            onMouseLeave={(e) => handleMouseLeave(item.id, e.currentTarget)}
+            onMouseEnter={(e) => handleMouseEnter(item.id, index, e.currentTarget)}
+            onMouseLeave={(e) => handleMouseLeave(item.id, index, e.currentTarget)}
           >
             <div className="relative w-full h-full rounded-[10px] shadow-[0px_10px_50px_-10px_rgba(0,0,0,0.2)] overflow-hidden">
               <Image
