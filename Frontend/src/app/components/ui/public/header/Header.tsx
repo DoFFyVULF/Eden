@@ -307,7 +307,7 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
                 whileTap={{ scale: 0.98 }}
                 transition={{ duration: 0.18 }}
               >
-                ЭДЕН
+                ЭДЭН
               </m.span>
               <m.span
                 className="absolute -bottom-1 left-1/2 h-px bg-[rgba(150,117,84,0.45)]"
@@ -422,7 +422,7 @@ export default function Header({ hideOnScroll = false }: HeaderProps) {
                     className="text-2xl tracking-[0.18em] text-[color:var(--public-text)]"
                     style={{ fontFamily: "var(--font-public-display), serif" }}
                   >
-                    ЭДЕН
+                    ЭДЭН
                   </p>
                   <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-[rgba(104,88,72,0.6)]">
                     Меню

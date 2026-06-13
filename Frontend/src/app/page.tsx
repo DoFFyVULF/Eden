@@ -69,7 +69,7 @@ export default function Home() {
               </h1>
 
               <p className="mt-7 max-w-2xl text-base leading-8 text-[color:var(--public-text-soft)] md:text-lg">
-                «Эден» помогает найти свой образ без спешки: понятные услуги,
+                «Эдэн» помогает найти свой образ без спешки: понятные услуги,
                 удобная запись и атмосфера, в которой приятно находиться.
               </p>
 
@@ -286,9 +286,9 @@ export default function Home() {
                     {
                       icon: Phone,
                       label: "Телефон",
-                      value: "+7 (342) 123-45-67",
+                      value: "+7 (342) 284-45-81",
                       sub: "Для вопросов и уточнений",
-                      href: "tel:+73421234567",
+                      href: "tel:+73422844581",
                     },
                   ].map(({ icon: Icon, label, value, sub, href }) => (
                     <div key={label} className="flex gap-4">

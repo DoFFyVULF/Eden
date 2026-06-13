@@ -444,10 +444,10 @@ export default function TopNavBar({ isAdmin }: { isAdmin: boolean }) {
           {/* Logo */}
           <Link
             href={ADMIN_ROUTES.DASHBOARD}
-            className="flex items-center gap-3 shrink-0 group"
+            className="flex items-center gap-3 pr-3 shrink-0 group"
           >
             <motion.div
-              whileHover={{ scale: 1.08, rotate: 8 }}
+              
               transition={{ type: "spring", stiffness: 400, damping: 12 }}
               className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-lg ${
                 isDark

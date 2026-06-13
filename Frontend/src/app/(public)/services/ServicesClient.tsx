@@ -21,42 +21,34 @@ function ServicesPageContent() {
   const searchParams = useSearchParams();
   const preselectedServiceId = searchParams.get("serviceId");
   const reduceMotion = useReducedMotion();
-  const initialData = publicDataService.getCachedServicesPageData();
-
-  const [services, setServices] = useState<IService[]>(initialData?.services ?? []);
-  const [activeMastersCount, setActiveMastersCount] = useState(
-    initialData?.activeMastersCount ?? 0,
-  );
-  const [loading, setLoading] = useState(!initialData);
+  
+  // ВАЖНО: Всегда начинаем с loading = true для идентичной гидратации
+  const [services, setServices] = useState<IService[]>([]);
+  const [activeMastersCount, setActiveMastersCount] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (preselectedServiceId && services.length > 0) {
-      const serviceIdNum = Number(preselectedServiceId);
-      const service = services.find((item) => item.id === serviceIdNum);
-
-      if (service) {
-        setSelectedServiceId(serviceIdNum);
-        setSelectedCategoryId(service.categoryId || service.category?.id || null);
-
-        setTimeout(() => {
-          window.scrollTo({ top: 360, behavior: "smooth" });
-        }, 100);
-      }
-    }
-  }, [preselectedServiceId, services]);
-
+  // Загрузка данных ПОСЛЕ гидратации
   useEffect(() => {
     let cancelled = false;
 
+    // Сначала проверяем кэш
+    const initialData = publicDataService.getCachedServicesPageData();
+    if (initialData && !cancelled) {
+      setServices(initialData.services);
+      setActiveMastersCount(initialData.activeMastersCount);
+      setLoading(false);
+    }
+
+    // Затем всегда делаем запрос для актуальности
     publicDataService
       .getServicesPageData()
       .then((data) => {
         if (cancelled) return;
-
         setServices(data.services);
         setActiveMastersCount(data.activeMastersCount);
+        setLoading(false);
       })
       .catch(console.error)
       .finally(() => {
@@ -69,6 +61,25 @@ function ServicesPageContent() {
       cancelled = true;
     };
   }, []);
+
+  // Обработка preselectedServiceId
+  useEffect(() => {
+    if (preselectedServiceId && services.length > 0) {
+      const serviceIdNum = Number(preselectedServiceId);
+      const service = services.find((item) => item.id === serviceIdNum);
+
+      if (service) {
+        setSelectedServiceId(serviceIdNum);
+        setSelectedCategoryId(
+          service.categoryId || service.category?.id || null,
+        );
+
+        setTimeout(() => {
+          window.scrollTo({ top: 360, behavior: "smooth" });
+        }, 100);
+      }
+    }
+  }, [preselectedServiceId, services]);
 
   const categories = useMemo(() => {
     const map = new Map<number, { id: number; title: string }>();
@@ -116,16 +127,25 @@ function ServicesPageContent() {
               Услуги, в которых важны и результат, и ощущение процесса
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-8 text-[color:var(--public-text-soft)]">
-              Спокойный luxury-подход: без визуального шума, с понятным каталогом,
-              живыми описаниями и удобным переходом в запись.
+              Всё просто и по делу: выбирайте то, что нужно именно вам, и
+              доверьтесь профессионалам.
             </p>
           </div>
 
           <div className="public-panel-strong rounded-[32px] p-6">
             <div className="grid gap-5 sm:grid-cols-3">
-                {[
+              {[
                 { value: services.length, label: "Услуг" },
-                { value: activeMastersCount, label: "Мастеров" },
+                {
+                  value: activeMastersCount,
+                  label:
+                    activeMastersCount === 1
+                      ? "Мастер"
+                      : [2, 3, 4].includes(activeMastersCount % 10) &&
+                          ![12, 13, 14].includes(activeMastersCount % 100)
+                        ? "Мастера"
+                        : "Мастеров",
+                },
                 { value: categories.length, label: "Направлений" },
               ].map((item) => (
                 <div key={item.label}>
@@ -154,7 +174,8 @@ function ServicesPageContent() {
 
         {selectedServiceId && (
           <div className="mt-6 rounded-[28px] border border-[color:var(--public-border)] bg-[rgba(255,252,247,0.68)] px-5 py-4 text-sm leading-7 text-[color:var(--public-text-soft)]">
-            Вы выбрали услугу из другой страницы, каталог уже сфокусирован на нужной категории.
+            Вы выбрали услугу из другой страницы, каталог уже сфокусирован на
+            нужной категории.
           </div>
         )}
 
@@ -165,24 +186,25 @@ function ServicesPageContent() {
           transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: "easeOut" }}
           className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
         >
-            {filteredServices.length > 0 ? (
-              filteredServices.map((service) => (
-                <ServiceCard key={service.id} service={service} />
-              ))
-            ) : (
-              <div className="public-panel col-span-full rounded-[30px] px-6 py-16 text-center">
-                <p
-                  className="text-3xl text-[color:var(--public-text)]"
-                  style={{ fontFamily: "var(--font-public-display), serif" }}
-                >
-                  В этой категории пока нет услуг
-                </p>
-                <p className="mt-3 text-sm text-[color:var(--public-text-soft)]">
-                  Выберите другое направление, чтобы посмотреть доступные предложения.
-                </p>
-              </div>
-            )}
-          </m.div>
+          {filteredServices.length > 0 ? (
+            filteredServices.map((service) => (
+              <ServiceCard key={service.id} service={service} />
+            ))
+          ) : (
+            <div className="public-panel col-span-full rounded-[30px] px-6 py-16 text-center">
+              <p
+                className="text-3xl text-[color:var(--public-text)]"
+                style={{ fontFamily: "var(--font-public-display), serif" }}
+              >
+                В этой категории пока нет услуг
+              </p>
+              <p className="mt-3 text-sm text-[color:var(--public-text-soft)]">
+                Выберите другое направление, чтобы посмотреть доступные
+                предложения.
+              </p>
+            </div>
+          )}
+        </m.div>
       </section>
     </div>
   );

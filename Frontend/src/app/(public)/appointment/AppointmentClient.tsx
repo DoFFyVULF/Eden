@@ -137,21 +137,15 @@ function AppointmentContent() {
   const router = useRouter();
   const preselectedServiceId = searchParams.get("serviceId");
   const reduceMotion = useReducedMotion();
-  const initialData = publicDataService.getCachedAppointmentPageData();
 
-  const [categories, setCategories] = useState<ICategory[]>(
-    initialData?.categories ?? [],
-  );
-  const [services, setServices] = useState<IService[]>(
-    initialData?.services ?? [],
-  );
-  const [masters, setMasters] = useState<IMaster[]>(initialData?.masters ?? []);
-  const [prices, setPrices] = useState<IServicePrice[]>(initialData?.prices ?? []);
-  const [schedules, setSchedules] = useState<IMasterSchedule[]>(
-    initialData?.schedules ?? [],
-  );
+  // ВАЖНО: Всегда начинаем с пустых данных и loading = true
+  const [categories, setCategories] = useState<ICategory[]>([]);
+  const [services, setServices] = useState<IService[]>([]);
+  const [masters, setMasters] = useState<IMaster[]>([]);
+  const [prices, setPrices] = useState<IServicePrice[]>([]);
+  const [schedules, setSchedules] = useState<IMasterSchedule[]>([]);
 
-  const [loading, setLoading] = useState(!initialData);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [limitExceeded, setLimitExceeded] = useState(false);
@@ -159,12 +153,8 @@ function AppointmentContent() {
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
   const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
 
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
-    null,
-  );
-  const [selectedServiceId, setSelectedServiceId] = useState<number | null>(
-    null,
-  );
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
   const [selectedMasterId, setSelectedMasterId] = useState<number | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
 
@@ -181,9 +171,22 @@ function AppointmentContent() {
     consent: "",
   });
 
+  // Загрузка данных ПОСЛЕ гидратации
   useEffect(() => {
     let cancelled = false;
 
+    // Сначала проверяем кэш
+    const initialData = publicDataService.getCachedAppointmentPageData();
+    if (initialData && !cancelled) {
+      setCategories(initialData.categories);
+      setServices(initialData.services);
+      setMasters(initialData.masters);
+      setPrices(initialData.prices);
+      setSchedules(initialData.schedules);
+      setLoading(false);
+    }
+
+    // Затем всегда делаем запрос для актуальности
     publicDataService
       .getAppointmentPageData()
       .then((data) => {
@@ -194,6 +197,7 @@ function AppointmentContent() {
         setMasters(data.masters);
         setPrices(data.prices);
         setSchedules(data.schedules);
+        setLoading(false);
       })
       .catch(console.error)
       .finally(() => {
@@ -453,8 +457,7 @@ function AppointmentContent() {
               Выберите услугу, мастера и удобное время без перегруза
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-8 text-[color:var(--public-text-soft)]">
-              Последовательный сценарий записи, где каждое решение понятно, а
-              календарь помогает выбрать слот без напряжения.
+            Шаг за шагом — от услуги до удобного времени. Всё просто и без суеты.
             </p>
           </div>
 
@@ -531,7 +534,7 @@ function AppointmentContent() {
                 <StepIntro
                   eyebrow="Шаг 2"
                   title="Выберите услугу"
-                  description="Карточки стали спокойнее и легче читаются, чтобы внимание шло на содержание, а не на фон."
+                  description=""
                 />
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                   {filteredServices.map((service) => (
@@ -560,7 +563,7 @@ function AppointmentContent() {
                 <StepIntro
                   eyebrow="Шаг 3"
                   title="Теперь выберите мастера"
-                  description="У каждого мастера показана специализация и актуальная стоимость именно для этой услуги."
+                  description=""
                 />
                 <div className="mx-auto grid max-w-4xl gap-4 md:grid-cols-2">
                   {availableMasters.map((master) => {
@@ -652,7 +655,7 @@ function AppointmentContent() {
                 <StepIntro
                   eyebrow="Последний шаг"
                   title="Оставьте данные для записи"
-                  description="Минимум полей, спокойная форма и понятное подтверждение после отправки."
+                  description="Заполните форму, и мы свяжемся с вами для подтверждения времени."
                 />
 
                 <form

@@ -31,7 +31,7 @@ export default function Footer() {
               className="text-5xl leading-none tracking-[0.14em] text-[color:var(--public-text)] md:text-7xl"
               style={{ fontFamily: "var(--font-public-display), serif" }}
             >
-              ЭДЕН
+              ЭДЭН
             </p>
             <p className="mt-5 max-w-md text-sm leading-7 text-[color:var(--public-text-soft)]">
               Пространство тихой роскоши, в котором красота ощущается как забота.
@@ -87,8 +87,8 @@ export default function Footer() {
                 <p>Вход со двора, этаж 1</p>
               </div>
               <div>
-                <a href="tel:+73421234567" className="text-lg text-[color:var(--public-text)] hover:text-[color:var(--public-accent-strong)]">
-                  +7 (342) 123-45-67
+                <a href="tel:+73422844581" className="text-lg text-[color:var(--public-text)] hover:text-[color:var(--public-accent-strong)]">
+                  +7 (342) 284-45-81
                 </a>
                 <p>Ежедневно с 9:00 до 20:00</p>
               </div>
@@ -97,7 +97,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-14 flex flex-col gap-4 border-t border-[color:var(--public-border)] pt-6 text-xs text-[color:var(--public-text-faint)] md:flex-row md:items-center md:justify-between">
-          <p>© {new Date().getFullYear()} Салон красоты «Эден».</p>
+          <p>© {new Date().getFullYear()} Салон красоты «Эдэн».</p>
           <div className="flex gap-6">
             <button
               type="button"
