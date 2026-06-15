@@ -320,7 +320,7 @@ export class AppointmentService {
     const dayEnd = new Date(requestedStart);
     dayEnd.setHours(23, 59, 59, 999);
 
-    const existingAppointments = await this.prisma.appointment.findMany({
+    const rawAppointments = await this.prisma.appointment.findMany({
       where: {
         masterID: masterId,
         appointmentTime: {
@@ -333,7 +333,10 @@ export class AppointmentService {
             }
           : {}),
         status: {
-          notIn: [AppointmentStatus.Отменен, AppointmentStatus.Завершен]
+          // Завершен is NOT excluded here because a completed appointment that
+          // is still "in progress" (end time > now) must block the slot.
+          // Instead, past Завершен appointments are filtered out below.
+          notIn: [AppointmentStatus.Отменен]
         }
       },
       include: {
@@ -343,6 +346,61 @@ export class AppointmentService {
           }
         }
       }
+    });
+
+    const now = new Date();
+    const completedAppointments = rawAppointments.filter(
+      (a) => a.status === AppointmentStatus.Завершен
+    );
+
+    let completedDurationMap: Map<string, number> | undefined;
+    if (completedAppointments.length > 0) {
+      const completedMasterIds = [
+        ...new Set(completedAppointments.map((a) => a.masterID))
+      ];
+      const completedServiceIds = [
+        ...new Set(completedAppointments.map((a) => a.serviceId))
+      ];
+
+      const servicePrices = await this.prisma.servicePrice.findMany({
+        where: {
+          masterID: { in: completedMasterIds },
+          serviceId: { in: completedServiceIds }
+        },
+        select: {
+          masterID: true,
+          serviceId: true,
+          durationOverride: true
+        }
+      });
+
+      completedDurationMap = new Map<string, number>();
+      servicePrices.forEach((sp) => {
+        if (sp.durationOverride != null) {
+          completedDurationMap.set(
+            `${sp.masterID}-${sp.serviceId}`,
+            Number(sp.durationOverride)
+          );
+        }
+      });
+    }
+
+    const existingAppointments = rawAppointments.filter((appointment) => {
+      if (appointment.status !== AppointmentStatus.Завершен) {
+        return true;
+      }
+      // Завершен appointments only block the slot if their end time is still
+      // in the future. A completed appointment from earlier today or a
+      // previous day whose time has already passed should not prevent
+      // new bookings in the same slot.
+      const duration =
+        completedDurationMap?.get(
+          `${appointment.masterID}-${appointment.serviceId}`
+        ) ?? appointment.service.duration;
+      const endTime = new Date(
+        appointment.appointmentTime.getTime() + duration * 60 * 1000
+      );
+      return endTime > now;
     });
 
     for (const appointment of existingAppointments) {
@@ -362,6 +420,14 @@ export class AppointmentService {
         );
       }
     }
+  }
+
+  private getAppointmentDurationMinutesSync(
+    masterId: number,
+    serviceId: number,
+    fallbackDuration: number
+  ) {
+    return fallbackDuration;
   }
 
   private async getAppointmentDurationMinutes(
