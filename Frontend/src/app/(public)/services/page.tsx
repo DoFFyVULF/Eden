@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import ServicesClient from "./ServicesClient";
-import { publicDataService } from "@/services/public/public-data.service";
-import { IPublicServicesPageData } from "@/types/public-data.types";
+import { staticServicesPageData } from "@/app/data/services/services.data";
 
-export const revalidate = 300; // 5 minutes ISR
-export const dynamic = "force-dynamic";
+// Полностью статическая страница — без запросов к БД/API
+export const dynamic = "force-static";
 
 export const metadata: Metadata = {
   title: "Услуги",
@@ -17,21 +16,6 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function ServicesPage() {
-  let initialData: IPublicServicesPageData | null = null;
-  try {
-    initialData = await publicDataService.getServicesPageData();
-  } catch (error) {
-    console.error("Failed to preload services page data", error);
-  }
-  if (!initialData) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-[color:var(--public-text-soft)]">
-          Не удалось загрузить данные. Обновите страницу.
-        </p>
-      </div>
-    );
-  }
-  return <ServicesClient initialData={initialData} />;
+export default function ServicesPage() {
+  return <ServicesClient initialData={staticServicesPageData} />;
 }

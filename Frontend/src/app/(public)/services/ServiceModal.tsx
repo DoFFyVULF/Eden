@@ -7,7 +7,7 @@ import { X, CalendarCheck } from "lucide-react";
 import { IService } from "@/types/services.types";
 import { routes } from "@/app/providers/routes";
 import { usePathname } from "next/navigation";
-import Image from "next/image";
+import SafeImage from "@/app/components/ui/SafeImage";
 
 interface ServiceModalProps {
   isOpen: boolean;
@@ -54,20 +54,15 @@ export default function ServiceModal({ isOpen, onClose, service, price }: Servic
               </button>
 
               <div className="grid md:grid-cols-[1.05fr_0.95fr]">
-                <div className="relative h-64 md:h-auto min-h-[320px] bg-[rgba(233,223,210,0.48)]">
-                  {service.img ? (
-                    <Image
-                    src={service.img}
+                <div className="relative h-64 md:h-auto min-h-[320px] overflow-hidden bg-[rgba(233,223,210,0.48)]">
+                  <SafeImage
+                    src={service.img || null}
                     alt={service.title}
+                    fallbackTitle={service.title}
                     fill
                     className="object-cover"
                     sizes="(max-width: 768px) 100vw, 50vw"
                   />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-7xl text-[color:var(--public-text-faint)] font-display">
-                      {service.title[0]}
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex flex-col gap-4 p-8 md:p-10">

@@ -2,8 +2,6 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { LazyMotion, domAnimation, m, useReducedMotion } from "framer-motion";
-import { publicDataService } from "@/services/public/public-data.service";
-import { IService } from "@/types/services.types";
 import { IPublicServicesPageData } from "@/types/public-data.types";
 import ServiceCard from "./serviceCard";
 import CategoryFilter from "./CategoryFilter";
@@ -23,32 +21,14 @@ function ServicesPageContent({ initialData }: { initialData: IPublicServicesPage
   const preselectedServiceId = searchParams.get("serviceId");
   const reduceMotion = useReducedMotion();
 
-  // Use initial data from server, no loading state needed
-  const [services, setServices] = useState<IService[]>(initialData.services);
-  const [activeMastersCount, setActiveMastersCount] = useState(initialData.activeMastersCount);
-  const [loading, setLoading] = useState(false);
+  // Статика — данные берутся напрямую из файла, без запросов к БД
+  const services = initialData.services;
+  const activeMastersCount = initialData.activeMastersCount;
+
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
 
-  // Background refresh to keep data fresh (stale-while-revalidate)
-  useEffect(() => {
-    let cancelled = false;
-
-    publicDataService
-      .getServicesPageData()
-      .then((data) => {
-        if (cancelled) return;
-        setServices(data.services);
-        setActiveMastersCount(data.activeMastersCount);
-      })
-      .catch(console.error);
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Обработка preselectedServiceId
+  // Обработка preselectedServiceId (?serviceId=xxx из других страниц)
   useEffect(() => {
     if (preselectedServiceId && services.length > 0) {
       const serviceIdNum = Number(preselectedServiceId);
@@ -88,10 +68,6 @@ function ServicesPageContent({ initialData }: { initialData: IPublicServicesPage
       return categoryId === selectedCategoryId;
     });
   }, [services, selectedCategoryId]);
-
-  if (loading) {
-    return <ServicesPageFallback />;
-  }
 
   return (
     <div className="overflow-x-hidden pb-24 pt-28 text-[color:var(--public-text)]">

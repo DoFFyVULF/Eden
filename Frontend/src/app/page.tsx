@@ -6,7 +6,7 @@ import Header from "./components/ui/public/header/Header";
 import Footer from "./components/ui/public/footer/Footer";
 import { MapPin, Clock3, Phone, MoveRight, Sparkles } from "lucide-react";
 import dynamic from "next/dynamic";
-import Image from "next/image";
+import SafeImage from "./components/ui/SafeImage";
 
 // 1. Ленивая загрузка тяжелой анимации Masonry.
 // ssr: false отключает рендеринг на сервере, что ускоряет отдачу HTML.
@@ -37,55 +37,52 @@ const YandexMap = dynamic(
 const items = [
   {
     id: "1",
-    img: "https://avatars.mds.yandex.net/i?id=8df62e0baa290f4b6022c865dbaff971_l-6824648-images-thumbs&n=13",
+    img: "/images/home/gallery-01.webp",
     width: 300,
     height: 600,
   },
-    {
+  {
     id: "2",
-    img: "https://funny.klev.club/smeh/uploads/posts/2024-04/funny-klev-club-lbqc-p-smeshnie-kartinki-strizhki-muzhskie-s-chel-27.jpg", // Убедитесь, что файл лежит в папке public
+    img: "/images/home/gallery-02.jpg",
     width: 300,
     height: 300,
   },
-    {
+  {
     id: "3",
-    img: " https://static.insales-cdn.com/r/Gm93jOpNwAU/rs:fit:1408:0:1/q:100/plain/images/articles/1/2405/6490469/21-classy-inverted-blonde-bob-over-50.webp@webp", 
+    img: "/images/home/gallery-03.webp",
     width: 300,
     height: 500,
   },
-    {
+  {
     id: "4",
-    img: "https://i.pinimg.com/474x/78/6f/35/786f35597c75823e492fc13a823c5fb4.jpg?nii=t", 
+    img: "/images/home/gallery-04.jpg",
     width: 200,
     height: 200,
   },
-    {
+  {
     id: "5",
-    img: "https://i.pinimg.com/originals/b3/1c/57/b31c57d02d1d083925ee40fd7d6f0b32.jpg?nii=t", 
+    img: "/images/home/gallery-05.jpg",
     width: 300,
     height: 200,
   },
-    {
+  {
     id: "6",
-    img: "https://i.pinimg.com/736x/a3/5b/78/a35b7814b2666d3e23ecd068f9c56059.jpg", 
+    img: "/images/home/gallery-06.jpg",
     width: 200,
     height: 200,
   },
-    {
+  {
     id: "7",
-    img: "https://avatars.mds.yandex.net/i?id=a3f2c197ec59c6e773875c0a98ced7b1_l-5873744-images-thumbs&n=13", 
+    img: "/images/home/gallery-07.webp",
     width: 200,
     height: 200,
   },
-      {
+  {
     id: "8",
-    img: "  https://i.pinimg.com/originals/b3/68/09/b36809b78c16ade3faa9deb9befeed2b.jpg?nii=t", 
+    img: "/images/home/gallery-08.jpg",
     width: 200,
     height: 200,
   },
- 
-
-
 ];
 
 export default function Home() {
@@ -215,13 +212,14 @@ export default function Home() {
 
                  <div className="public-panel overflow-hidden rounded-[38px] p-3">
               <div className="relative h-[520px] overflow-hidden rounded-[30px] bg-gray-100">
-                {/* Изображение интерьера */}
-                <Image 
-                  src="https://avatars.mds.yandex.net/get-altay/5483320/2a0000017cb36e1fe89d330d19537b568ca8/XXXL" 
-                  alt="Интерьер" 
-                  fill 
-                  className="object-cover" 
-                  priority 
+                 {/* Изображение интерьера — локальный файл */}
+                <SafeImage
+                  src="/images/home/interior.jpg"
+                  alt="Интерьер"
+                  fallbackTitle="Интерьер салона"
+                  fill
+                  className="object-cover"
+                  priority
                 />
                 
                 {/* Затемняющий слой с теплым оттенком для гармонии с фоном */}

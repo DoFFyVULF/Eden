@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import { gsap } from "gsap";
 import Image from "next/image";
-import { X, Maximize2, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Maximize2, ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 
 const useMedia = (
   queries: string[],
@@ -125,6 +125,8 @@ const Masonry: React.FC<MasonryProps> = ({
   const [selectedImage, setSelectedImage] = useState<Item | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [modalImgError, setModalImgError] = useState(false);
   
   const modalRef = useRef<HTMLDivElement>(null);
   const modalContentRef = useRef<HTMLDivElement>(null);
@@ -266,6 +268,7 @@ const Masonry: React.FC<MasonryProps> = ({
   const openModal = (item: Item, index: number) => {
     setSelectedImage(item);
     setCurrentIndex(index);
+    setModalImgError(false);
     setIsModalOpen(true);
     if (typeof document !== "undefined") document.body.style.overflow = "hidden";
     
@@ -319,6 +322,7 @@ const Masonry: React.FC<MasonryProps> = ({
     }
     
     const newImage = items[newIndex];
+    setModalImgError(false);
     
     if (modalImageRef.current) {
       gsap.to(modalImageRef.current, {
@@ -364,14 +368,27 @@ const Masonry: React.FC<MasonryProps> = ({
             onMouseEnter={(e) => handleMouseEnter(item.id, index, e.currentTarget)}
             onMouseLeave={(e) => handleMouseLeave(item.id, index, e.currentTarget)}
           >
-            <div className="relative w-full h-full rounded-[10px] shadow-[0px_10px_50px_-10px_rgba(0,0,0,0.2)] overflow-hidden">
-              <Image
-                src={item.img}
-                alt={item.title || "Gallery image"}
-                fill
-                sizes="(max-width: 600px) 50vw, (max-width: 1000px) 33vw, (max-width: 1500px) 25vw, 20vw"
-                className="object-cover"
-              />
+            <div className="relative w-full h-full rounded-[10px] shadow-[0px_10px_50px_-10px_rgba(0,0,0,0.2)] overflow-hidden bg-[rgba(232,223,212,0.52)]">
+              {failedImages.has(item.id) ? (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[linear-gradient(145deg,rgba(255,253,249,0.92),rgba(238,227,214,0.9))] p-3 text-center">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-[color:var(--public-border)] bg-white/85">
+                    <ImageOff className="h-4 w-4 text-[color:var(--public-text-faint)]" />
+                  </div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text-faint)]">
+                    Фото недоступно
+                  </p>
+                </div>
+              ) : (
+                <Image
+                  src={item.img}
+                  alt={item.title || "Gallery image"}
+                  fill
+                  sizes="(max-width: 600px) 50vw, (max-width: 1000px) 33vw, (max-width: 1500px) 25vw, 20vw"
+                  className="object-cover"
+                  onError={() => setFailedImages((prev) => new Set(prev).add(item.id))}
+                  unoptimized={false}
+                />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <div className="absolute bottom-4 left-4 right-4">
                   {item.title && (
@@ -432,12 +449,27 @@ const Masonry: React.FC<MasonryProps> = ({
             style={{ transform: "scale(0.85)" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div ref={modalImageRef} className="relative">
-              <img
-                src={selectedImage.img}
-                alt={selectedImage.title || "Gallery image"}
-                className="w-full h-full object-contain max-h-[85vh]"
-              />
+            <div ref={modalImageRef} className="relative min-h-[240px] bg-[rgba(232,223,212,0.52)]">
+              {modalImgError || failedImages.has(selectedImage.id) ? (
+                <div className="flex h-[40vh] w-full flex-col items-center justify-center gap-3 bg-[linear-gradient(145deg,rgba(255,253,249,0.92),rgba(238,227,214,0.9))] p-6 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[color:var(--public-border)] bg-white/85">
+                    <ImageOff className="h-6 w-6 text-[color:var(--public-text-faint)]" />
+                  </div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--public-text-faint)]">
+                    Фото недоступно
+                  </p>
+                  <p className="max-w-sm text-sm leading-6 text-[color:var(--public-text-soft)]">
+                    Не удалось загрузить изображение. Попробуйте позже.
+                  </p>
+                </div>
+              ) : (
+                <img
+                  src={selectedImage.img}
+                  alt={selectedImage.title || "Gallery image"}
+                  className="w-full h-full object-contain max-h-[85vh]"
+                  onError={() => setModalImgError(true)}
+                />
+              )}
             </div>
             
             {(selectedImage.title || selectedImage.description) && (

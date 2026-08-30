@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   format,
   startOfMonth,
@@ -13,12 +13,9 @@ import {
   isToday,
   isSameDay,
   startOfDay,
-  parseISO,
 } from "date-fns";
 import { ru } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Loader2, CalendarDays, Clock3 } from "lucide-react";
-import { appointmentService } from "@/services/appointment/appointment.service";
-import { IAppointment } from "@/types/appointment.types";
+import { ChevronLeft, ChevronRight, CalendarDays, Clock3 } from "lucide-react";
 
 interface DaySchedule {
   workingHours: { start: string; end: string };
@@ -94,39 +91,6 @@ export default function BeautyCalendar({
   const today = startOfDay(new Date());
   const [viewMonth, setViewMonth] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-const [bookedAppointments, setBookedAppointments] = useState<IAppointment[]>([]);
-const [isLoadingBooked, setIsLoadingBooked] = useState(false);
-
-const bookedCacheRef = useRef<Map<string, { fetchedAt: number; data: IAppointment[] }>>(new Map());
-const BOOKED_CACHE_TTL = 2 * 60 * 1000;
-
-useEffect(() => {
-	bookedCacheRef.current.clear();
-}, [selectedMasterId]);
-
-useEffect(() => {
-	const fetchBooked = async () => {
-		if (!selectedDate || !selectedMasterId) return;
-		const dateStr = format(selectedDate, "yyyy-MM-dd");
-		const cacheKey = `${selectedMasterId}:${dateStr}`;
-		const cached = bookedCacheRef.current.get(cacheKey);
-		if (cached && Date.now() - cached.fetchedAt < BOOKED_CACHE_TTL) {
-			setBookedAppointments(cached.data);
-			return;
-		}
-		setIsLoadingBooked(true);
-		try {
-			const data = await appointmentService.getByDate(dateStr, selectedMasterId);
-			bookedCacheRef.current.set(cacheKey, { fetchedAt: Date.now(), data });
-			setBookedAppointments(data);
-		} catch (error) {
-			console.error("Ошибка загрузки занятых слотов:", error);
-		} finally {
-			setIsLoadingBooked(false);
-		}
-	};
-	void fetchBooked();
-}, [selectedDate, selectedMasterId]);
 
   const days = useMemo(
     () =>
@@ -162,15 +126,16 @@ useEffect(() => {
       slotInterval,
     );
 
-    const bookedTimes = bookedAppointments
-      .filter((appointment) => appointment.status !== "Отменен")
-      .map((appointment) => {
-        const date =
-          typeof appointment.appointmentTime === "string"
-            ? parseISO(appointment.appointmentTime)
-            : new Date(appointment.appointmentTime);
-        return format(date, "HH:mm");
-      });
+    // Статика — занятые слоты читаем из localStorage (без БД)
+    let bookedTimes: string[] = [];
+    if (typeof window !== "undefined") {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const key = `eden-booked:${selectedMasterId}:${dateStr}`;
+      try {
+        const raw = window.localStorage.getItem(key);
+        if (raw) bookedTimes = JSON.parse(raw);
+      } catch {}
+    }
 
     const now = new Date();
     const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
@@ -186,7 +151,7 @@ useEffect(() => {
 
       return true;
     });
-  }, [selectedDate, getSchedule, slotInterval, bookedAppointments]);
+  }, [selectedDate, getSchedule, slotInterval, selectedMasterId]);
 
   const selectedDateStr = selectedDate ? format(selectedDate, "yyyy-MM-dd") : "";
   const selectedSchedule = selectedDate ? getSchedule(selectedDate) : null;
@@ -205,7 +170,7 @@ useEffect(() => {
             Выберите удобный день
           </h3>
           <p className="mt-2 text-sm leading-7 text-[color:var(--public-text-soft)]">
-            Доступные даты и время показаны только для выбранного мастера.
+            Доступные даты и время показаны только для выбранного мастера. Работает без сервера — данные в браузере.
           </p>
         </div>
 
@@ -412,14 +377,7 @@ useEffect(() => {
             )}
           </div>
 
-          {isLoadingBooked ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-12">
-              <Loader2 className="h-5 w-5 animate-spin text-[color:var(--public-accent-strong)]" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--public-text-faint)]">
-                Проверяем доступное время
-              </p>
-            </div>
-          ) : timeSlots.length > 0 ? (
+          {timeSlots.length > 0 ? (
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {timeSlots.map((time) => {
                 const isActive =

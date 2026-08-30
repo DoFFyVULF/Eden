@@ -2,19 +2,11 @@
 
 import { useState, useEffect, useMemo, Suspense } from "react";
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import { LazyMotion, domAnimation, m, useReducedMotion } from "framer-motion";
+import SafeImage, { PhotoUnavailable } from "@/app/components/ui/SafeImage";
 import { useSearchParams, useRouter } from "next/navigation";
-import { appointmentService } from "@/services/appointment/appointment.service";
-import { publicDataService } from "@/services/public/public-data.service";
 
-import { ICategory } from "@/types/category.types";
-import { IService } from "@/types/services.types";
-import { IMaster } from "@/types/masters.type";
-import { IServicePrice } from "@/types/service-price.types";
-import { IMasterSchedule } from "@/types/schedule.types";
 import { IPublicAppointmentPageData } from "@/types/public-data.types";
-import { AppointmentStatus } from "@/types/appointment.types";
 
 interface ISelectedAppointment {
   masterId: number;
@@ -42,7 +34,6 @@ const LimitExceededWindow = dynamic(
 import ConsentCheckbox from "@/app/components/ui/public/appointment/ConsentCheckbox";
 import ServiceCard from "../services/serviceCard";
 import { formatPhoneNumber } from "@/app/lib/formatPhoneNumber";
-import { errorCatch } from "@/api/error";
 import { useLegalDocument } from "@/contexts/LegalDocumentContext";
 
 import {
@@ -58,8 +49,6 @@ import {
 
 const PERSON_NAME_REGEX = /^[A-Za-zА-Яа-яЁё]+(?:[ '-][A-Za-zА-Яа-яЁё]+)*$/u;
 const sanitizePersonName = (value: string) => value.replace(/[^A-Za-zА-Яа-яЁё\s'-]/gu, "");
-
-interface ISelectedAppointment { masterId: number; day: string; time: string; }
 
 function FadeSection({
   children,
@@ -146,15 +135,14 @@ function AppointmentContent({ initialData }: AppointmentContentProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const preselectedServiceId = searchParams.get("serviceId");
-  const reduceMotion = useReducedMotion();
 
-  const [categories, setCategories] = useState<ICategory[]>(initialData.categories);
-  const [services, setServices] = useState<IService[]>(initialData.services);
-  const [masters, setMasters] = useState<IMaster[]>(initialData.masters);
-  const [prices, setPrices] = useState<IServicePrice[]>(initialData.prices);
-  const [schedules, setSchedules] = useState<IMasterSchedule[]>(initialData.schedules);
+  // Статика — без запросов к БД, данные напрямую из файла
+  const categories = initialData.categories;
+  const services = initialData.services;
+  const masters = initialData.masters;
+  const prices = initialData.prices;
+  const schedules = initialData.schedules;
 
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [limitExceeded, setLimitExceeded] = useState(false);
@@ -178,26 +166,6 @@ function AppointmentContent({ initialData }: AppointmentContentProps) {
     phone: "",
     consent: "",
   });
-
-  useEffect(() => {
-    setLoading(false);
-    let cancelled = false;
-    publicDataService
-      .getAppointmentPageData()
-      .then((data) => {
-        if (!cancelled) {
-          setCategories(data.categories);
-          setServices(data.services);
-          setMasters(data.masters);
-          setPrices(data.prices);
-          setSchedules(data.schedules);
-        }
-      })
-      .catch(console.error);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (preselectedServiceId && services.length > 0) {
@@ -382,6 +350,7 @@ function AppointmentContent({ initialData }: AppointmentContentProps) {
 
     setSubmitting(true);
 
+    // Статический режим — без бэка, сохраняем в localStorage
     try {
       const appointmentDate = new Date(
         `${selectedAppointment.day}T${selectedAppointment.time}:00`,
@@ -396,33 +365,44 @@ function AppointmentContent({ initialData }: AppointmentContentProps) {
         clientPhone: formData.phone.replace(/\D/g, ""),
         price: Number(currentPrice),
         comment: formData.comment?.trim() || undefined,
-        status: AppointmentStatus.Новый,
+        createdAt: new Date().toISOString(),
       };
 
-      await appointmentService.createPublic(dto);
-      setSuccess(true);
-    } catch (error: any) {
-      if (
-        error?.response?.status === 429 &&
-        error?.response?.data?.code === "PUBLIC_APPOINTMENT_LIMIT_EXCEEDED"
-      ) {
+      // Лимит 3 записи в сутки с одного устройства (эмуляция бэка)
+      const STORAGE_KEY = "eden-static-appointments";
+      const LIMIT_KEY = "eden-static-appointments-date";
+      const today = new Date().toISOString().slice(0, 10);
+      const lastDate = typeof window !== "undefined" ? window.localStorage.getItem(LIMIT_KEY) : null;
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
+      const list: any[] = raw ? JSON.parse(raw) : [];
+      const todayCount = lastDate === today ? list.filter((a) => a.createdAt.slice(0,10) === today).length : 0;
+      if (todayCount >= 3) {
         setLimitExceeded(true);
         return;
       }
 
-      alert(`Ошибка: ${errorCatch(error) || "Проверьте введенные данные"}`);
+      // Имитация задержки сети
+      await new Promise((r) => setTimeout(r, 600));
+
+      const nextList = [...list, dto];
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextList));
+        window.localStorage.setItem(LIMIT_KEY, today);
+        // также сохраняем занятый слот для календаря
+        const bookedKey = `eden-booked:${selectedMasterId}:${selectedAppointment.day}`;
+        const bookedRaw = window.localStorage.getItem(bookedKey);
+        const booked: string[] = bookedRaw ? JSON.parse(bookedRaw) : [];
+        booked.push(selectedAppointment.time);
+        window.localStorage.setItem(bookedKey, JSON.stringify(booked));
+      }
+
+      setSuccess(true);
+    } catch (error: any) {
+      alert("Ошибка: Проверьте введенные данные");
     } finally {
       setSubmitting(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-7 w-7 animate-spin text-[color:var(--public-accent-strong)]" />
-      </div>
-    );
-  }
 
   return (
     <div className="overflow-x-hidden px-4 pb-24 pt-28">
@@ -568,13 +548,21 @@ function AppointmentContent({ initialData }: AppointmentContentProps) {
                         onClick={() => setSelectedMasterId(master.id)}
                         className="public-panel flex items-center gap-4 rounded-[28px] p-5 text-left hover:border-[color:var(--public-border-strong)]"
                       >
-                        <Image
-                          src={master.photo || "/avatar-placeholder.png"}
-                          alt=""
-                          width={80}
-                          height={80}
-                          className="h-20 w-20 rounded-full object-cover"
-                        />
+                        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full border border-[color:var(--public-border)] bg-[rgba(232,223,212,0.52)]">
+                          {master.photo ? (
+                            <SafeImage
+                              src={master.photo}
+                              alt={`${master.surname} ${master.name}`}
+                              fallbackTitle={`${master.surname} ${master.name}`}
+                              fallbackCompact
+                              width={80}
+                              height={80}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <PhotoUnavailable compact />
+                          )}
+                        </div>
                         <div>
                           <p
                             className="text-3xl leading-none text-[color:var(--public-text)]"

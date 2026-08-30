@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { m, useReducedMotion } from "framer-motion";
 import { Clock3, MoveUpRight } from "lucide-react";
 import { IService } from "@/types/services.types";
-import Image from "next/image";
+import SafeImage from "@/app/components/ui/SafeImage";
 
 const ServiceModal = dynamic(() => import("./ServiceModal"));
 
@@ -51,19 +51,14 @@ className="group block h-full cursor-pointer outline-none"
 >
 <article className="public-panel h-full overflow-hidden rounded-[30px] bg-white border border-[color:var(--public-border)] hover:shadow-lg transition-shadow duration-300">
   <div className="relative h-56 overflow-hidden bg-[rgba(232,223,212,0.52)]">
-    {service.img ? (
-      <Image
-        src={service.img}
-        alt={service.title}
-        fill
-        sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
-        className="object-cover transition-transform duration-700 group-hover:scale-105"
-      />
-    ) : (
-      <div className="flex h-full w-full items-center justify-center text-6xl text-[color:var(--public-text-faint)] font-display">
-        {service.title[0]}
-      </div>
-    )}
+    <SafeImage
+      src={service.img || null}
+      alt={service.title}
+      fallbackTitle={service.title}
+      fill
+      sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
+      className="object-cover transition-transform duration-700 group-hover:scale-105"
+    />
     <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[rgba(94,71,53,0.22)]" />
 
     {service.category && (

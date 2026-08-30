@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import AppointmentClient from "./AppointmentClient";
-import { publicDataService } from "@/services/public/public-data.service";
-import { IPublicAppointmentPageData } from "@/types/public-data.types";
+import { staticAppointmentPageData } from "@/app/data/appointment/staticAppointmentData";
 
-export const revalidate = 300;
-export const dynamic = "force-dynamic";
+// Полностью статическая страница — без запросов к БД/API
+export const dynamic = "force-static";
 
-export async function generateMetadata() {
+export async function generateMetadata(): Promise<Metadata> {
   return {
     title: "Онлайн-запись",
     description:
@@ -19,21 +18,6 @@ export async function generateMetadata() {
   };
 }
 
-export default async function AppointmentPage() {
-  let initialData: IPublicAppointmentPageData | null = null;
-  try {
-    initialData = await publicDataService.getAppointmentPageData();
-  } catch (error) {
-    console.error("Failed to preload appointment page data", error);
-  }
-  if (!initialData) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-[color:var(--public-text-soft)]">
-          Не удалось загрузить данные. Обновите страницу.
-        </p>
-      </div>
-    );
-  }
-  return <AppointmentClient initialData={initialData} />;
+export default function AppointmentPage() {
+  return <AppointmentClient initialData={staticAppointmentPageData} />;
 }
